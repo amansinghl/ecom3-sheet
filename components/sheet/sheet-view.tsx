@@ -11,6 +11,9 @@ import { HeroSection } from './hero-section';
 import { useSheetStore } from '@/lib/store/sheet-store';
 import { useKeyboardShortcuts } from '@/hooks/use-keyboard-shortcuts';
 import { loadColumnVisibility, saveColumnVisibility } from '@/lib/utils/storage';
+import { useSheetData } from '@/hooks/use-sheet-data';
+import { toast } from 'sonner';
+import { sheetApiService } from '@/lib/api/sheets';
 
 interface SheetViewProps {
   config: SheetConfig;
@@ -215,7 +218,7 @@ function generateMockData(config: SheetConfig, count: number = 100): RowData[] {
 
 export function SheetView({ config, userRole }: SheetViewProps) {
   const [data, setData] = useState<RowData[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [localError, setLocalError] = useState<string | null>(null);
   const { 
     viewState, 
     selectedRows, 
@@ -229,6 +232,19 @@ export function SheetView({ config, userRole }: SheetViewProps) {
   const [showCommandPalette, setShowCommandPalette] = useState(false);
   const toolbarRef = useRef<ToolbarRef>(null);
 
+  // Fetch sheet data from API based on sheet ID
+  const { 
+    data: apiData, 
+    isLoading, 
+    isError, 
+    error 
+  } = useSheetData(
+    config.id === 'escalations' ? 'escalation' : config.id,
+    {
+      enabled: config.id !== 'portfolio', // Don't fetch for portfolio sheet
+    }
+  );
+
   // View management
   const defaultView = config.views?.find((v) => v.isDefault) || config.views?.[0];
   const [activeViewId, setActiveViewId] = useState<string | undefined>(defaultView?.id);
@@ -241,21 +257,29 @@ export function SheetView({ config, userRole }: SheetViewProps) {
     loadColumnWidthsForSheet(config.id);
   }, [config.id, setActiveSheetId, loadViewStateForSheet, loadColumnWidthsForSheet]);
 
-  // Simulate data loading
+  // Update data when API data changes
   useEffect(() => {
-    setIsLoading(true);
-    const timer = setTimeout(() => {
-      // Only generate mock data for non-portfolio sheets
-      if (config.id !== 'portfolio') {
-        setData(generateMockData(config, 100)); // Generate 100 rows for testing
-      } else {
-        setData([]); // Start with empty data for portfolio
-      }
-      setIsLoading(false);
-    }, 800); // Simulate loading time
+    if (apiData) {
+      setData(apiData);
+      setLocalError(null);
+    }
+  }, [apiData]);
 
-    return () => clearTimeout(timer);
-  }, [config]);
+  // Handle API errors
+  useEffect(() => {
+    if (isError && error) {
+      const errorMessage = error.message || 'Failed to load sheet data';
+      setLocalError(errorMessage);
+      toast.error(errorMessage);
+      
+      // Fallback to mock data if portfolio sheet, otherwise show error
+      if (config.id === 'portfolio') {
+        setData([]);
+      } else {
+        console.error('Sheet data error:', error);
+      }
+    }
+  }, [isError, error, config.id]);
 
   // Apply filters and add empty rows
   const filteredData = useMemo(() => {
@@ -288,7 +312,10 @@ export function SheetView({ config, userRole }: SheetViewProps) {
     return [...result, ...emptyRows];
   }, [data, viewState.columnFilters, config.columns]);
 
-  const handleCellUpdate = (rowId: string, columnId: string, value: any) => {
+  const handleCellUpdate = async (rowId: string, columnId: string, value: any) => {
+    // Check if this is the shipment_no column for escalation sheet
+    const isShipmentNoUpdate = columnId === 'shipment_no' && config.id === 'escalations' && value;
+
     // Check if this is an empty row being edited
     if (rowId.startsWith('empty-')) {
       // Convert empty row to real row
@@ -305,6 +332,35 @@ export function SheetView({ config, userRole }: SheetViewProps) {
       });
 
       setData((prev) => [...prev, newRow]);
+
+      // If shipment number was entered in empty row, fetch details from backend
+      if (isShipmentNoUpdate) {
+        try {
+          toast.loading('Fetching escalation details...', { id: 'fetch-escalation' });
+          const response = await sheetApiService.updateEscalationSheet(String(value));
+          
+          if (response.data?.escalation) {
+            // Update the newly created row with data from backend
+            setData((prev) =>
+              prev.map((row) => {
+                if (row.id === newRow.id) {
+                  return {
+                    ...row,
+                    ...response.data.escalation,
+                    id: row.id, // Keep the generated ID
+                    updatedAt: new Date(),
+                  };
+                }
+                return row;
+              })
+            );
+            toast.success('Escalation details loaded successfully', { id: 'fetch-escalation' });
+          }
+        } catch (error: any) {
+          console.error('Failed to fetch escalation details:', error);
+          toast.error(error.message || 'Failed to fetch escalation details', { id: 'fetch-escalation' });
+        }
+      }
     } else {
       // Update existing row
       setData((prev) =>
@@ -319,6 +375,35 @@ export function SheetView({ config, userRole }: SheetViewProps) {
           return row;
         })
       );
+
+      // If shipment number was updated, fetch details from backend
+      if (isShipmentNoUpdate) {
+        try {
+          toast.loading('Fetching escalation details...', { id: 'fetch-escalation' });
+          const response = await sheetApiService.updateEscalationSheet(String(value));
+          
+          if (response.data?.escalation) {
+            // Update the row with data from backend
+            setData((prev) =>
+              prev.map((row) => {
+                if (row.id === rowId) {
+                  return {
+                    ...row,
+                    ...response.data.escalation,
+                    id: rowId, // Keep the existing ID
+                    updatedAt: new Date(),
+                  };
+                }
+                return row;
+              })
+            );
+            toast.success('Escalation details loaded successfully', { id: 'fetch-escalation' });
+          }
+        } catch (error: any) {
+          console.error('Failed to fetch escalation details:', error);
+          toast.error(error.message || 'Failed to fetch escalation details', { id: 'fetch-escalation' });
+        }
+      }
     }
   };
 
