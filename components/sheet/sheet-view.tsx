@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo, useEffect, useRef } from 'react';
-import { SheetConfig, RowData, UserRole } from '@/types';
+import { SheetConfig, RowData, UserRole, ColumnFilter } from '@/types';
 import { DataGrid } from './data-grid';
 import { Toolbar, ToolbarRef } from './toolbar';
 import { CommandPalette } from './command-palette';
@@ -225,12 +225,14 @@ export function SheetView({ config, userRole }: SheetViewProps) {
     clearSelection, 
     setEditingCell, 
     clearAllFilters,
+    setColumnFilter,
     loadViewStateForSheet,
     loadColumnWidthsForSheet,
     setActiveSheetId
   } = useSheetStore();
   const [showCommandPalette, setShowCommandPalette] = useState(false);
   const toolbarRef = useRef<ToolbarRef>(null);
+  const hasAppliedDefaultFilters = useRef(false);
 
   // Fetch sheet data from API based on sheet ID
   const { 
@@ -255,7 +257,35 @@ export function SheetView({ config, userRole }: SheetViewProps) {
     setActiveSheetId(config.id);
     loadViewStateForSheet(config.id);
     loadColumnWidthsForSheet(config.id);
+    // Reset the flag when sheet changes
+    hasAppliedDefaultFilters.current = false;
   }, [config.id, setActiveSheetId, loadViewStateForSheet, loadColumnWidthsForSheet]);
+
+  // Apply default view filters if no filters are already set (after state loads)
+  useEffect(() => {
+    // Only apply default filters once on initial mount
+    if (hasAppliedDefaultFilters.current) return;
+    
+    const defaultView = config.views?.find((v) => v.isDefault) || config.views?.[0];
+    if (defaultView?.filters && Object.keys(viewState.columnFilters).length === 0) {
+      hasAppliedDefaultFilters.current = true;
+      const columnFilters: Record<string, ColumnFilter> = {};
+      defaultView.filters.forEach((filter) => {
+        columnFilters[filter.columnId] = {
+          type: 'condition',
+          condition: {
+            operator: filter.operator,
+            value: filter.value,
+          },
+        };
+      });
+      
+      // Apply the filters
+      Object.entries(columnFilters).forEach(([columnId, filter]) => {
+        setColumnFilter(columnId, filter);
+      });
+    }
+  }, [config.views, viewState.columnFilters, setColumnFilter]);
 
   // Update data when API data changes
   useEffect(() => {
@@ -523,8 +553,30 @@ export function SheetView({ config, userRole }: SheetViewProps) {
 
   const handleViewChange = (viewId: string) => {
     setActiveViewId(viewId);
-    // Clear user filters when switching views to avoid confusion
-    clearAllFilters();
+    
+    // Apply view filters when switching views
+    const selectedView = config.views?.find((v) => v.id === viewId);
+    if (selectedView?.filters) {
+      // Convert view filters to column filters format
+      const columnFilters: Record<string, ColumnFilter> = {};
+      selectedView.filters.forEach((filter) => {
+        columnFilters[filter.columnId] = {
+          type: 'condition',
+          condition: {
+            operator: filter.operator,
+            value: filter.value,
+          },
+        };
+      });
+      
+      // Apply the filters
+      Object.entries(columnFilters).forEach(([columnId, filter]) => {
+        setColumnFilter(columnId, filter);
+      });
+    } else {
+      // Clear filters if view has no filters
+      clearAllFilters();
+    }
   };
 
   // Keyboard shortcuts

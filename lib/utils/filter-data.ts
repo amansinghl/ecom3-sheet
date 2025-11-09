@@ -34,18 +34,24 @@ export function applyFilters(
           return operator === 'isEmpty';
         }
 
+        // Check if both value and filterValue are numbers (even if column type is not defined)
+        const isValueNumeric = typeof value === 'number' || !isNaN(Number(value));
+        const isFilterValueNumeric = typeof filterValue === 'number' || !isNaN(Number(filterValue));
+        const isNumericComparison = isValueNumeric && isFilterValueNumeric && (column?.type === 'number' || typeof value === 'number' || typeof filterValue === 'number');
+
         const stringValue = String(value).toLowerCase();
-        const filterValueString = String(filterValue || '').toLowerCase();
+        // Use nullish coalescing to handle 0 correctly (0 || '' would be '')
+        const filterValueString = String(filterValue ?? '').toLowerCase();
 
         switch (operator) {
           case 'equals':
-            if (column?.type === 'number') {
+            if (isNumericComparison) {
               return Number(value) === Number(filterValue);
             }
             return stringValue === filterValueString;
 
           case 'notEquals':
-            if (column?.type === 'number') {
+            if (isNumericComparison) {
               return Number(value) !== Number(filterValue);
             }
             return stringValue !== filterValueString;

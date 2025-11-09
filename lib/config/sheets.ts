@@ -35,7 +35,7 @@ export const escalationSheetConfig: SheetConfig = {
         {
           columnId: 'is_closed',
           operator: 'equals',
-          value: false,
+          value: 0, // 0 means open/not closed
         },
       ],
       isDefault: true,
@@ -48,7 +48,7 @@ export const escalationSheetConfig: SheetConfig = {
         {
           columnId: 'is_closed',
           operator: 'equals',
-          value: true,
+          value: 1, // 1 means closed
         },
       ],
       isDefault: false,
