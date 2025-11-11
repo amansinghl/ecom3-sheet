@@ -3,7 +3,7 @@
  * Base URL is determined by environment variable NEXT_PUBLIC_API_URL
  */
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '';
 
 export interface ApiError {
   message: string;

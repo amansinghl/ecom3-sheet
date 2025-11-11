@@ -322,7 +322,7 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
       ref={tableContainerRef}
       className="relative h-full w-full overflow-auto rounded-md border border-border bg-background"
     >
-      <table className="border-collapse" style={{ width: table.getCenterTotalSize() }}>
+      <table className="border-collapse" style={{ width: table.getCenterTotalSize(), tableLayout: 'fixed' }}>
         <thead className="sticky top-0 z-10 bg-muted/50 backdrop-blur">
           {table.getHeaderGroups().map((headerGroup) => (
             <tr key={headerGroup.id} className="border-b border-border">
@@ -330,10 +330,10 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
                 <th
                   key={header.id}
                   className={cn(
-                    'relative border-r border-border px-3 text-left text-xs font-medium',
+                    'relative border-r border-border px-3 text-left text-xs font-medium overflow-hidden',
                     rowHeightClasses[rowHeight]
                   )}
-                  style={{ width: `${header.getSize()}px` }}
+                  style={{ width: `${header.getSize()}px`, maxWidth: `${header.getSize()}px` }}
                 >
                   {header.isPlaceholder
                     ? null
@@ -409,8 +409,8 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
                     {row.getVisibleCells().map((cell) => (
                       <td
                         key={cell.id}
-                        className={cn('border-r border-border p-0', rowHeightClasses[rowHeight])}
-                        style={{ width: `${cell.column.getSize()}px` }}
+                        className={cn('border-r border-border p-0 overflow-hidden', rowHeightClasses[rowHeight])}
+                        style={{ width: `${cell.column.getSize()}px`, maxWidth: `${cell.column.getSize()}px` }}
                       >
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
                       </td>

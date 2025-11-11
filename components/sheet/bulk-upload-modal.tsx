@@ -189,17 +189,9 @@ export function BulkUploadModal({ isOpen, onClose, onUpload }: BulkUploadModalPr
         <DialogFooter>
           <Button
             type="button"
-            variant="outline"
-            onClick={handleClose}
-            disabled={isUploading}
-          >
-            <X className="h-4 w-4 mr-2" />
-            Cancel
-          </Button>
-          <Button
-            type="button"
             onClick={handleUpload}
             disabled={!file || isUploading}
+            className="w-full"
           >
             <Upload className="h-4 w-4 mr-2" />
             {isUploading ? 'Uploading...' : 'Upload & Process'}

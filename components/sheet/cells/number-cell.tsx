@@ -2,12 +2,14 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { RowHeight } from '@/lib/store/sheet-store';
+import { ColumnConfig } from '@/types';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { getCellTextSize, getCellPadding } from './cell-utils';
 
 interface NumberCellProps {
   value: any;
+  columnConfig: ColumnConfig;
   isEditing: boolean;
   canEdit: boolean;
   rowHeight: RowHeight;
@@ -18,6 +20,7 @@ interface NumberCellProps {
 
 export function NumberCell({
   value,
+  columnConfig,
   isEditing,
   canEdit,
   rowHeight,
@@ -66,6 +69,14 @@ export function NumberCell({
     );
   }
 
+  // Check if this is an ID column (ends with _id or _no)
+  const isIdColumn = columnConfig.id.endsWith('_id') || columnConfig.id.endsWith('_no');
+  
+  // Format number: use toLocaleString() for regular numbers, plain toString() for IDs
+  const formattedValue = value !== null && value !== undefined
+    ? (isIdColumn ? value.toString() : value.toLocaleString())
+    : '';
+
   return (
     <div
       className={cn(
@@ -76,7 +87,7 @@ export function NumberCell({
       )}
       onClick={canEdit ? onEdit : undefined}
     >
-      {value !== null && value !== undefined ? value.toLocaleString() : ''}
+      {formattedValue}
     </div>
   );
 }
