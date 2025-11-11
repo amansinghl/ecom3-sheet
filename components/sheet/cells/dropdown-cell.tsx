@@ -25,9 +25,21 @@ export function DropdownCell({
   rowHeight,
   onEdit,
   onSave,
+  onCancel,
 }: DropdownCellProps) {
   const [editValue, setEditValue] = useState(value || '');
+  const [open, setOpen] = useState(false);
   const options = columnConfig.options || [];
+
+  // Reset edit value when editing starts
+  useEffect(() => {
+    if (isEditing) {
+      setEditValue(value || '');
+      setOpen(true);
+    } else {
+      setOpen(false);
+    }
+  }, [isEditing, value]);
 
   const getLabel = (val: string) => {
     const option = options.find((opt) => opt.value === val);
@@ -38,12 +50,20 @@ export function DropdownCell({
     return (
       <div className="p-1">
         <Select
+          open={open}
+          onOpenChange={(isOpen) => {
+            setOpen(isOpen);
+            if (!isOpen) {
+              // Close without selection - cancel edit
+              onCancel();
+            }
+          }}
           value={editValue}
           onValueChange={(val) => {
             setEditValue(val);
+            setOpen(false);
             onSave(val);
           }}
-          defaultOpen
         >
           <SelectTrigger className="h-8 w-full">
             <SelectValue placeholder="Select..." />

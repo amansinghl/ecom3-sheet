@@ -8,12 +8,14 @@ import { CommandPalette } from './command-palette';
 import { TableSkeleton } from './table-skeleton';
 import { ViewsSidebar } from './views-sidebar';
 import { HeroSection } from './hero-section';
+import { BulkUploadModal } from './bulk-upload-modal';
 import { useSheetStore } from '@/lib/store/sheet-store';
 import { useKeyboardShortcuts } from '@/hooks/use-keyboard-shortcuts';
 import { loadColumnVisibility, saveColumnVisibility } from '@/lib/utils/storage';
 import { useSheetData } from '@/hooks/use-sheet-data';
 import { toast } from 'sonner';
 import { sheetApiService } from '@/lib/api/sheets';
+import * as XLSX from 'xlsx';
 
 interface SheetViewProps {
   config: SheetConfig;
@@ -231,6 +233,7 @@ export function SheetView({ config, userRole }: SheetViewProps) {
     setActiveSheetId
   } = useSheetStore();
   const [showCommandPalette, setShowCommandPalette] = useState(false);
+  const [showBulkUploadModal, setShowBulkUploadModal] = useState(false);
   const toolbarRef = useRef<ToolbarRef>(null);
   const hasAppliedDefaultFilters = useRef(false);
 
@@ -239,7 +242,8 @@ export function SheetView({ config, userRole }: SheetViewProps) {
     data: apiData, 
     isLoading, 
     isError, 
-    error 
+    error,
+    refetch
   } = useSheetData(
     config.id === 'escalations' ? 'escalation' : config.id,
     {
@@ -336,6 +340,12 @@ export function SheetView({ config, userRole }: SheetViewProps) {
         emptyRow[col.id] = null;
       });
 
+      // Set is_closed to 0 (open) by default for escalation sheet empty rows
+      // This ensures empty rows are visible in the "Open Escalations" view
+      if (config.id === 'escalations') {
+        emptyRow.is_closed = 0;
+      }
+
       return emptyRow;
     });
 
@@ -346,8 +356,26 @@ export function SheetView({ config, userRole }: SheetViewProps) {
     // Check if this is the shipment_no column for escalation sheet
     const isShipmentNoUpdate = columnId === 'shipment_no' && config.id === 'escalations' && value;
 
+    // Convert rowId to string to handle cases where it might be a number from API
+    const rowIdString = String(rowId);
+
+    // Fields that should trigger the update-entries API call
+    const updatableFields = [
+      'notes',
+      'manual_case',
+      'followup_remarks',
+      'source_of_complaint',
+      'manual_ticket_status',
+      'email_subject',
+      'lr_number',
+      'closure_datetime', // Also handle closure_datetime
+    ];
+
+    // Check if this is an updatable field for escalation sheet
+    const isUpdatableField = config.id === 'escalations' && updatableFields.includes(columnId);
+
     // Check if this is an empty row being edited
-    if (rowId.startsWith('empty-')) {
+    if (rowIdString.startsWith('empty-')) {
       // Convert empty row to real row
       const newRow: any = {
         id: `row-${Date.now()}`,
@@ -373,7 +401,7 @@ export function SheetView({ config, userRole }: SheetViewProps) {
             // Update the newly created row with data from backend
             setData((prev) =>
               prev.map((row) => {
-                if (row.id === newRow.id) {
+                if (String(row.id) === String(newRow.id)) {
                   return {
                     ...row,
                     ...response.data.escalation,
@@ -393,9 +421,13 @@ export function SheetView({ config, userRole }: SheetViewProps) {
       }
     } else {
       // Update existing row
+      // Find the row to get its actual ID (might be a number from API)
+      const currentRow = data.find((row) => String(row.id) === rowIdString);
+      const actualRowId = currentRow?.id;
+
       setData((prev) =>
         prev.map((row) => {
-          if (row.id === rowId) {
+          if (String(row.id) === rowIdString) {
             return {
               ...row,
               [columnId]: value,
@@ -405,6 +437,75 @@ export function SheetView({ config, userRole }: SheetViewProps) {
           return row;
         })
       );
+
+      // If this is an updatable field and we have a valid row ID (not a generated one)
+      if (isUpdatableField && actualRowId && typeof actualRowId === 'number') {
+        try {
+          const updatePayload: Record<string, any> = {};
+          
+          // Handle closure_datetime separately - convert Date to ISO string or null
+          if (columnId === 'closure_datetime') {
+            updatePayload.closure_datetime = value ? (value instanceof Date ? value.toISOString() : value) : null;
+          } else {
+            updatePayload[columnId] = value;
+          }
+
+          // Handle manual_ticket_status changes - backend will set is_closed accordingly
+          // But we can also update it locally for immediate feedback
+          if (columnId === 'manual_ticket_status') {
+            const statusLower = String(value).toLowerCase();
+            if (statusLower === 'close') {
+              updatePayload.is_closed = 1;
+              // Update local state immediately
+              setData((prev) =>
+                prev.map((row) => {
+                  if (String(row.id) === rowIdString) {
+                    return {
+                      ...row,
+                      is_closed: 1,
+                    };
+                  }
+                  return row;
+                })
+              );
+            } else if (statusLower === 'open') {
+              updatePayload.is_closed = 0;
+              // Update local state immediately
+              setData((prev) =>
+                prev.map((row) => {
+                  if (String(row.id) === rowIdString) {
+                    return {
+                      ...row,
+                      is_closed: 0,
+                    };
+                  }
+                  return row;
+                })
+              );
+            }
+          }
+
+          // Call the update-entries API
+          await sheetApiService.updateEscalationEntries(actualRowId, updatePayload);
+          // Success is handled silently - the UI is already updated
+        } catch (error: any) {
+          console.error('Failed to update escalation entry:', error);
+          toast.error(error.message || 'Failed to update field');
+          
+          // Revert the local change on error
+          setData((prev) =>
+            prev.map((row) => {
+              if (String(row.id) === rowIdString) {
+                return {
+                  ...row,
+                  [columnId]: currentRow?.[columnId], // Revert to previous value
+                };
+              }
+              return row;
+            })
+          );
+        }
+      }
 
       // If shipment number was updated, fetch details from backend
       if (isShipmentNoUpdate) {
@@ -416,7 +517,7 @@ export function SheetView({ config, userRole }: SheetViewProps) {
             // Update the row with data from backend
             setData((prev) =>
               prev.map((row) => {
-                if (row.id === rowId) {
+                if (String(row.id) === rowIdString) {
                   return {
                     ...row,
                     ...response.data.escalation,
@@ -451,6 +552,12 @@ export function SheetView({ config, userRole }: SheetViewProps) {
       newRow[col.id] = col.defaultValue || null;
     });
 
+    // Set is_closed to 0 (open) by default for escalation sheet
+    // This ensures new rows are visible in the "Open Escalations" view
+    if (config.id === 'escalations') {
+      newRow.is_closed = 0;
+    }
+
     setData((prev) => [...prev, newRow]); // Add at bottom
     
     // Focus on the first cell of the newly created row
@@ -468,7 +575,8 @@ export function SheetView({ config, userRole }: SheetViewProps) {
   };
 
   const handleDuplicateRow = (rowId: string) => {
-    const rowToDuplicate = data.find((row) => row.id === rowId);
+    const rowIdString = String(rowId);
+    const rowToDuplicate = data.find((row) => String(row.id) === rowIdString);
     if (!rowToDuplicate) return;
 
     const newRow: any = {
@@ -481,7 +589,7 @@ export function SheetView({ config, userRole }: SheetViewProps) {
     };
 
     // Insert after the duplicated row
-    const index = data.findIndex((row) => row.id === rowId);
+    const index = data.findIndex((row) => String(row.id) === rowIdString);
     setData((prev) => [
       ...prev.slice(0, index + 1),
       newRow,
@@ -490,7 +598,8 @@ export function SheetView({ config, userRole }: SheetViewProps) {
   };
 
   const handleCopyRow = (rowId: string) => {
-    const rowToCopy = data.find((row) => row.id === rowId);
+    const rowIdString = String(rowId);
+    const rowToCopy = data.find((row) => String(row.id) === rowIdString);
     if (!rowToCopy) return;
 
     // Create a copy of the row data (excluding metadata)
@@ -529,7 +638,114 @@ export function SheetView({ config, userRole }: SheetViewProps) {
   };
 
   const handleDeleteRow = (rowId: string) => {
-    setData((prev) => prev.filter((row) => row.id !== rowId));
+    const rowIdString = String(rowId);
+    setData((prev) => prev.filter((row) => String(row.id) !== rowIdString));
+  };
+
+  const handleBulkUpload = () => {
+    setShowBulkUploadModal(true);
+  };
+
+  const processBulkUploadFile = async (file: File) => {
+    try {
+      toast.loading('Reading Excel file...', { id: 'bulk-upload' });
+
+      // Read the file as array buffer
+      const arrayBuffer = await file.arrayBuffer();
+      
+      // Parse the Excel file
+      const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+      
+      // Get the first sheet
+      const firstSheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[firstSheetName];
+      
+      // Convert sheet to JSON
+      const jsonData = XLSX.utils.sheet_to_json(worksheet, { 
+        header: 1, // Use array format to preserve column order
+        defval: null // Use null for empty cells
+      }) as any[][];
+
+      if (jsonData.length < 2) {
+        toast.error('Excel file must have at least a header row and one data row', { id: 'bulk-upload' });
+        throw new Error('Invalid file format');
+      }
+
+      // Get headers from first row
+      const headers = jsonData[0].map((h: any) => String(h || '').toLowerCase().trim());
+      
+      // Find column indices
+      const shipmentNoIndex = headers.findIndex((h: string) => 
+        h === 'shipment_no' || h === 'shipment no' || h === 'shipmentno'
+      );
+      const manualCaseIndex = headers.findIndex((h: string) => 
+        h === 'manual_case' || h === 'manual case' || h === 'manualcase'
+      );
+      const followupRemarksIndex = headers.findIndex((h: string) => 
+        h === 'followup_remarks' || h === 'followup remarks' || h === 'followupremarks'
+      );
+
+      if (shipmentNoIndex === -1) {
+        toast.error('Excel file must have a "shipment_no" column', { id: 'bulk-upload' });
+        throw new Error('Missing shipment_no column');
+      }
+
+      // Convert rows to the required format
+      const uploadData: Array<{
+        shipment_no: string | number;
+        manual_case?: string | null;
+        followup_remarks?: string | null;
+      }> = [];
+
+      // Process data rows (skip header row)
+      for (let i = 1; i < jsonData.length; i++) {
+        const row = jsonData[i];
+        const shipmentNo = row[shipmentNoIndex];
+        
+        // Skip empty rows
+        if (!shipmentNo) continue;
+
+        const record: any = {
+          shipment_no: shipmentNo,
+        };
+
+        if (manualCaseIndex !== -1 && row[manualCaseIndex]) {
+          record.manual_case = String(row[manualCaseIndex]).trim() || null;
+        }
+
+        if (followupRemarksIndex !== -1 && row[followupRemarksIndex]) {
+          record.followup_remarks = String(row[followupRemarksIndex]).trim() || null;
+        }
+
+        uploadData.push(record);
+      }
+
+      if (uploadData.length === 0) {
+        toast.error('No valid data rows found in Excel file', { id: 'bulk-upload' });
+        throw new Error('No valid data');
+      }
+
+      toast.loading(`Uploading ${uploadData.length} records...`, { id: 'bulk-upload' });
+
+      // Call the bulk upload API
+      await sheetApiService.bulkUploadEscalations(uploadData);
+
+      toast.success(`Successfully uploaded ${uploadData.length} records!`, { id: 'bulk-upload' });
+
+      // Refresh the data after successful upload
+      if (refetch) {
+        await refetch();
+      }
+
+    } catch (error: any) {
+      console.error('Bulk upload error:', error);
+      if (!error.message || error.message === 'Invalid file format' || error.message === 'Missing shipment_no column' || error.message === 'No valid data') {
+        // Error already shown in toast
+        throw error;
+      }
+      toast.error(error.message || 'Failed to upload Excel file', { id: 'bulk-upload' });
+      throw error;
+    }
   };
 
   // Initialize column visibility (empty on server, loaded on client)
@@ -616,6 +832,7 @@ export function SheetView({ config, userRole }: SheetViewProps) {
           userRole={userRole}
           onAddRow={handleAddRow}
           onDeleteRows={handleDeleteRows}
+          onBulkUpload={handleBulkUpload}
           columnVisibility={columnVisibility}
           onColumnVisibilityChange={handleColumnVisibilityChange}
           onOpenCommandPalette={() => setShowCommandPalette(true)}
@@ -626,6 +843,11 @@ export function SheetView({ config, userRole }: SheetViewProps) {
           onAddRow={handleAddRow}
           onDeleteRows={handleDeleteRows}
           onOpenFilter={() => {}}
+        />
+        <BulkUploadModal
+          isOpen={showBulkUploadModal}
+          onClose={() => setShowBulkUploadModal(false)}
+          onUpload={processBulkUploadFile}
         />
         <div className="flex-1 overflow-hidden animate-in fade-in duration-300">
           {/* Show hero section for portfolio sheet */}

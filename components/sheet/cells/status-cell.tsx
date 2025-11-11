@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ColumnConfig, StatusOption } from '@/types';
 import { RowHeight } from '@/lib/store/sheet-store';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -28,8 +28,10 @@ export function StatusCell({
   rowHeight,
   onEdit,
   onSave,
+  onCancel,
 }: StatusCellProps) {
   const [editValue, setEditValue] = useState(value || '');
+  const [open, setOpen] = useState(false);
   const options = (columnConfig.options || []) as StatusOption[];
   const textSizeClass = getCellTextSize(rowHeight);
   const paddingClass = getCellPadding(rowHeight);
@@ -40,6 +42,16 @@ export function StatusCell({
   // Avatar size based on row height
   const avatarSize = rowHeight === 'compact' ? 'h-4 w-4' : rowHeight === 'spacious' ? 'h-7 w-7' : 'h-5 w-5';
   const avatarTextSize = rowHeight === 'compact' ? 'text-[8px]' : 'text-[10px]';
+
+  // Reset edit value when editing starts
+  useEffect(() => {
+    if (isEditing) {
+      setEditValue(value || '');
+      setOpen(true);
+    } else {
+      setOpen(false);
+    }
+  }, [isEditing, value]);
 
   const getOption = (val: string): StatusOption | undefined => {
     return options.find((opt) => opt.value === val);
@@ -69,12 +81,20 @@ export function StatusCell({
     return (
       <div className="p-1">
         <Select
+          open={open}
+          onOpenChange={(isOpen) => {
+            setOpen(isOpen);
+            if (!isOpen) {
+              // Close without selection - cancel edit
+              onCancel();
+            }
+          }}
           value={editValue}
           onValueChange={(val) => {
             setEditValue(val);
+            setOpen(false);
             onSave(val);
           }}
-          defaultOpen
         >
           <SelectTrigger className="h-8 w-full">
             <SelectValue placeholder="Select status..." />

@@ -11,7 +11,7 @@ import {
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
 } from '@/components/ui/dropdown-menu';
-import { Search, FileDown, Plus, Settings, SplitSquareVertical, Eye, EyeOff, Download, FileSpreadsheet, RefreshCw, Sliders, ArrowUpNarrowWide, ArrowDownWideNarrow, Rows3 } from 'lucide-react';
+import { Search, FileDown, Plus, Settings, SplitSquareVertical, Eye, EyeOff, Download, FileSpreadsheet, RefreshCw, Sliders, ArrowUpNarrowWide, ArrowDownWideNarrow, Rows3, Upload } from 'lucide-react';
 import { useSheetStore, RowHeight } from '@/lib/store/sheet-store';
 import { SheetConfig, RowData, UserRole } from '@/types';
 import { exportToCSV, exportToExcel } from '@/lib/utils/export';
@@ -23,6 +23,7 @@ interface ToolbarProps {
   userRole: UserRole;
   onAddRow?: () => void;
   onDeleteRows?: () => void;
+  onBulkUpload?: () => void;
   columnVisibility?: Record<string, boolean>;
   onColumnVisibilityChange?: (visibility: Record<string, boolean>) => void;
   onOpenCommandPalette?: () => void;
@@ -32,7 +33,7 @@ export interface ToolbarRef {
   focusSearch: () => void;
 }
 
-export const Toolbar = forwardRef<ToolbarRef, ToolbarProps>(({ config, data, userRole, onAddRow, onDeleteRows, columnVisibility = {}, onColumnVisibilityChange, onOpenCommandPalette }, ref) => {
+export const Toolbar = forwardRef<ToolbarRef, ToolbarProps>(({ config, data, userRole, onAddRow, onDeleteRows, onBulkUpload, columnVisibility = {}, onColumnVisibilityChange, onOpenCommandPalette }, ref) => {
   useImperativeHandle(ref, () => ({
     focusSearch: () => {
       // Open command palette instead of focusing search
@@ -117,6 +118,18 @@ export const Toolbar = forwardRef<ToolbarRef, ToolbarProps>(({ config, data, use
           <Button size="sm" onClick={onAddRow} className="h-7 shrink-0 text-xs px-2">
             <Plus className="h-3.5 w-3.5 sm:mr-1.5" />
             <span className="hidden sm:inline">Add Row</span>
+          </Button>
+        )}
+
+        {canEdit && onBulkUpload && config.id === 'escalations' && (
+          <Button 
+            size="sm" 
+            variant="outline" 
+            onClick={onBulkUpload} 
+            className="h-7 shrink-0 text-xs px-2"
+          >
+            <Upload className="h-3.5 w-3.5 sm:mr-1.5" />
+            <span className="hidden sm:inline">Bulk Upload</span>
           </Button>
         )}
 

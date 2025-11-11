@@ -99,6 +99,64 @@ class SheetApiService {
   }
 
   /**
+   * Update escalation sheet entries
+   * Updates specific fields in an escalation record
+   * 
+   * @param id The ID of the escalation record
+   * @param payload Object containing the fields to update
+   * @returns API response with operation result
+   * @throws Error if API request fails
+   */
+  async updateEscalationEntries(
+    id: number | string,
+    payload: Record<string, any>
+  ): Promise<ApiResponse<any>> {
+    try {
+      const response = await apiClient.post<ApiResponse<any>>(
+        '/sheets/escalation/update-entries',
+        {
+          id: Number(id),
+          ...payload,
+        }
+      );
+
+      return response;
+    } catch (error) {
+      console.error('Failed to update escalation entries:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Bulk upload escalation entries
+   * Uploads multiple escalation records from Excel file
+   * 
+   * @param data Array of escalation records to upload
+   * @returns API response with operation result
+   * @throws Error if API request fails
+   */
+  async bulkUploadEscalations(
+    data: Array<{
+      shipment_no: string | number;
+      manual_case?: string | null;
+      followup_remarks?: string | null;
+      [key: string]: any;
+    }>
+  ): Promise<ApiResponse<any>> {
+    try {
+      const response = await apiClient.post<ApiResponse<any>>(
+        '/sheets/escalation/bulk-upload-escalations',
+        data
+      );
+
+      return response;
+    } catch (error) {
+      console.error('Failed to bulk upload escalations:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Get tech sheet data
    * Fetches tech sheet records from backend
    * 
