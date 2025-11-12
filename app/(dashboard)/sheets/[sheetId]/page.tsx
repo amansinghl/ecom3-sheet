@@ -14,7 +14,7 @@ export default async function SheetPage({ params }: PageProps) {
   const { sheetId } = await params;
 
   if (!session) {
-    redirect('/login');
+    redirect('/');
   }
 
   const config = getSheetById(sheetId);

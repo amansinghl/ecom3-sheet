@@ -62,7 +62,7 @@ export function UrlCell({
     <div
       className={cn(
         'h-full w-full px-3 py-2 text-sm flex items-center gap-2 truncate',
-        canEdit && 'cursor-text hover:bg-muted/50'
+        canEdit ? 'cursor-text hover:bg-muted/50' : 'cursor-not-allowed'
       )}
       onClick={canEdit ? onEdit : undefined}
     >

@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { Mail } from 'lucide-react';
+import { RowHeight } from '@/lib/store/sheet-store';
 
 interface EmailCellProps {
   value: any;
@@ -60,7 +61,7 @@ export function EmailCell({
     <div
       className={cn(
         'h-full w-full px-3 py-2 text-sm flex items-center gap-2 truncate',
-        canEdit && 'cursor-text hover:bg-muted/50'
+        canEdit ? 'cursor-text hover:bg-muted/50' : 'cursor-not-allowed'
       )}
       onClick={canEdit ? onEdit : undefined}
     >

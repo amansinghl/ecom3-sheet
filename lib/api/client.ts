@@ -9,6 +9,14 @@ export interface ApiError {
   message: string;
   error?: string;
   status?: number;
+  isTokenExpired?: boolean;
+}
+
+export class TokenExpiredError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'TokenExpiredError';
+  }
 }
 
 export interface ApiResponse<T> {
@@ -19,9 +27,25 @@ export interface ApiResponse<T> {
 
 class ApiClient {
   private baseUrl: string;
+  private token: string | null = null;
+  private onTokenExpired?: () => void;
 
   constructor(baseUrl: string = API_BASE_URL) {
     this.baseUrl = baseUrl;
+  }
+
+  /**
+   * Set callback to be called when token expires
+   */
+  setOnTokenExpired(callback: () => void) {
+    this.onTokenExpired = callback;
+  }
+
+  /**
+   * Set the authentication token for API requests
+   */
+  setToken(token: string | null) {
+    this.token = token;
   }
 
   /**
@@ -83,13 +107,21 @@ class ApiClient {
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const url = `${this.baseUrl}${endpoint}`;
 
+    // Build headers with Authorization if token is available
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      ...(options.headers as Record<string, string> || {}),
+    };
+
+    // Add Authorization header if token is set
+    if (this.token) {
+      headers['Authorization'] = `Bearer ${this.token}`;
+    }
+
     try {
       const response = await fetch(url, {
         ...options,
-        headers: {
-          'Content-Type': 'application/json',
-          ...options.headers,
-        },
+        headers,
       });
 
       // Handle non-2xx responses
@@ -101,11 +133,33 @@ class ApiClient {
           errorData = { error: response.statusText };
         }
 
+        // Check for token expiration error
+        const errorMessage = errorData.errors?.message || errorData.message || errorData.error || response.statusText;
+        const isTokenExpired = 
+          errorMessage.toLowerCase().includes('blacklisted') ||
+          errorMessage.toLowerCase().includes('re-login') ||
+          errorMessage.toLowerCase().includes('token expired') ||
+          errorMessage.toLowerCase().includes('token has been') ||
+          errorMessage.toLowerCase().includes('token not found') ||
+          errorMessage.toLowerCase().includes('api token not found') ||
+          errorMessage.toLowerCase().includes('authentication required') ||
+          response.status === 401;
+
+        if (isTokenExpired && this.onTokenExpired) {
+          // Call the token expiration handler
+          this.onTokenExpired();
+        }
+
         const error: ApiError = {
-          message: errorData.message || errorData.error || response.statusText,
+          message: errorMessage,
           error: errorData.error,
           status: response.status,
+          isTokenExpired,
         };
+
+        if (isTokenExpired) {
+          throw new TokenExpiredError(errorMessage);
+        }
 
         throw error;
       }
@@ -114,7 +168,10 @@ class ApiClient {
       const data = await response.json();
       return data as T;
     } catch (error) {
-      // Re-throw API errors
+      // Re-throw TokenExpiredError and API errors
+      if (error instanceof TokenExpiredError) {
+        throw error;
+      }
       if (error instanceof Error && 'status' in error) {
         throw error;
       }

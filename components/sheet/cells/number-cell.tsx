@@ -83,7 +83,7 @@ export function NumberCell({
         'h-full w-full text-right truncate tabular-nums',
         textSizeClass,
         paddingClass,
-        canEdit && 'cursor-text hover:bg-muted/50'
+        canEdit ? 'cursor-text hover:bg-muted/50' : 'cursor-not-allowed'
       )}
       onClick={canEdit ? onEdit : undefined}
     >

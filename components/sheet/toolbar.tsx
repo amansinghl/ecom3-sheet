@@ -55,11 +55,39 @@ export const Toolbar = forwardRef<ToolbarRef, ToolbarProps>(({ config, data, use
   const canDelete = config.permissions?.[userRole]?.canDelete ?? false;
 
   const handleExportCSV = () => {
-    exportToCSV(data, config, `${config.name}.csv`);
+    // If rows are selected, export only selected rows
+    // Otherwise, export the filtered data (excluding empty rows)
+    let dataToExport = data;
+    
+    if (selectedRows.size > 0) {
+      // Filter to only selected rows and exclude empty rows
+      dataToExport = data.filter(
+        (row) => selectedRows.has(row.id) && !(row as any)._isEmpty
+      );
+    } else {
+      // Exclude empty rows from export
+      dataToExport = data.filter((row) => !(row as any)._isEmpty);
+    }
+    
+    exportToCSV(dataToExport, config, `${config.name}.csv`);
   };
 
   const handleExportExcel = () => {
-    exportToExcel(data, config, `${config.name}.xlsx`);
+    // If rows are selected, export only selected rows
+    // Otherwise, export the filtered data (excluding empty rows)
+    let dataToExport = data;
+    
+    if (selectedRows.size > 0) {
+      // Filter to only selected rows and exclude empty rows
+      dataToExport = data.filter(
+        (row) => selectedRows.has(row.id) && !(row as any)._isEmpty
+      );
+    } else {
+      // Exclude empty rows from export
+      dataToExport = data.filter((row) => !(row as any)._isEmpty);
+    }
+    
+    exportToExcel(dataToExport, config, `${config.name}.xlsx`);
   };
 
   const toggleColumnVisibility = (columnId: string) => {

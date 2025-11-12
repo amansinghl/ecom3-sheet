@@ -90,7 +90,7 @@ export function DateCell({
         'h-full w-full truncate',
         textSizeClass,
         paddingClass,
-        canEdit && 'cursor-text hover:bg-muted/50'
+        canEdit ? 'cursor-text hover:bg-muted/50' : 'cursor-not-allowed'
       )}
       onClick={canEdit ? onEdit : undefined}
     >

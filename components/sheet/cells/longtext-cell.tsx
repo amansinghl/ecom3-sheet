@@ -43,7 +43,7 @@ export function LongTextCell({
           'h-full w-full truncate',
           textSizeClass,
           paddingClass,
-          canEdit && 'cursor-pointer hover:bg-muted/50'
+          canEdit ? 'cursor-pointer hover:bg-muted/50' : 'cursor-not-allowed'
         )}
         onClick={() => canEdit && setIsOpen(true)}
       >

@@ -42,39 +42,8 @@ export function HeroSection() {
         className="space-y-4 mb-6"
       >
         <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold bg-gradient-to-r from-purple-600 via-blue-600 to-emerald-600 bg-clip-text text-transparent">
-          Aman Singh
+          Portfolio
         </h1>
-        <div className="flex flex-wrap items-center justify-center gap-3 text-lg md:text-xl font-medium">
-          <motion.span
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.4 }}
-            className="flex items-center gap-2 text-purple-600 dark:text-purple-400"
-          >
-            <Sparkles className="h-5 w-5" />
-            Visionary
-          </motion.span>
-          <span className="text-muted-foreground">•</span>
-          <motion.span
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.5 }}
-            className="flex items-center gap-2 text-blue-600 dark:text-blue-400"
-          >
-            <Star className="h-5 w-5" />
-            Talented
-          </motion.span>
-          <span className="text-muted-foreground">•</span>
-          <motion.span
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.6 }}
-            className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400"
-          >
-            <Award className="h-5 w-5" />
-            Exceptional
-          </motion.span>
-        </div>
       </motion.div>
 
       {/* Description */}
@@ -84,30 +53,8 @@ export function HeroSection() {
         transition={{ delay: 0.7 }}
         className="text-base md:text-lg text-muted-foreground max-w-2xl leading-relaxed mb-8"
       >
-        A distinguished professional combining exceptional talent with innovative thinking.
-        Dedicated to excellence and driven by a passion for creating meaningful impact.
+        Other sheets can be added here as well.
       </motion.p>
-
-      {/* Stats/Highlights */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.8 }}
-        className="grid grid-cols-3 gap-6 md:gap-12 max-w-2xl mx-auto"
-      >
-        <div className="space-y-1">
-          <div className="text-2xl md:text-3xl font-bold text-primary">∞</div>
-          <div className="text-xs md:text-sm text-muted-foreground">Possibilities</div>
-        </div>
-        <div className="space-y-1">
-          <div className="text-2xl md:text-3xl font-bold text-primary">100%</div>
-          <div className="text-xs md:text-sm text-muted-foreground">Excellence</div>
-        </div>
-        <div className="space-y-1">
-          <div className="text-2xl md:text-3xl font-bold text-primary">24/7</div>
-          <div className="text-xs md:text-sm text-muted-foreground">Dedication</div>
-        </div>
-      </motion.div>
 
       {/* Decorative Bottom Line */}
       <motion.div

@@ -107,7 +107,7 @@ export function UserCell({ value, columnConfig, isEditing, canEdit,
       className={cn(
         'h-full w-full flex items-center gap-1.5',
         paddingClass,
-        canEdit && 'cursor-pointer hover:bg-muted/50'
+        canEdit ? 'cursor-pointer hover:bg-muted/50' : 'cursor-not-allowed'
       )}
       onClick={canEdit ? onEdit : undefined}
     >

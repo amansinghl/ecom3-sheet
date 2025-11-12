@@ -133,7 +133,7 @@ export function StatusCell({
       className={cn(
         'h-full w-full flex items-center',
         paddingClass,
-        canEdit && 'cursor-pointer hover:bg-muted/50'
+        canEdit ? 'cursor-pointer hover:bg-muted/50' : 'cursor-not-allowed'
       )}
       onClick={canEdit ? onEdit : undefined}
     >

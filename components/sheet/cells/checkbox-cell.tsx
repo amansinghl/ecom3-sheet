@@ -2,6 +2,7 @@
 
 import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
+import { RowHeight } from '@/lib/store/sheet-store';
 
 interface CheckboxCellProps {
   value: any;
@@ -18,7 +19,7 @@ export function CheckboxCell({ value, canEdit,
     <div
       className={cn(
         'h-full w-full px-3 py-2 flex items-center justify-center',
-        canEdit && 'cursor-pointer hover:bg-muted/50'
+        canEdit ? 'cursor-pointer hover:bg-muted/50' : 'cursor-not-allowed'
       )}
     >
       <Checkbox

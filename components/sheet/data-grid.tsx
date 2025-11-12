@@ -145,10 +145,14 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
           const hasFilter = !!viewState.columnFilters[colConfig.id];
           const isHovered = hoveredColumn === colConfig.id;
           const showFilterIcon = hasFilter || isHovered;
+          const isEditable = canEdit && (colConfig.editable ?? true);
 
           return (
             <div
-              className="flex items-center gap-1 group"
+              className={cn(
+                "flex items-center gap-1 group",
+                !isEditable && "cursor-not-allowed"
+              )}
               onMouseEnter={() => setHoveredColumn(colConfig.id)}
               onMouseLeave={() => setHoveredColumn(null)}
             >
@@ -406,15 +410,24 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
                       rowHeightClasses[rowHeight]
                     )}
                   >
-                    {row.getVisibleCells().map((cell) => (
+                    {row.getVisibleCells().map((cell) => {
+                      const colConfig = config.columns.find(c => c.id === cell.column.id);
+                      const isEditable = colConfig ? canEdit && (colConfig.editable ?? true) : true;
+                      
+                      return (
                       <td
                         key={cell.id}
-                        className={cn('border-r border-border p-0 overflow-hidden', rowHeightClasses[rowHeight])}
+                        className={cn(
+                          'border-r border-border p-0 overflow-hidden',
+                          rowHeightClasses[rowHeight],
+                          !isEditable && 'cursor-not-allowed'
+                        )}
                         style={{ width: `${cell.column.getSize()}px`, maxWidth: `${cell.column.getSize()}px` }}
                       >
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
                       </td>
-                    ))}
+                      );
+                    })}
                   </tr>
                 );
               })}

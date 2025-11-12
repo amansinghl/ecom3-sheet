@@ -4,6 +4,7 @@
  */
 
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
+import { useSession } from 'next-auth/react';
 import { RowData } from '@/types';
 import { sheetApiService } from '@/lib/api/sheets';
 
@@ -59,13 +60,22 @@ export function useSheetData(
   sheetName: string,
   options: UseSheetDataOptions = {}
 ): UseQueryResult<RowData[], Error> {
+  const { data: session, status } = useSession();
+  const hasToken = !!(session as any)?.sheet_token;
+  const isSessionReady = status !== 'loading';
+  
   return useQuery({
     queryKey: ['sheet', sheetName],
     queryFn: async () => {
       const data = await sheetApiService.getSheetData(sheetName);
       return data;
     },
-    enabled: options.enabled !== false && !!sheetName,
+    // Only enable query if:
+    // 1. Explicitly enabled (or not disabled)
+    // 2. Sheet name is provided
+    // 3. Session is loaded (not loading)
+    // 4. User is authenticated with a token
+    enabled: (options.enabled !== false) && !!sheetName && isSessionReady && status === 'authenticated' && hasToken,
     retry: options.retry ?? 3,
     staleTime: options.staleTime ?? 5 * 60 * 1000,
     gcTime: options.cacheTime ?? 10 * 60 * 1000,
