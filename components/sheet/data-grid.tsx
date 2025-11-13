@@ -324,6 +324,41 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
     prevEditingCellRef.current = editingCell;
   }, [editingCell, rows, rowVirtualizer]);
 
+  // Save scroll position to localStorage
+  useEffect(() => {
+    const container = tableContainerRef.current;
+    if (!container) return;
+
+    const handleScroll = () => {
+      const scrollTop = container.scrollTop;
+      const scrollLeft = container.scrollLeft;
+      localStorage.setItem(`scroll-position-${config.id}`, JSON.stringify({ scrollTop, scrollLeft }));
+    };
+
+    container.addEventListener('scroll', handleScroll);
+    return () => container.removeEventListener('scroll', handleScroll);
+  }, [config.id]);
+
+  // Restore scroll position on mount
+  useEffect(() => {
+    const container = tableContainerRef.current;
+    if (!container) return;
+
+    const saved = localStorage.getItem(`scroll-position-${config.id}`);
+    if (saved) {
+      try {
+        const { scrollTop, scrollLeft } = JSON.parse(saved);
+        // Restore after a short delay to ensure content is rendered
+        setTimeout(() => {
+          container.scrollTop = scrollTop;
+          container.scrollLeft = scrollLeft;
+        }, 100);
+      } catch (e) {
+        console.error('Failed to restore scroll position:', e);
+      }
+    }
+  }, [config.id]);
+
   return (
     <div 
       ref={tableContainerRef}

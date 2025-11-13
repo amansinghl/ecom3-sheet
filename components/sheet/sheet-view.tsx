@@ -123,29 +123,16 @@ export function SheetView({ config, userRole }: SheetViewProps) {
   const filteredData = useMemo(() => {
     let result = data;
 
-    console.log('Active filters:', viewState.columnFilters);
-    console.log('Data before filtering:', data.length, 'rows');
-
     // Apply column filters
     if (Object.keys(viewState.columnFilters).length > 0) {
       const { applyFilters } = require('@/lib/utils/filter-data');
       result = applyFilters(result, viewState.columnFilters, config.columns);
-      console.log('Data after filtering:', result.length, 'rows');
-      console.log('Filtered out:', data.length - result.length, 'rows');
     }
 
     // Get list of filled empty row IDs to skip
     const filledEmptyIds = new Set(
       data.filter(row => String(row.id).startsWith('empty-') && row._isFilled).map(row => row.id)
     );
-    console.log('Filled empty row IDs:', Array.from(filledEmptyIds));
-    console.log('Total data rows:', data.length);
-    console.log('Data rows detail:', data.map(r => ({ 
-      id: r.id, 
-      shipment_no: r.shipment_no,
-      awb_no: r.awb_no,
-      _isFilled: r._isFilled 
-    })));
 
     // Add 50 empty editable rows at the bottom (virtual scrolling handles rendering)
     // Skip rows that have been filled
@@ -154,7 +141,6 @@ export function SheetView({ config, userRole }: SheetViewProps) {
       
       // Skip if this empty row has been filled
       if (filledEmptyIds.has(emptyId)) {
-        console.log(`Skipping empty row ${emptyId} because it's filled`);
         return null;
       }
       
@@ -233,29 +219,18 @@ export function SheetView({ config, userRole }: SheetViewProps) {
         }
         
         // Add the filled row to data
-        console.log('Adding temp row:', tempRow);
-        setData((prev) => {
-          console.log('Previous data length:', prev.length);
-          const newData = [...prev, tempRow];
-          console.log('New data length:', newData.length);
-          console.log('Temp row added, ID:', tempRow.id);
-          return newData;
-        });
+        setData((prev) => [...prev, tempRow]);
         
         // Then fetch the full data from API
         try {
           toast.loading('Fetching escalation details...', { id: 'fetch-escalation' });
           const response = await sheetApiService.updateEscalationSheet(String(value));
-          console.log('API response received:', response.data?.escalation);
           
           if (response.data?.escalation) {
             // Update the row with data from backend
-            setData((prev) => {
-              console.log('Updating row with ID:', rowIdString);
-              console.log('Prev data before update:', prev.map(r => ({ id: r.id, _isFilled: r._isFilled })));
-              const updated = prev.map((row) => {
+            setData((prev) =>
+              prev.map((row) => {
                 if (String(row.id) === rowIdString) {
-                  console.log('Found matching row, updating with:', response.data.escalation);
                   return {
                     ...row,
                     ...response.data.escalation,
@@ -266,10 +241,8 @@ export function SheetView({ config, userRole }: SheetViewProps) {
                   };
                 }
                 return row;
-              });
-              console.log('Updated data:', updated.map(r => ({ id: r.id, _isFilled: r._isFilled })));
-              return updated;
-            });
+              })
+            );
             toast.success('Escalation details loaded successfully', { id: 'fetch-escalation' });
           } else {
             toast.error('No escalation data received', { id: 'fetch-escalation' });
