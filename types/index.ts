@@ -140,6 +140,7 @@ export interface ViewState {
   sorts: Sort[];
   searchQuery: string;
   hiddenColumns: string[];
+  pinnedColumns: string[]; // Columns pinned to the left
 }
 
 // API Response Types

@@ -11,7 +11,7 @@ import {
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
 } from '@/components/ui/dropdown-menu';
-import { Search, FileDown, Plus, Settings, SplitSquareVertical, Eye, EyeOff, Download, FileSpreadsheet, RefreshCw, Sliders, ArrowUpNarrowWide, ArrowDownWideNarrow, Rows3, Upload } from 'lucide-react';
+import { Search, FileDown, Plus, Settings, SplitSquareVertical, Eye, EyeOff, Download, FileSpreadsheet, RefreshCw, Sliders, ArrowUpNarrowWide, ArrowDownWideNarrow, Rows3, Upload, Pin, PinOff } from 'lucide-react';
 import { useSheetStore, RowHeight } from '@/lib/store/sheet-store';
 import { SheetConfig, RowData, UserRole } from '@/types';
 import { exportToCSV, exportToExcel } from '@/lib/utils/export';
@@ -48,6 +48,7 @@ export const Toolbar = forwardRef<ToolbarRef, ToolbarProps>(({ config, data, use
     clearSelection,
     rowHeight,
     setRowHeight,
+    toggleColumnPin,
   } = useSheetStore();
 
   const canEdit = config.permissions?.[userRole]?.canEdit ?? false;
@@ -177,21 +178,43 @@ export const Toolbar = forwardRef<ToolbarRef, ToolbarProps>(({ config, data, use
             <DropdownMenuSeparator />
             {config.columns.map((col) => {
               const isVisible = columnVisibility[col.id] !== false;
+              const isPinned = viewState.pinnedColumns.includes(col.id);
               return (
                 <DropdownMenuItem
                   key={col.id}
                   className="flex items-center gap-2 cursor-pointer"
                   onSelect={(e) => {
                     e.preventDefault();
-                    toggleColumnVisibility(col.id);
                   }}
                 >
-                  {isVisible ? (
-                    <Eye className="h-4 w-4 text-primary" />
-                  ) : (
-                    <EyeOff className="h-4 w-4 text-muted-foreground" />
-                  )}
-                  <span className="flex-1">{col.label}</span>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleColumnVisibility(col.id);
+                    }}
+                    className="flex items-center gap-2 flex-1 hover:bg-transparent"
+                  >
+                    {isVisible ? (
+                      <Eye className="h-4 w-4 text-primary" />
+                    ) : (
+                      <EyeOff className="h-4 w-4 text-muted-foreground" />
+                    )}
+                    <span className="flex-1 text-left">{col.label}</span>
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleColumnPin(col.id);
+                    }}
+                    className="p-1 rounded hover:bg-muted transition-colors"
+                    title={isPinned ? 'Unpin column' : 'Pin column'}
+                  >
+                    {isPinned ? (
+                      <PinOff className="h-3.5 w-3.5 text-primary" />
+                    ) : (
+                      <Pin className="h-3.5 w-3.5 text-muted-foreground" />
+                    )}
+                  </button>
                 </DropdownMenuItem>
               );
             })}

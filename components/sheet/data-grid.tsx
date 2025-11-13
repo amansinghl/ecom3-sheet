@@ -21,7 +21,7 @@ import { RowContextMenu } from './row-context-menu';
 import { EmptyState } from './empty-state';
 import { ColumnFilterDropdown } from './column-filter-dropdown';
 import { cn } from '@/lib/utils';
-import { ChevronDown, ChevronUp, Filter } from 'lucide-react';
+import { ChevronDown, ChevronUp, Filter, Pin, PinOff } from 'lucide-react';
 
 interface DataGridProps {
   config: SheetConfig;
@@ -39,12 +39,11 @@ interface DataGridProps {
 }
 
 export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibility: externalColumnVisibility, onColumnVisibilityChange, onDuplicateRow, onCopyRow, onDeleteRow, onAddRow, onClearFilters, hasActiveFilters }: DataGridProps) {
-  const { selectedRows, toggleRowSelection, editingCell, setEditingCell, viewState, rowHeight, columnWidths, setColumnWidth, setColumnFilter } = useSheetStore();
+  const { selectedRows, toggleRowSelection, editingCell, setEditingCell, viewState, rowHeight, columnWidths, setColumnWidth, setColumnFilter, toggleColumnPin } = useSheetStore();
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnResizeMode] = useState<ColumnResizeMode>('onChange');
   const [hoveredRow, setHoveredRow] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; rowId: string } | null>(null);
-  const [hoveredColumn, setHoveredColumn] = useState<string | null>(null);
   const [openFilterPopover, setOpenFilterPopover] = useState<string | null>(null);
   
   // Ref for virtual scrolling container
@@ -83,6 +82,14 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
     comfortable: 'py-2',
     spacious: 'py-3',
   };
+
+  // Reorder columns so pinned ones come first
+  const orderedColumns = useMemo(() => {
+    const pinnedIds = viewState.pinnedColumns;
+    const pinned = config.columns.filter(col => pinnedIds.includes(col.id));
+    const unpinned = config.columns.filter(col => !pinnedIds.includes(col.id));
+    return [...pinned, ...unpinned];
+  }, [config.columns, viewState.pinnedColumns]);
 
   // Create columns from config
   const columns = useMemo<ColumnDef<RowData>[]>(() => {
@@ -136,29 +143,45 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
       },
     ];
 
-    config.columns.forEach((colConfig) => {
+    orderedColumns.forEach((colConfig) => {
+      const isPinned = viewState.pinnedColumns.includes(colConfig.id);
+      
       cols.push({
         id: colConfig.id,
         accessorKey: colConfig.id,
         header: ({ column }) => {
           const isSorted = column.getIsSorted();
           const hasFilter = !!viewState.columnFilters[colConfig.id];
-          const isHovered = hoveredColumn === colConfig.id;
-          const showFilterIcon = hasFilter || isHovered;
           const isEditable = canEdit && (colConfig.editable ?? true);
 
           return (
             <div
               className={cn(
-                "flex items-center gap-1 group",
+                "flex items-center gap-1 group/header",
                 !isEditable && "cursor-not-allowed"
               )}
-              onMouseEnter={() => setHoveredColumn(colConfig.id)}
-              onMouseLeave={() => setHoveredColumn(null)}
             >
-              <span className="font-semibold flex-1">{colConfig.label}</span>
+              <button
+                className={cn(
+                  'p-0.5 rounded hover:bg-muted transition-all shrink-0',
+                  'opacity-0 group-hover/header:opacity-100',
+                  isPinned && 'text-primary opacity-100'
+                )}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleColumnPin(colConfig.id);
+                }}
+                title={isPinned ? 'Unpin column' : 'Pin column'}
+              >
+                {isPinned ? (
+                  <PinOff className="h-3 w-3" />
+                ) : (
+                  <Pin className="h-3 w-3" />
+                )}
+              </button>
+              <span className="font-semibold flex-1 truncate">{colConfig.label}</span>
               {isSorted && (
-                <span>
+                <span className="shrink-0">
                   {isSorted === 'asc' ? (
                     <ChevronUp className="h-3 w-3" />
                   ) : (
@@ -173,9 +196,9 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
                 <PopoverTrigger asChild>
                   <button
                     className={cn(
-                      'p-0.5 rounded hover:bg-muted transition-opacity',
-                      showFilterIcon ? 'opacity-100' : 'opacity-0',
-                      hasFilter && 'text-primary'
+                      'p-0.5 rounded hover:bg-muted transition-all shrink-0',
+                      'opacity-0 group-hover/header:opacity-100',
+                      hasFilter && 'text-primary opacity-100'
                     )}
                     onClick={(e) => {
                       e.stopPropagation();
@@ -238,10 +261,9 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
     });
 
     return cols;
-    // Note: hoveredRow, hoveredColumn, and openFilterPopover are intentionally NOT in dependencies
-    // They are UI state used only for styling/display and don't affect column structure
-    // Including them would cause columns to regenerate on every mouse move, remounting all cells
-  }, [config, canEdit, editingCell, setEditingCell, onCellUpdate, columnWidths, viewState.columnFilters, setColumnFilter]);
+    // Note: openFilterPopover is intentionally NOT in dependencies as it's UI state for popover visibility
+    // Including it would cause columns to regenerate unnecessarily
+  }, [orderedColumns, canEdit, editingCell, setEditingCell, onCellUpdate, columnWidths, viewState.columnFilters, viewState.pinnedColumns, setColumnFilter, toggleColumnPin, rowHeight]);
 
   const table = useReactTable({
     data,
@@ -295,6 +317,25 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
     enableColumnResizing: true,
     columnResizeMode,
   });
+
+  // Calculate sticky positions for pinned columns
+  const stickyPositions = useMemo(() => {
+    const positions: Record<string, number> = {};
+    let currentLeft = 60; // Start after select column
+    
+    viewState.pinnedColumns.forEach(columnId => {
+      positions[columnId] = currentLeft;
+      const width = columnWidths[columnId] || 150;
+      currentLeft += width;
+    });
+    
+    return positions;
+  }, [viewState.pinnedColumns, columnWidths]);
+
+  // Get the last pinned column ID for shadow effect
+  const lastPinnedColumn = viewState.pinnedColumns.length > 0 
+    ? viewState.pinnedColumns[viewState.pinnedColumns.length - 1] 
+    : 'select';
 
   // Virtual scrolling setup
   const { rows } = table.getRowModel();
@@ -365,39 +406,55 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
       className="relative h-full w-full overflow-auto rounded-md border border-border bg-background"
     >
       <table className="border-collapse" style={{ width: table.getCenterTotalSize(), tableLayout: 'fixed' }}>
-        <thead className="sticky top-0 z-10 bg-muted/50 backdrop-blur">
+        <thead className="sticky top-0 z-30 bg-muted/50 backdrop-blur">
           {table.getHeaderGroups().map((headerGroup) => (
             <tr key={headerGroup.id} className="border-b border-border">
-              {headerGroup.headers.map((header) => (
-                <th
-                  key={header.id}
-                  className={cn(
-                    'relative border-r border-border px-3 text-left text-xs font-medium overflow-hidden',
-                    rowHeightClasses[rowHeight]
-                  )}
-                  style={{ width: `${header.getSize()}px`, maxWidth: `${header.getSize()}px` }}
-                >
-                  {header.isPlaceholder
-                    ? null
-                    : flexRender(header.column.columnDef.header, header.getContext())}
-                  {header.column.getCanResize() && (
-                    <div
-                      onMouseDown={header.getResizeHandler()}
-                      onTouchStart={header.getResizeHandler()}
-                      className={cn(
-                        'absolute right-0 top-0 h-full w-[3px] cursor-col-resize select-none touch-none',
-                        'bg-transparent hover:bg-primary/50 active:bg-primary transition-colors',
-                        'after:absolute after:right-0 after:top-0 after:h-full after:w-[8px] after:-translate-x-1/2',
-                        header.column.getIsResizing() && 'bg-primary'
-                      )}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                      }}
-                      title="Drag to resize column"
-                    />
-                  )}
-                </th>
-              ))}
+              {headerGroup.headers.map((header, index) => {
+                const columnId = header.column.id;
+                const isPinned = columnId === 'select' || viewState.pinnedColumns.includes(columnId);
+                const stickyLeft = columnId === 'select' ? 0 : stickyPositions[columnId];
+                const isLastPinned = columnId === lastPinnedColumn;
+                
+                return (
+                  <th
+                    key={header.id}
+                    className={cn(
+                      'relative border-r border-border px-3 text-left text-xs font-medium overflow-hidden',
+                      rowHeightClasses[rowHeight],
+                      isPinned ? 'sticky z-40' : 'bg-muted/50 backdrop-blur',
+                      isLastPinned && 'shadow-[2px_0_4px_rgba(0,0,0,0.1)]'
+                    )}
+                    style={{ 
+                      width: `${header.getSize()}px`, 
+                      maxWidth: `${header.getSize()}px`,
+                      ...(isPinned ? { 
+                        left: `${stickyLeft}px`,
+                        backgroundColor: 'hsl(var(--muted))'
+                      } : {})
+                    }}
+                  >
+                    {header.isPlaceholder
+                      ? null
+                      : flexRender(header.column.columnDef.header, header.getContext())}
+                    {header.column.getCanResize() && (
+                      <div
+                        onMouseDown={header.getResizeHandler()}
+                        onTouchStart={header.getResizeHandler()}
+                        className={cn(
+                          'absolute right-0 top-0 h-full w-[3px] cursor-col-resize select-none touch-none',
+                          'bg-transparent hover:bg-primary/50 active:bg-primary transition-colors',
+                          'after:absolute after:right-0 after:top-0 after:h-full after:w-[8px] after:-translate-x-1/2',
+                          header.column.getIsResizing() && 'bg-primary'
+                        )}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                        }}
+                        title="Drag to resize column"
+                      />
+                    )}
+                  </th>
+                );
+              })}
             </tr>
           ))}
         </thead>
@@ -435,7 +492,7 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
                       }
                     }}
                     className={cn(
-                      'border-b border-border transition-colors',
+                      'border-b border-border group/row',
                       // Base zebra striping
                       idx % 2 === 0 ? 'bg-background' : 'bg-muted/30',
                       // Hover states with zebra striping maintained (using primary color)
@@ -448,9 +505,28 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
                       rowHeightClasses[rowHeight]
                     )}
                   >
-                    {row.getVisibleCells().map((cell) => {
+                    {row.getVisibleCells().map((cell, cellIndex) => {
                       const colConfig = config.columns.find(c => c.id === cell.column.id);
                       const isEditable = colConfig ? canEdit && (colConfig.editable ?? true) : true;
+                      const columnId = cell.column.id;
+                      const isPinned = columnId === 'select' || viewState.pinnedColumns.includes(columnId);
+                      const stickyLeft = columnId === 'select' ? 0 : stickyPositions[columnId];
+                      const isLastPinned = columnId === lastPinnedColumn;
+                      
+                      // Determine background color for pinned cells
+                      const getBgColor = () => {
+                        if (!isPinned) return undefined;
+                        
+                        if (selectedRows.has(row.id) && !isEmptyRow) {
+                          return 'hsl(var(--primary) / 0.1)';
+                        } else if (isEmptyRow) {
+                          return 'hsl(var(--muted) / 0.1)';
+                        } else if (idx % 2 === 0) {
+                          return 'hsl(var(--background))';
+                        } else {
+                          return 'hsl(var(--muted) / 0.3)';
+                        }
+                      };
                       
                       return (
                       <td
@@ -458,9 +534,18 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
                         className={cn(
                           'border-r border-border p-0 overflow-hidden',
                           rowHeightClasses[rowHeight],
-                          !isEditable && 'cursor-not-allowed'
+                          !isEditable && 'cursor-not-allowed',
+                          isPinned && 'sticky z-20',
+                          isLastPinned && 'shadow-[2px_0_4px_rgba(0,0,0,0.1)]'
                         )}
-                        style={{ width: `${cell.column.getSize()}px`, maxWidth: `${cell.column.getSize()}px` }}
+                        style={{ 
+                          width: `${cell.column.getSize()}px`, 
+                          maxWidth: `${cell.column.getSize()}px`,
+                          ...(isPinned ? { 
+                            left: `${stickyLeft}px`,
+                            backgroundColor: getBgColor()
+                          } : {})
+                        }}
                       >
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
                       </td>

@@ -8,7 +8,9 @@ import {
   saveColumnWidths,
   loadColumnWidths,
   saveHiddenColumns,
-  loadHiddenColumns
+  loadHiddenColumns,
+  savePinnedColumns,
+  loadPinnedColumns
 } from '@/lib/utils/storage';
 
 export type RowHeight = 'compact' | 'comfortable' | 'spacious';
@@ -36,6 +38,8 @@ interface SheetStore {
   setSorts: (sorts: ViewState['sorts']) => void;
   setSearchQuery: (query: string) => void;
   setHiddenColumns: (columns: string[]) => void;
+  setPinnedColumns: (columns: string[]) => void;
+  toggleColumnPin: (columnId: string) => void;
   resetViewState: () => void;
   loadViewStateForSheet: (sheetId: string) => void;
 
@@ -59,6 +63,7 @@ const defaultViewState: ViewState = {
   sorts: [],
   searchQuery: '',
   hiddenColumns: [],
+  pinnedColumns: [],
 };
 
 export const useSheetStore = create<SheetStore>((set, get) => ({
@@ -154,20 +159,45 @@ export const useSheetStore = create<SheetStore>((set, get) => ({
     const { activeSheetId } = get();
     saveHiddenColumns(activeSheetId, columns);
   },
+  setPinnedColumns: (columns) => {
+    set((state) => ({
+      viewState: { ...state.viewState, pinnedColumns: columns },
+    }));
+    const { activeSheetId } = get();
+    savePinnedColumns(activeSheetId, columns);
+  },
+  toggleColumnPin: (columnId) => {
+    set((state) => {
+      const { pinnedColumns } = state.viewState;
+      const newPinnedColumns = pinnedColumns.includes(columnId)
+        ? pinnedColumns.filter((id) => id !== columnId)
+        : [...pinnedColumns, columnId];
+      
+      const { activeSheetId } = get();
+      savePinnedColumns(activeSheetId, newPinnedColumns);
+      
+      return {
+        viewState: { ...state.viewState, pinnedColumns: newPinnedColumns },
+      };
+    });
+  },
   resetViewState: () => {
     set({ viewState: defaultViewState });
     const { activeSheetId } = get();
     saveFilters(activeSheetId, {});
     saveHiddenColumns(activeSheetId, []);
+    savePinnedColumns(activeSheetId, []);
   },
   loadViewStateForSheet: (sheetId) => {
     const columnFilters = loadFilters(sheetId);
     const hiddenColumns = loadHiddenColumns(sheetId);
+    const pinnedColumns = loadPinnedColumns(sheetId);
     set((state) => ({
       viewState: {
         ...state.viewState,
         columnFilters,
         hiddenColumns,
+        pinnedColumns,
       },
     }));
   },

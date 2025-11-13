@@ -12,6 +12,7 @@ const STORAGE_KEYS = {
   rowHeight: (sheetId: string) => `sheet-row-height-${sheetId}`,
   columnVisibility: (sheetId: string) => `column-visibility-${sheetId}`,
   hiddenColumns: (sheetId: string) => `sheet-hidden-columns-${sheetId}`,
+  pinnedColumns: (sheetId: string) => `sheet-pinned-columns-${sheetId}`,
 };
 
 /**
@@ -148,6 +149,32 @@ export function loadHiddenColumns(sheetId: string): string[] {
 }
 
 /**
+ * Save pinned columns to localStorage
+ */
+export function savePinnedColumns(sheetId: string, columns: string[]): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(STORAGE_KEYS.pinnedColumns(sheetId), JSON.stringify(columns));
+  } catch (error) {
+    console.error('Failed to save pinned columns to localStorage:', error);
+  }
+}
+
+/**
+ * Load pinned columns from localStorage
+ */
+export function loadPinnedColumns(sheetId: string): string[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const stored = localStorage.getItem(STORAGE_KEYS.pinnedColumns(sheetId));
+    return stored ? JSON.parse(stored) : [];
+  } catch (error) {
+    console.error('Failed to load pinned columns from localStorage:', error);
+    return [];
+  }
+}
+
+/**
  * Clear all stored data for a specific sheet
  */
 export function clearSheetStorage(sheetId: string): void {
@@ -158,6 +185,7 @@ export function clearSheetStorage(sheetId: string): void {
     localStorage.removeItem(STORAGE_KEYS.rowHeight(sheetId));
     localStorage.removeItem(STORAGE_KEYS.columnVisibility(sheetId));
     localStorage.removeItem(STORAGE_KEYS.hiddenColumns(sheetId));
+    localStorage.removeItem(STORAGE_KEYS.pinnedColumns(sheetId));
   } catch (error) {
     console.error('Failed to clear sheet storage:', error);
   }
