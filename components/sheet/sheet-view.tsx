@@ -25,6 +25,7 @@ interface SheetViewProps {
 export function SheetView({ config, userRole }: SheetViewProps) {
   const [data, setData] = useState<RowData[]>([]);
   const [localError, setLocalError] = useState<string | null>(null);
+  const [convertedEmptyRows, setConvertedEmptyRows] = useState<Set<string>>(new Set());
   const { 
     viewState, 
     selectedRows, 
@@ -96,10 +97,22 @@ export function SheetView({ config, userRole }: SheetViewProps) {
   }, [config.views, viewState.columnFilters, setColumnFilter]);
 
   // Update data when API data changes
+  // Merge API data with locally created rows (rows with IDs starting with 'row-')
   useEffect(() => {
     if (apiData) {
-      setData(apiData);
+      setData((prevData) => {
+        // Find locally created rows (rows with IDs starting with 'row-')
+        const localRows = prevData.filter((row) => {
+          const rowIdString = String(row.id);
+          return rowIdString.startsWith('row-');
+        });
+        
+        // Merge API data with local rows
+        // Local rows are appended so they appear at the bottom
+        return [...apiData, ...localRows];
+      });
       setLocalError(null);
+      // Don't clear converted empty rows - they should persist until page refresh
     }
   }, [apiData]);
 
@@ -130,9 +143,16 @@ export function SheetView({ config, userRole }: SheetViewProps) {
     }
 
     // Add 50 empty editable rows at the bottom (virtual scrolling handles rendering)
+    // Exclude empty rows that have been converted to real rows
     const emptyRows = Array.from({ length: 50 }, (_, i) => {
+      const emptyRowId = `empty-${i}`;
+      // Skip if this empty row has been converted
+      if (convertedEmptyRows.has(emptyRowId)) {
+        return null;
+      }
+      
       const emptyRow: any = {
-        id: `empty-${i}`,
+        id: emptyRowId,
         createdAt: new Date(),
         updatedAt: new Date(),
         createdBy: 'user-1',
@@ -151,10 +171,10 @@ export function SheetView({ config, userRole }: SheetViewProps) {
       }
 
       return emptyRow;
-    });
+    }).filter((row): row is any => row !== null);
 
     return [...result, ...emptyRows];
-  }, [data, viewState.columnFilters, config.columns]);
+  }, [data, viewState.columnFilters, config.columns, convertedEmptyRows]);
 
   const handleCellUpdate = async (rowId: string, columnId: string, value: any) => {
     // Check if this is the shipment_no column for escalation sheet
@@ -180,6 +200,9 @@ export function SheetView({ config, userRole }: SheetViewProps) {
 
     // Check if this is an empty row being edited
     if (rowIdString.startsWith('empty-')) {
+      // Mark this empty row as converted so it won't appear again
+      setConvertedEmptyRows((prev) => new Set(prev).add(rowIdString));
+      
       // Convert empty row to real row
       const newRow: any = {
         id: `row-${Date.now()}`,
