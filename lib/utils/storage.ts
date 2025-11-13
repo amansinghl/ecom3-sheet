@@ -2,7 +2,7 @@
  * Utility functions for managing persistent state in localStorage
  */
 
-import { Filter } from '@/types';
+import { ColumnFilter } from '@/types';
 import { RowHeight } from '@/lib/store/sheet-store';
 
 // Storage keys
@@ -17,7 +17,7 @@ const STORAGE_KEYS = {
 /**
  * Save filters to localStorage
  */
-export function saveFilters(sheetId: string, filters: Filter[]): void {
+export function saveFilters(sheetId: string, filters: Record<string, ColumnFilter>): void {
   if (typeof window === 'undefined') return;
   try {
     localStorage.setItem(STORAGE_KEYS.filters(sheetId), JSON.stringify(filters));
@@ -29,14 +29,14 @@ export function saveFilters(sheetId: string, filters: Filter[]): void {
 /**
  * Load filters from localStorage
  */
-export function loadFilters(sheetId: string): Filter[] {
-  if (typeof window === 'undefined') return [];
+export function loadFilters(sheetId: string): Record<string, ColumnFilter> {
+  if (typeof window === 'undefined') return {};
   try {
     const stored = localStorage.getItem(STORAGE_KEYS.filters(sheetId));
-    return stored ? JSON.parse(stored) : [];
+    return stored ? JSON.parse(stored) : {};
   } catch (error) {
     console.error('Failed to load filters from localStorage:', error);
-    return [];
+    return {};
   }
 }
 
