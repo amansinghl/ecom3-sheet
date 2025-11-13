@@ -3,6 +3,7 @@ import Credentials from 'next-auth/providers/credentials';
 import { UserRole } from '@/types';
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
+  secret: process.env.NEXTAUTH_SECRET,
   providers: [
     Credentials({
       id: 'token',
