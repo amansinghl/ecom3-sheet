@@ -25,7 +25,6 @@ interface SheetViewProps {
 export function SheetView({ config, userRole }: SheetViewProps) {
   const [data, setData] = useState<RowData[]>([]);
   const [localError, setLocalError] = useState<string | null>(null);
-  const [convertedEmptyRows, setConvertedEmptyRows] = useState<Set<string>>(new Set());
   const { 
     viewState, 
     selectedRows, 
@@ -97,22 +96,10 @@ export function SheetView({ config, userRole }: SheetViewProps) {
   }, [config.views, viewState.columnFilters, setColumnFilter]);
 
   // Update data when API data changes
-  // Merge API data with locally created rows (rows with IDs starting with 'row-')
   useEffect(() => {
     if (apiData) {
-      setData((prevData) => {
-        // Find locally created rows (rows with IDs starting with 'row-')
-        const localRows = prevData.filter((row) => {
-          const rowIdString = String(row.id);
-          return rowIdString.startsWith('row-');
-        });
-        
-        // Merge API data with local rows
-        // Local rows are appended so they appear at the bottom
-        return [...apiData, ...localRows];
-      });
+      setData(apiData);
       setLocalError(null);
-      // Don't clear converted empty rows - they should persist until page refresh
     }
   }, [apiData]);
 
@@ -136,23 +123,43 @@ export function SheetView({ config, userRole }: SheetViewProps) {
   const filteredData = useMemo(() => {
     let result = data;
 
+    console.log('Active filters:', viewState.columnFilters);
+    console.log('Data before filtering:', data.length, 'rows');
+
     // Apply column filters
     if (Object.keys(viewState.columnFilters).length > 0) {
       const { applyFilters } = require('@/lib/utils/filter-data');
       result = applyFilters(result, viewState.columnFilters, config.columns);
+      console.log('Data after filtering:', result.length, 'rows');
+      console.log('Filtered out:', data.length - result.length, 'rows');
     }
 
+    // Get list of filled empty row IDs to skip
+    const filledEmptyIds = new Set(
+      data.filter(row => String(row.id).startsWith('empty-') && row._isFilled).map(row => row.id)
+    );
+    console.log('Filled empty row IDs:', Array.from(filledEmptyIds));
+    console.log('Total data rows:', data.length);
+    console.log('Data rows detail:', data.map(r => ({ 
+      id: r.id, 
+      shipment_no: r.shipment_no,
+      awb_no: r.awb_no,
+      _isFilled: r._isFilled 
+    })));
+
     // Add 50 empty editable rows at the bottom (virtual scrolling handles rendering)
-    // Exclude empty rows that have been converted to real rows
+    // Skip rows that have been filled
     const emptyRows = Array.from({ length: 50 }, (_, i) => {
-      const emptyRowId = `empty-${i}`;
-      // Skip if this empty row has been converted
-      if (convertedEmptyRows.has(emptyRowId)) {
+      const emptyId = `empty-${i}`;
+      
+      // Skip if this empty row has been filled
+      if (filledEmptyIds.has(emptyId)) {
+        console.log(`Skipping empty row ${emptyId} because it's filled`);
         return null;
       }
       
       const emptyRow: any = {
-        id: emptyRowId,
+        id: emptyId,
         createdAt: new Date(),
         updatedAt: new Date(),
         createdBy: 'user-1',
@@ -171,14 +178,15 @@ export function SheetView({ config, userRole }: SheetViewProps) {
       }
 
       return emptyRow;
-    }).filter((row): row is any => row !== null);
+    }).filter(Boolean); // Remove null entries
 
     return [...result, ...emptyRows];
-  }, [data, viewState.columnFilters, config.columns, convertedEmptyRows]);
+  }, [data, viewState.columnFilters, config.columns, config.id]);
 
   const handleCellUpdate = async (rowId: string, columnId: string, value: any) => {
     // Check if this is the shipment_no column for escalation sheet
-    const isShipmentNoUpdate = columnId === 'shipment_no' && config.id === 'escalations' && value;
+    // Check for null/undefined explicitly to allow 0 as a valid value
+    const isShipmentNoUpdate = columnId === 'shipment_no' && config.id === 'escalations' && (value !== null && value !== undefined && value !== '');
 
     // Convert rowId to string to handle cases where it might be a number from API
     const rowIdString = String(rowId);
@@ -200,51 +208,93 @@ export function SheetView({ config, userRole }: SheetViewProps) {
 
     // Check if this is an empty row being edited
     if (rowIdString.startsWith('empty-')) {
-      // Mark this empty row as converted so it won't appear again
-      setConvertedEmptyRows((prev) => new Set(prev).add(rowIdString));
+      // Extract the empty row index
+      const emptyIndex = parseInt(rowIdString.replace('empty-', ''));
       
-      // Convert empty row to real row
-      const newRow: any = {
-        id: `row-${Date.now()}`,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        createdBy: 'user-1',
-        updatedBy: 'user-1',
-      };
-
-      config.columns.forEach((col) => {
-        newRow[col.id] = col.id === columnId ? value : col.defaultValue || null;
-      });
-
-      setData((prev) => [...prev, newRow]);
-
-      // If shipment number was entered in empty row, fetch details from backend
+      // If shipment number was entered in empty row, fetch details from backend and create new row
       if (isShipmentNoUpdate) {
+        // First, immediately update the row with the entered value
+        const tempRow: any = {
+          id: rowIdString, // Keep the empty row ID temporarily
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          createdBy: 'user-1',
+          updatedBy: 'user-1',
+          _isFilled: true, // Mark as filled so it won't be regenerated
+        };
+        
+        config.columns.forEach((col) => {
+          tempRow[col.id] = col.id === columnId ? value : col.defaultValue || null;
+        });
+        
+        // Set is_closed to 0 (open) by default for escalation sheet
+        if (config.id === 'escalations') {
+          tempRow.is_closed = 0;
+        }
+        
+        // Add the filled row to data
+        console.log('Adding temp row:', tempRow);
+        setData((prev) => {
+          console.log('Previous data length:', prev.length);
+          const newData = [...prev, tempRow];
+          console.log('New data length:', newData.length);
+          console.log('Temp row added, ID:', tempRow.id);
+          return newData;
+        });
+        
+        // Then fetch the full data from API
         try {
           toast.loading('Fetching escalation details...', { id: 'fetch-escalation' });
           const response = await sheetApiService.updateEscalationSheet(String(value));
+          console.log('API response received:', response.data?.escalation);
           
           if (response.data?.escalation) {
-            // Update the newly created row with data from backend
-            setData((prev) =>
-              prev.map((row) => {
-                if (String(row.id) === String(newRow.id)) {
+            // Update the row with data from backend
+            setData((prev) => {
+              console.log('Updating row with ID:', rowIdString);
+              console.log('Prev data before update:', prev.map(r => ({ id: r.id, _isFilled: r._isFilled })));
+              const updated = prev.map((row) => {
+                if (String(row.id) === rowIdString) {
+                  console.log('Found matching row, updating with:', response.data.escalation);
                   return {
                     ...row,
                     ...response.data.escalation,
-                    id: row.id, // Keep the generated ID
+                    id: row.id, // Preserve the original ID (empty-X)
+                    _isFilled: true, // Preserve the filled flag
+                    [columnId]: value, // Ensure the edited field is preserved
                     updatedAt: new Date(),
                   };
                 }
                 return row;
-              })
-            );
+              });
+              console.log('Updated data:', updated.map(r => ({ id: r.id, _isFilled: r._isFilled })));
+              return updated;
+            });
             toast.success('Escalation details loaded successfully', { id: 'fetch-escalation' });
+          } else {
+            toast.error('No escalation data received', { id: 'fetch-escalation' });
           }
         } catch (error: any) {
           console.error('Failed to fetch escalation details:', error);
           toast.error(error.message || 'Failed to fetch escalation details', { id: 'fetch-escalation' });
         }
+      } else {
+        // Not a shipment number update, just fill the empty row with the entered value
+        const filledRow: any = {
+          id: rowIdString, // Keep the empty row ID
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          createdBy: 'user-1',
+          updatedBy: 'user-1',
+          _isFilled: true, // Mark as filled
+        };
+
+        config.columns.forEach((col) => {
+          filledRow[col.id] = col.id === columnId ? value : col.defaultValue || null;
+        });
+
+        // Add the filled row to data
+        setData((prev) => [...prev, filledRow]);
       }
     } else {
       // Update existing row
@@ -357,6 +407,8 @@ export function SheetView({ config, userRole }: SheetViewProps) {
               })
             );
             toast.success('Escalation details loaded successfully', { id: 'fetch-escalation' });
+          } else {
+            toast.error('No escalation data received', { id: 'fetch-escalation' });
           }
         } catch (error: any) {
           console.error('Failed to fetch escalation details:', error);

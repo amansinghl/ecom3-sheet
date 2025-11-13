@@ -238,7 +238,10 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
     });
 
     return cols;
-  }, [config, canEdit, editingCell, setEditingCell, onCellUpdate, hoveredRow, columnWidths, hoveredColumn, openFilterPopover, viewState.columnFilters, data, setColumnFilter]);
+    // Note: hoveredRow, hoveredColumn, and openFilterPopover are intentionally NOT in dependencies
+    // They are UI state used only for styling/display and don't affect column structure
+    // Including them would cause columns to regenerate on every mouse move, remounting all cells
+  }, [config, canEdit, editingCell, setEditingCell, onCellUpdate, columnWidths, viewState.columnFilters, setColumnFilter]);
 
   const table = useReactTable({
     data,
