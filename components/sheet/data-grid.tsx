@@ -367,12 +367,19 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
     overscan: 10, // Render 10 extra rows outside viewport
   });
 
-  // Scroll to editing cell when it changes
+  // Scroll to editing cell when it changes (only if not visible)
   useEffect(() => {
     if (editingCell && editingCell !== prevEditingCellRef.current) {
       const rowIndex = rows.findIndex(row => row.id === editingCell.rowId);
       if (rowIndex !== -1) {
-        rowVirtualizer.scrollToIndex(rowIndex, { align: 'center', behavior: 'smooth' });
+        // Check if the row is already visible in the viewport
+        const virtualItems = rowVirtualizer.getVirtualItems();
+        const isVisible = virtualItems.some(item => item.index === rowIndex);
+        
+        // Only scroll if the row is not visible, and use 'start' alignment to keep position
+        if (!isVisible) {
+          rowVirtualizer.scrollToIndex(rowIndex, { align: 'start', behavior: 'smooth' });
+        }
       }
     }
     prevEditingCellRef.current = editingCell;

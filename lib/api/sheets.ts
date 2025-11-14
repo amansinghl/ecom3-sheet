@@ -157,6 +157,27 @@ class SheetApiService {
   }
 
   /**
+   * Delete escalation by id and shipment number
+   * 
+   * @param id The ID of the escalation record
+   * @param shipment_no Shipment number to delete
+   * @returns API response
+   * @throws Error if API request fails
+   */
+  async deleteEscalation(id: number | string, shipment_no: string | number): Promise<ApiResponse<any>> {
+    try {
+      const response = await apiClient.post<ApiResponse<any>>(
+        `/sheets/escalation/delete/${id}`,
+        { shipment_no: shipment_no }
+      );
+      return response;
+    } catch (error) {
+      console.error('Failed to delete escalation:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Get tech sheet data
    * Fetches tech sheet records from backend
    * 

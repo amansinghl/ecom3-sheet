@@ -427,7 +427,15 @@ export function SheetView({ config, userRole }: SheetViewProps) {
 
           // Call the update-entries API
           await sheetApiService.updateEscalationEntries(actualRowId, updatePayload);
-          // Success is handled silently - the UI is already updated
+          
+          // Show success message with row identifier
+          const columnLabel = config.columns.find((col) => col.id === columnId)?.label || columnId;
+          const rowIdentifier = currentRow?.shipment_no 
+            ? `shipment_no: ${currentRow.shipment_no}` 
+            : `row ID: ${actualRowId}`;
+          toast.success(`Updated ${columnLabel} for ${rowIdentifier}`, { 
+            id: `update-${actualRowId}-${columnId}` 
+          });
         } catch (error: any) {
           console.error('Failed to update escalation entry:', error);
           toast.error(error.message || 'Failed to update field');
@@ -471,6 +479,8 @@ export function SheetView({ config, userRole }: SheetViewProps) {
 
     setData((prev) => [...prev, newRow]); // Add at bottom
     
+    toast.success('New row added', { id: 'add-row' });
+    
     // Focus on the first cell of the newly created row
     setTimeout(() => {
       const firstColumn = config.columns[0];
@@ -480,9 +490,68 @@ export function SheetView({ config, userRole }: SheetViewProps) {
     }, 0);
   };
 
-  const handleDeleteRows = () => {
+  const handleDeleteRows = async () => {
+    const deletedCount = selectedRows.size;
+    const deletedRows = data.filter((row) => selectedRows.has(row.id));
+    
+    if (deletedCount === 0) return;
+    
+    // Filter rows that have shipment_no (existing rows from backend)
+    const rowsToDelete = deletedRows.filter((row) => {
+      const isExistingRow = typeof row.id === 'number' || (typeof row.id === 'string' && !row.id.startsWith('row-') && !row.id.startsWith('empty-'));
+      return isExistingRow && row.shipment_no;
+    });
+    
+    // Optimistically remove from UI
     setData((prev) => prev.filter((row) => !selectedRows.has(row.id)));
     clearSelection();
+    
+    // Delete from backend if escalation sheet and rows have shipment_no and id
+    if (config.id === 'escalations' && rowsToDelete.length > 0) {
+      toast.loading(`Deleting ${rowsToDelete.length} row${rowsToDelete.length > 1 ? 's' : ''}...`, { id: 'delete-rows' });
+      
+      try {
+        // Delete all rows in parallel
+        await Promise.all(
+          rowsToDelete
+            .filter((row) => row.id) // Only delete rows that have an id
+            .map((row) => 
+              sheetApiService.deleteEscalation(row.id, row.shipment_no)
+            )
+        );
+        
+        const shipmentNos = rowsToDelete
+          .map((row) => row.shipment_no)
+          .filter(Boolean)
+          .slice(0, 3)
+          .join(', ');
+        const moreText = rowsToDelete.length > 3 ? ` and ${rowsToDelete.length - 3} more` : '';
+        toast.success(`Deleted ${rowsToDelete.length} row${rowsToDelete.length > 1 ? 's' : ''}${shipmentNos ? ` (${shipmentNos}${moreText})` : ''}`, {
+          id: 'delete-rows'
+        });
+      } catch (error: any) {
+        console.error('Failed to delete rows:', error);
+        toast.error(error.message || 'Failed to delete rows. Please refresh and try again.', {
+          id: 'delete-rows'
+        });
+        
+        // Refresh data to restore deleted rows
+        if (refetch) {
+          await refetch();
+        }
+      }
+    } else {
+      // For new rows or non-escalation sheets, just show success
+      const shipmentNos = deletedRows
+        .map((row) => row.shipment_no)
+        .filter(Boolean)
+        .slice(0, 3)
+        .join(', ');
+      const moreText = deletedCount > 3 ? ` and ${deletedCount - 3} more` : '';
+      toast.success(`Deleted ${deletedCount} row${deletedCount > 1 ? 's' : ''}${shipmentNos ? ` (${shipmentNos}${moreText})` : ''}`, {
+        id: 'delete-rows'
+      });
+    }
   };
 
   const handleDuplicateRow = (rowId: string) => {
@@ -506,6 +575,11 @@ export function SheetView({ config, userRole }: SheetViewProps) {
       newRow,
       ...prev.slice(index + 1),
     ]);
+    
+    const rowIdentifier = rowToDuplicate.shipment_no 
+      ? `shipment_no: ${rowToDuplicate.shipment_no}` 
+      : `row ID: ${rowIdString}`;
+    toast.success(`Duplicated row (${rowIdentifier})`, { id: `duplicate-${rowIdString}` });
   };
 
   const handleCopyRow = (rowId: string) => {
@@ -546,11 +620,52 @@ export function SheetView({ config, userRole }: SheetViewProps) {
       // Fallback for older browsers
       navigator.clipboard.writeText(textData);
     }
+    
+    const rowIdentifier = rowToCopy.shipment_no 
+      ? `shipment_no: ${rowToCopy.shipment_no}` 
+      : `row ID: ${rowIdString}`;
+    toast.success(`Copied row data (${rowIdentifier}) to clipboard`, { id: `copy-${rowIdString}` });
   };
 
-  const handleDeleteRow = (rowId: string) => {
+  const handleDeleteRow = async (rowId: string) => {
     const rowIdString = String(rowId);
+    const rowToDelete = data.find((row) => String(row.id) === rowIdString);
+    
+    if (!rowToDelete) return;
+    
+    const isExistingRow = typeof rowToDelete.id === 'number' || (typeof rowToDelete.id === 'string' && !rowToDelete.id.startsWith('row-') && !rowToDelete.id.startsWith('empty-'));
+    const hasShipmentNo = rowToDelete.shipment_no;
+    
+    // Optimistically remove from UI
     setData((prev) => prev.filter((row) => String(row.id) !== rowIdString));
+    
+    // Delete from backend if escalation sheet and row has shipment_no and id
+    if (config.id === 'escalations' && isExistingRow && hasShipmentNo && rowToDelete.id) {
+      toast.loading('Deleting row...', { id: `delete-${rowIdString}` });
+      
+      try {
+        await sheetApiService.deleteEscalation(rowToDelete.id, rowToDelete.shipment_no);
+        toast.success(`Deleted row (shipment_no: ${rowToDelete.shipment_no})`, { 
+          id: `delete-${rowIdString}` 
+        });
+      } catch (error: any) {
+        console.error('Failed to delete row:', error);
+        toast.error(error.message || 'Failed to delete row. Please refresh and try again.', {
+          id: `delete-${rowIdString}`
+        });
+        
+        // Refresh data to restore deleted row
+        if (refetch) {
+          await refetch();
+        }
+      }
+    } else {
+      // For new rows or non-escalation sheets, just show success
+      const rowIdentifier = rowToDelete.shipment_no 
+        ? `shipment_no: ${rowToDelete.shipment_no}` 
+        : `row ID: ${rowIdString}`;
+      toast.success(`Deleted row (${rowIdentifier})`, { id: `delete-${rowIdString}` });
+    }
   };
 
   const handleBulkUpload = () => {
@@ -561,9 +676,17 @@ export function SheetView({ config, userRole }: SheetViewProps) {
     // Save current scroll position
     const scrollTop = scrollContainerRef.current?.scrollTop || 0;
     
+    // Show loading toast
+    toast.loading('Refreshing escalation sheet...', { id: 'refresh' });
+    
     // Refresh the data
     if (refetch) {
-      await refetch();
+      try {
+        await refetch();
+        toast.success('Escalation sheet refreshed successfully', { id: 'refresh' });
+      } catch (error: any) {
+        toast.error('Failed to refresh escalation sheet', { id: 'refresh' });
+      }
     }
     
     // Restore scroll position after data is loaded and DOM is updated
