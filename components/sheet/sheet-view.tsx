@@ -130,10 +130,23 @@ export function SheetView({ config, userRole }: SheetViewProps) {
       result = applyFilters(result, viewState.columnFilters, config.columns);
     }
 
+    // Get list of filled empty row IDs to skip
+    const filledEmptyIds = new Set(
+      data.filter(row => String(row.id).startsWith('empty-') && row._isFilled).map(row => row.id)
+    );
+
     // Add 50 empty editable rows at the bottom (virtual scrolling handles rendering)
+    // Skip rows that have been filled
     const emptyRows = Array.from({ length: 50 }, (_, i) => {
+      const emptyId = `empty-${i}`;
+      
+      // Skip if this empty row has been filled
+      if (filledEmptyIds.has(emptyId)) {
+        return null;
+      }
+      
       const emptyRow: any = {
-        id: `empty-${i}`,
+        id: emptyId,
         createdAt: new Date(),
         updatedAt: new Date(),
         createdBy: 'user-1',
@@ -152,14 +165,15 @@ export function SheetView({ config, userRole }: SheetViewProps) {
       }
 
       return emptyRow;
-    });
+    }).filter(Boolean); // Remove null entries
 
     return [...result, ...emptyRows];
-  }, [data, viewState.columnFilters, config.columns]);
+  }, [data, viewState.columnFilters, config.columns, config.id]);
 
   const handleCellUpdate = async (rowId: string, columnId: string, value: any) => {
     // Check if this is the shipment_no column for escalation sheet
-    const isShipmentNoUpdate = columnId === 'shipment_no' && config.id === 'escalations' && value;
+    // Check for null/undefined explicitly to allow 0 as a valid value
+    const isShipmentNoUpdate = columnId === 'shipment_no' && config.id === 'escalations' && (value !== null && value !== undefined && value !== '');
 
     // Convert rowId to string to handle cases where it might be a number from API
     const rowIdString = String(rowId);
@@ -193,23 +207,34 @@ export function SheetView({ config, userRole }: SheetViewProps) {
 
     // Check if this is an empty row being edited
     if (rowIdString.startsWith('empty-')) {
-      // Convert empty row to real row
-      const newRow: any = {
-        id: `row-${Date.now()}`,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        createdBy: 'user-1',
-        updatedBy: 'user-1',
-      };
-
-      config.columns.forEach((col) => {
-        newRow[col.id] = col.id === columnId ? value : col.defaultValue || null;
-      });
-
-      setData((prev) => [...prev, newRow]);
-
-      // If shipment number was entered in empty row, fetch details from backend
+      // Extract the empty row index
+      const emptyIndex = parseInt(rowIdString.replace('empty-', ''));
+      
+      // If shipment number was entered in empty row, fetch details from backend and create new row
       if (isShipmentNoUpdate) {
+        // First, immediately update the row with the entered value
+        const tempRow: any = {
+          id: rowIdString, // Keep the empty row ID temporarily
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          createdBy: 'user-1',
+          updatedBy: 'user-1',
+          _isFilled: true, // Mark as filled so it won't be regenerated
+        };
+        
+        config.columns.forEach((col) => {
+          tempRow[col.id] = col.id === columnId ? value : col.defaultValue || null;
+        });
+        
+        // Set is_closed to 0 (open) by default for escalation sheet
+        if (config.id === 'escalations') {
+          tempRow.is_closed = 0;
+        }
+        
+        // Add the filled row to data
+        setData((prev) => [...prev, tempRow]);
+        
+        // Then fetch the full data from API
         try {
           toast.loading('Fetching escalation details...', { id: 'fetch-escalation' });
           const response = await sheetApiService.updateEscalationSheet(String(value));
@@ -220,7 +245,7 @@ export function SheetView({ config, userRole }: SheetViewProps) {
             const backendId = response.data.escalation.id;
             setData((prev) =>
               prev.map((row) => {
-                if (String(row.id) === String(newRow.id)) {
+                if (String(row.id) === rowIdString) {
                   return {
                     ...row,
                     ...response.data.escalation,
@@ -240,11 +265,30 @@ export function SheetView({ config, userRole }: SheetViewProps) {
                 setEditingCell({ rowId: backendId, columnId: 'manual_case' });
               }
             }, 100);
+          } else {
+            toast.error('No escalation data received', { id: 'fetch-escalation' });
           }
         } catch (error: any) {
           console.error('Failed to fetch escalation details:', error);
           toast.error(error.message || 'Failed to fetch escalation details', { id: 'fetch-escalation' });
         }
+      } else {
+        // Not a shipment number update, just fill the empty row with the entered value
+        const filledRow: any = {
+          id: rowIdString, // Keep the empty row ID
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          createdBy: 'user-1',
+          updatedBy: 'user-1',
+          _isFilled: true, // Mark as filled
+        };
+
+        config.columns.forEach((col) => {
+          filledRow[col.id] = col.id === columnId ? value : col.defaultValue || null;
+        });
+
+        // Add the filled row to data
+        setData((prev) => [...prev, filledRow]);
       }
     } else if (rowIdString.startsWith('row-')) {
       // This is a new row (not empty, but not saved to backend yet)
@@ -402,7 +446,6 @@ export function SheetView({ config, userRole }: SheetViewProps) {
           );
         }
       }
-
     }
   };
 
