@@ -36,9 +36,10 @@ interface DataGridProps {
   onAddRow?: () => void;
   onClearFilters?: () => void;
   hasActiveFilters?: boolean;
+  scrollContainerRef?: React.RefObject<HTMLDivElement | null>;
 }
 
-export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibility: externalColumnVisibility, onColumnVisibilityChange, onDuplicateRow, onCopyRow, onDeleteRow, onAddRow, onClearFilters, hasActiveFilters }: DataGridProps) {
+export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibility: externalColumnVisibility, onColumnVisibilityChange, onDuplicateRow, onCopyRow, onDeleteRow, onAddRow, onClearFilters, hasActiveFilters, scrollContainerRef }: DataGridProps) {
   const { selectedRows, toggleRowSelection, editingCell, setEditingCell, viewState, rowHeight, columnWidths, setColumnWidth, setColumnFilter } = useSheetStore();
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnResizeMode] = useState<ColumnResizeMode>('onChange');
@@ -48,7 +49,8 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
   const [openFilterPopover, setOpenFilterPopover] = useState<string | null>(null);
   
   // Ref for virtual scrolling container
-  const tableContainerRef = useRef<HTMLDivElement>(null);
+  const internalTableContainerRef = useRef<HTMLDivElement>(null);
+  const tableContainerRef = scrollContainerRef || internalTableContainerRef;
   const prevEditingCellRef = useRef(editingCell);
   
   // Initialize column visibility (empty on server to avoid hydration mismatch)
@@ -212,13 +214,24 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
           const isEditing =
             editingCell?.rowId === row.id && editingCell?.columnId === column.id;
           const value = row.getValue(column.id);
+          
+          // Check if this is shipment_no column and if row is existing (numeric ID)
+          const rowId = row.original.id;
+          const isExistingRow = typeof rowId === 'number' || (typeof rowId === 'string' && !rowId.startsWith('row-') && !rowId.startsWith('empty-'));
+          const isShipmentNoColumn = colConfig.id === 'shipment_no' && config.id === 'escalations';
+          
+          // shipment_no should only be editable for new rows (not existing ones)
+          const isEditable = colConfig.editable ?? true;
+          const canEditThisCell = isShipmentNoColumn 
+            ? (canEdit && isEditable && !isExistingRow)
+            : (canEdit && isEditable);
 
           return (
             <CellRenderer
               value={value}
               columnConfig={colConfig}
               isEditing={isEditing}
-              canEdit={canEdit && (colConfig.editable ?? true)}
+              canEdit={canEditThisCell}
               rowHeight={rowHeight}
               onEdit={() => setEditingCell({ rowId: row.id, columnId: column.id })}
               onSave={(newValue) => {

@@ -24,6 +24,7 @@ interface ToolbarProps {
   onAddRow?: () => void;
   onDeleteRows?: () => void;
   onBulkUpload?: () => void;
+  onRefresh?: () => void;
   columnVisibility?: Record<string, boolean>;
   onColumnVisibilityChange?: (visibility: Record<string, boolean>) => void;
   onOpenCommandPalette?: () => void;
@@ -33,7 +34,7 @@ export interface ToolbarRef {
   focusSearch: () => void;
 }
 
-export const Toolbar = forwardRef<ToolbarRef, ToolbarProps>(({ config, data, userRole, onAddRow, onDeleteRows, onBulkUpload, columnVisibility = {}, onColumnVisibilityChange, onOpenCommandPalette }, ref) => {
+export const Toolbar = forwardRef<ToolbarRef, ToolbarProps>(({ config, data, userRole, onAddRow, onDeleteRows, onBulkUpload, onRefresh, columnVisibility = {}, onColumnVisibilityChange, onOpenCommandPalette }, ref) => {
   useImperativeHandle(ref, () => ({
     focusSearch: () => {
       // Open command palette instead of focusing search
@@ -140,6 +141,18 @@ export const Toolbar = forwardRef<ToolbarRef, ToolbarProps>(({ config, data, use
               Clear
             </Button>
           </div>
+        )}
+
+        {onRefresh && config.id === 'escalations' && (
+          <Button 
+            size="sm" 
+            variant="outline" 
+            onClick={onRefresh} 
+            className="h-7 shrink-0 text-xs px-2"
+          >
+            <RefreshCw className="h-3.5 w-3.5 sm:mr-1.5" />
+            <span className="hidden sm:inline">Refresh</span>
+          </Button>
         )}
 
         {canEdit && onAddRow && (
