@@ -10,10 +10,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { LogOut, User, Settings, Sparkles, Shield, Eye } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { ThemeToggle } from './theme-toggle';
+import { getRandomAvatar } from '@/lib/config/user-avatar';
 
 export function Header() {
   const { data: session } = useSession();
@@ -50,6 +51,7 @@ export function Header() {
 
   const roleConfig = user ? getRoleConfig(user.role) : null;
   const RoleIcon = roleConfig?.icon;
+  const avatarPath = user ? getRandomAvatar(user.email || user.name) : null;
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/80 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60">
@@ -82,6 +84,9 @@ export function Header() {
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="relative h-8 w-8 rounded-full">
                     <Avatar className="h-8 w-8">
+                      {avatarPath && (
+                        <AvatarImage src={avatarPath} alt={user.name || 'User'} />
+                      )}
                       <AvatarFallback className="bg-gradient-to-br from-primary to-purple-600 text-primary-foreground font-semibold text-xs">
                         {user.name
                           ?.split(' ')
@@ -96,6 +101,9 @@ export function Header() {
                   <DropdownMenuLabel className="p-3">
                     <div className="flex items-center gap-3">
                       <Avatar className="h-12 w-12 ring-2 ring-background shadow-sm">
+                        {avatarPath && (
+                          <AvatarImage src={avatarPath} alt={user.name || 'User'} />
+                        )}
                         <AvatarFallback className="bg-gradient-to-br from-primary to-purple-600 text-primary-foreground font-semibold">
                           {user.name
                             ?.split(' ')
