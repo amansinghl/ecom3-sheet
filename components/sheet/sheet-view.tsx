@@ -519,6 +519,11 @@ export function SheetView({ config, userRole }: SheetViewProps) {
   };
 
   const handleAddRow = () => {
+    // Don't allow adding rows in the "Closed Escalations" view
+    if (config.id === 'escalations' && activeViewId === 'closed') {
+      return;
+    }
+
     const newRowId = `row-${Date.now()}`;
     const newRow: any = {
       id: newRowId,
@@ -968,6 +973,7 @@ export function SheetView({ config, userRole }: SheetViewProps) {
             globalSearch,
             onGlobalSearchChange: setGlobalSearch,
             visibleRowCount,
+            activeViewId,
           } as any)}
         />
         <CommandPalette

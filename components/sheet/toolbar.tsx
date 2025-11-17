@@ -32,13 +32,14 @@ export interface ToolbarProps {
   globalSearch?: string;
   onGlobalSearchChange?: (value: string) => void;
   visibleRowCount?: number;
+  activeViewId?: string;
 }
 
 export interface ToolbarRef {
   focusSearch: () => void;
 }
 
-export const Toolbar = forwardRef<ToolbarRef, ToolbarProps>(({ config, data, userRole, onAddRow, onDeleteRows, onBulkUpload, onRefresh, columnVisibility = {}, onColumnVisibilityChange, onOpenCommandPalette, globalSearch = '', onGlobalSearchChange, visibleRowCount = 0 }, ref) => {
+export const Toolbar = forwardRef<ToolbarRef, ToolbarProps>(({ config, data, userRole, onAddRow, onDeleteRows, onBulkUpload, onRefresh, columnVisibility = {}, onColumnVisibilityChange, onOpenCommandPalette, globalSearch = '', onGlobalSearchChange, visibleRowCount = 0, activeViewId }, ref) => {
   const searchInputRef = useRef<HTMLInputElement>(null);
   useImperativeHandle(ref, () => ({
     focusSearch: () => {
@@ -171,7 +172,12 @@ export const Toolbar = forwardRef<ToolbarRef, ToolbarProps>(({ config, data, use
         </div>
 
         {canEdit && onAddRow && (
-          <Button size="sm" onClick={onAddRow} className="h-7 shrink-0 text-xs px-2">
+          <Button 
+            size="sm" 
+            onClick={onAddRow} 
+            className="h-7 shrink-0 text-xs px-2"
+            disabled={config.id === 'escalations' && activeViewId === 'closed'}
+          >
             <Plus className="h-3.5 w-3.5 sm:mr-1.5" />
             <span className="hidden sm:inline">Add Row</span>
           </Button>
