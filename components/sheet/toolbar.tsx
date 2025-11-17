@@ -1,6 +1,6 @@
 'use client';
 
-import { forwardRef, useImperativeHandle } from 'react';
+import { forwardRef, useImperativeHandle, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -16,8 +16,9 @@ import { useSheetStore, RowHeight } from '@/lib/store/sheet-store';
 import { SheetConfig, RowData, UserRole } from '@/types';
 import { exportToCSV, exportToExcel } from '@/lib/utils/export';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 
-interface ToolbarProps {
+export interface ToolbarProps {
   config: SheetConfig;
   data: RowData[];
   userRole: UserRole;
@@ -28,18 +29,21 @@ interface ToolbarProps {
   columnVisibility?: Record<string, boolean>;
   onColumnVisibilityChange?: (visibility: Record<string, boolean>) => void;
   onOpenCommandPalette?: () => void;
+  globalSearch?: string;
+  onGlobalSearchChange?: (value: string) => void;
 }
 
 export interface ToolbarRef {
   focusSearch: () => void;
 }
 
-export const Toolbar = forwardRef<ToolbarRef, ToolbarProps>(({ config, data, userRole, onAddRow, onDeleteRows, onBulkUpload, onRefresh, columnVisibility = {}, onColumnVisibilityChange, onOpenCommandPalette }, ref) => {
+export const Toolbar = forwardRef<ToolbarRef, ToolbarProps>(({ config, data, userRole, onAddRow, onDeleteRows, onBulkUpload, onRefresh, columnVisibility = {}, onColumnVisibilityChange, onOpenCommandPalette, globalSearch = '', onGlobalSearchChange }, ref) => {
+  const searchInputRef = useRef<HTMLInputElement>(null);
   useImperativeHandle(ref, () => ({
     focusSearch: () => {
-      // Open command palette instead of focusing search
-      if (onOpenCommandPalette) {
-        onOpenCommandPalette();
+      if (searchInputRef.current) {
+        searchInputRef.current.focus();
+        searchInputRef.current.select();
       }
     },
   }));
@@ -108,22 +112,25 @@ export const Toolbar = forwardRef<ToolbarRef, ToolbarProps>(({ config, data, use
   return (
     <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-1.5 sm:gap-2 border-b border-border bg-background px-2 sm:px-3 py-1.5 animate-in fade-in slide-in-from-top duration-300">
       <div className="flex items-center gap-1.5 flex-1 overflow-x-auto">
-        {onOpenCommandPalette && (
-          <Button 
-            variant="outline" 
-            size="sm"
-            onClick={onOpenCommandPalette}
-            className="h-7 w-full sm:max-w-xs justify-start text-muted-foreground min-w-0 text-xs px-2"
-          >
-            <Search className="mr-1.5 h-3.5 w-3.5 shrink-0" />
-            <span className="hidden sm:inline truncate">Search...</span>
-            <span className="sm:hidden truncate">Search</span>
-            <kbd className="ml-auto pointer-events-none hidden sm:inline-flex h-4 select-none items-center gap-0.5 rounded border bg-muted px-1 font-mono text-[9px] font-medium text-muted-foreground opacity-100">
+        <div className="relative w-full sm:max-w-xs">
+          <Search className="absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            ref={searchInputRef}
+            value={globalSearch}
+            onChange={(e) => onGlobalSearchChange?.(e.target.value)}
+            placeholder="Search all columns..."
+            className="h-8 pl-7 pr-12 text-xs"
+          />
+          {onOpenCommandPalette && (
+            <button
+              type="button"
+              onClick={onOpenCommandPalette}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-mono text-muted-foreground border rounded px-1 py-0.5 hidden sm:inline-flex items-center gap-0.5"
+            >
               ⌘K
-            </kbd>
-          </Button>
-        )}
-
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="flex items-center gap-1.5 overflow-x-auto">

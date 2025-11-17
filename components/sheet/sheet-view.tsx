@@ -25,6 +25,7 @@ interface SheetViewProps {
 
 export function SheetView({ config, userRole }: SheetViewProps) {
   const [data, setData] = useState<RowData[]>([]);
+  const [globalSearch, setGlobalSearch] = useState('');
   const [localError, setLocalError] = useState<string | null>(null);
   const { 
     viewState, 
@@ -132,6 +133,35 @@ export function SheetView({ config, userRole }: SheetViewProps) {
       result = applyFilters(result, viewState.columnFilters, config.columns);
     }
 
+    // Apply global search across visible data (excluding empty rows)
+    if (globalSearch.trim()) {
+      const searchTerm = globalSearch.trim().toLowerCase();
+      result = result.filter((row) => {
+        // Skip placeholder empty rows
+        if (String(row.id).startsWith('empty-')) return false;
+
+        return config.columns.some((column) => {
+          const value = row[column.id];
+          if (value === null || value === undefined) return false;
+
+          let stringValue: string;
+          if (value instanceof Date) {
+            stringValue = value.toISOString();
+          } else if (typeof value === 'object') {
+            try {
+              stringValue = JSON.stringify(value);
+            } catch {
+              stringValue = String(value);
+            }
+          } else {
+            stringValue = String(value);
+          }
+
+          return stringValue.toLowerCase().includes(searchTerm);
+        });
+      });
+    }
+
     // Get list of filled empty row IDs to skip
     const filledEmptyIds = new Set(
       data.filter(row => String(row.id).startsWith('empty-') && row._isFilled).map(row => row.id)
@@ -170,7 +200,7 @@ export function SheetView({ config, userRole }: SheetViewProps) {
     }).filter(Boolean); // Remove null entries
 
     return [...result, ...emptyRows];
-  }, [data, viewState.columnFilters, config.columns, config.id]);
+  }, [data, viewState.columnFilters, config.columns, config.id, globalSearch]);
 
   const handleCellUpdate = async (rowId: string, columnId: string, value: any) => {
     // Check if this is the shipment_no column for escalation sheet
@@ -918,6 +948,10 @@ export function SheetView({ config, userRole }: SheetViewProps) {
           columnVisibility={columnVisibility}
           onColumnVisibilityChange={handleColumnVisibilityChange}
           onOpenCommandPalette={() => setShowCommandPalette(true)}
+          {...({
+            globalSearch,
+            onGlobalSearchChange: setGlobalSearch,
+          } as any)}
         />
         <CommandPalette
           isOpen={showCommandPalette}
