@@ -11,7 +11,7 @@ import {
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
 } from '@/components/ui/dropdown-menu';
-import { Search, FileDown, Plus, Settings, SplitSquareVertical, Eye, EyeOff, Download, FileSpreadsheet, RefreshCw, Sliders, ArrowUpNarrowWide, ArrowDownWideNarrow, Rows3, Upload, Pin, PinOff } from 'lucide-react';
+import { Search, FileDown, Plus, Settings, SplitSquareVertical, Eye, EyeOff, Download, FileSpreadsheet, RefreshCw, Sliders, ArrowUpNarrowWide, ArrowDownWideNarrow, Rows3, Upload, Pin, PinOff, X } from 'lucide-react';
 import { useSheetStore, RowHeight } from '@/lib/store/sheet-store';
 import { SheetConfig, RowData, UserRole } from '@/types';
 import { exportToCSV, exportToExcel } from '@/lib/utils/export';
@@ -31,13 +31,14 @@ export interface ToolbarProps {
   onOpenCommandPalette?: () => void;
   globalSearch?: string;
   onGlobalSearchChange?: (value: string) => void;
+  visibleRowCount?: number;
 }
 
 export interface ToolbarRef {
   focusSearch: () => void;
 }
 
-export const Toolbar = forwardRef<ToolbarRef, ToolbarProps>(({ config, data, userRole, onAddRow, onDeleteRows, onBulkUpload, onRefresh, columnVisibility = {}, onColumnVisibilityChange, onOpenCommandPalette, globalSearch = '', onGlobalSearchChange }, ref) => {
+export const Toolbar = forwardRef<ToolbarRef, ToolbarProps>(({ config, data, userRole, onAddRow, onDeleteRows, onBulkUpload, onRefresh, columnVisibility = {}, onColumnVisibilityChange, onOpenCommandPalette, globalSearch = '', onGlobalSearchChange, visibleRowCount = 0 }, ref) => {
   const searchInputRef = useRef<HTMLInputElement>(null);
   useImperativeHandle(ref, () => ({
     focusSearch: () => {
@@ -121,13 +122,14 @@ export const Toolbar = forwardRef<ToolbarRef, ToolbarProps>(({ config, data, use
             placeholder="Search all columns..."
             className="h-8 pl-7 pr-12 text-xs"
           />
-          {onOpenCommandPalette && (
+          {globalSearch && (
             <button
               type="button"
-              onClick={onOpenCommandPalette}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-mono text-muted-foreground border rounded px-1 py-0.5 hidden sm:inline-flex items-center gap-0.5"
+              onClick={() => onGlobalSearchChange?.('')}
+              className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-muted text-muted-foreground transition"
+              aria-label="Clear search"
             >
-              ⌘K
+              <X className="h-3 w-3" />
             </button>
           )}
         </div>
@@ -151,17 +153,22 @@ export const Toolbar = forwardRef<ToolbarRef, ToolbarProps>(({ config, data, use
           </div>
         )}
 
-        {onRefresh && config.id === 'escalations' && (
-          <Button 
-            size="sm" 
-            variant="outline" 
-            onClick={onRefresh} 
-            className="h-7 shrink-0 text-xs px-2"
-          >
-            <RefreshCw className="h-3.5 w-3.5 sm:mr-1.5" />
-            <span className="hidden sm:inline">Refresh</span>
-          </Button>
-        )}
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs text-muted-foreground whitespace-nowrap">
+            Total: {visibleRowCount}
+          </span>
+          {onRefresh && config.id === 'escalations' && (
+            <Button 
+              size="sm" 
+              variant="outline" 
+              onClick={onRefresh} 
+              className="h-7 shrink-0 text-xs px-2"
+            >
+              <RefreshCw className="h-3.5 w-3.5 sm:mr-1.5" />
+              <span className="hidden sm:inline">Refresh</span>
+            </Button>
+          )}
+        </div>
 
         {canEdit && onAddRow && (
           <Button size="sm" onClick={onAddRow} className="h-7 shrink-0 text-xs px-2">

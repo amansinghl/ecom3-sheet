@@ -274,9 +274,7 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
     });
 
     return cols;
-    // Note: openFilterPopover is intentionally NOT in dependencies as it's UI state for popover visibility
-    // Including it would cause columns to regenerate unnecessarily
-  }, [orderedColumns, canEdit, editingCell, setEditingCell, onCellUpdate, columnWidths, viewState.columnFilters, viewState.pinnedColumns, setColumnFilter, toggleColumnPin, rowHeight]);
+  }, [orderedColumns, canEdit, editingCell, setEditingCell, onCellUpdate, columnWidths, viewState.columnFilters, viewState.pinnedColumns, setColumnFilter, toggleColumnPin, rowHeight, openFilterPopover]);
 
   const table = useReactTable({
     data,

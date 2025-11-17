@@ -127,18 +127,30 @@ export function SheetView({ config, userRole }: SheetViewProps) {
   const filteredData = useMemo(() => {
     let result = data;
 
+    const isTemporaryRow = (row: RowData) => {
+      const idString = String(row.id);
+      return idString.startsWith('row-');
+    };
+
     // Apply column filters
     if (Object.keys(viewState.columnFilters).length > 0) {
       const { applyFilters } = require('@/lib/utils/filter-data');
-      result = applyFilters(result, viewState.columnFilters, config.columns);
+      const existingRows = result.filter((row) => !isTemporaryRow(row));
+      const filteredExistingRows = applyFilters(existingRows, viewState.columnFilters, config.columns);
+      const filteredIds = new Set(filteredExistingRows.map((row: RowData) => String(row.id)));
+      
+      result = result.filter((row) => isTemporaryRow(row) || filteredIds.has(String(row.id)));
     }
 
     // Apply global search across visible data (excluding empty rows)
     if (globalSearch.trim()) {
       const searchTerm = globalSearch.trim().toLowerCase();
       result = result.filter((row) => {
+        const idString = String(row.id);
         // Skip placeholder empty rows
-        if (String(row.id).startsWith('empty-')) return false;
+        if (idString.startsWith('empty-')) return false;
+        // Always include temporary rows (new unsaved rows)
+        if (idString.startsWith('row-')) return true;
 
         return config.columns.some((column) => {
           const value = row[column.id];
@@ -201,6 +213,10 @@ export function SheetView({ config, userRole }: SheetViewProps) {
 
     return [...result, ...emptyRows];
   }, [data, viewState.columnFilters, config.columns, config.id, globalSearch]);
+
+  const visibleRowCount = useMemo(() => {
+    return filteredData.filter((row) => !String(row.id).startsWith('empty-')).length;
+  }, [filteredData]);
 
   const handleCellUpdate = async (rowId: string, columnId: string, value: any) => {
     // Check if this is the shipment_no column for escalation sheet
@@ -951,6 +967,7 @@ export function SheetView({ config, userRole }: SheetViewProps) {
           {...({
             globalSearch,
             onGlobalSearchChange: setGlobalSearch,
+            visibleRowCount,
           } as any)}
         />
         <CommandPalette
