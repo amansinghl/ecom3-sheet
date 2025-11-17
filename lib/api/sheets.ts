@@ -122,7 +122,7 @@ class SheetApiService {
 
       return response;
     } catch (error) {
-      console.error('Failed to update escalation entries:', error);
+      // Error is handled in the component with user-friendly toast messages
       throw error;
     }
   }

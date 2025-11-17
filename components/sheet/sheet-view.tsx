@@ -427,6 +427,11 @@ export function SheetView({ config, userRole }: SheetViewProps) {
             }
           }
 
+          // Add vamashipper to the update payload
+          if (currentRow?.vamashipper) {
+            updatePayload.vamashipper = currentRow.vamashipper;
+          }
+
           // Call the update-entries API
           await sheetApiService.updateEscalationEntries(actualRowId, updatePayload);
           
@@ -439,17 +444,25 @@ export function SheetView({ config, userRole }: SheetViewProps) {
             id: `update-${actualRowId}-${columnId}` 
           });
         } catch (error: any) {
-          console.error('Failed to update escalation entry:', error);
-          toast.error(error.message || 'Failed to update field');
+          // Extract error message from ApiError object or Error instance
+          const errorMessage = error?.message || error?.error || 'Failed to update field';
+          toast.error(errorMessage);
           
           // Revert the local change on error
           setData((prev) =>
             prev.map((row) => {
               if (String(row.id) === rowIdString) {
-                return {
+                const revertedRow: any = {
                   ...row,
                   [columnId]: currentRow?.[columnId], // Revert to previous value
                 };
+                
+                // If we changed manual_ticket_status, also revert is_closed
+                if (columnId === 'manual_ticket_status' && currentRow) {
+                  revertedRow.is_closed = currentRow.is_closed;
+                }
+                
+                return revertedRow;
               }
               return row;
             })

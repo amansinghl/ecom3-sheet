@@ -449,7 +449,7 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
                       maxWidth: `${header.getSize()}px`,
                       ...(isPinned ? { 
                         left: `${stickyLeft}px`,
-                        backgroundColor: 'hsl(var(--muted))'
+                        backgroundColor: '#ffffff'
                       } : {})
                     }}
                   >
@@ -540,11 +540,11 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
                         if (selectedRows.has(row.id) && !isEmptyRow) {
                           return 'hsl(var(--primary) / 0.1)';
                         } else if (isEmptyRow) {
-                          return 'hsl(var(--muted) / 0.1)';
+                          return '#ffffff';
                         } else if (idx % 2 === 0) {
-                          return 'hsl(var(--background))';
+                          return '#ffffff';
                         } else {
-                          return 'hsl(var(--muted) / 0.3)';
+                          return '#ffffff';
                         }
                       };
                       
