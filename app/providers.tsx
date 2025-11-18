@@ -68,7 +68,7 @@ function ApiTokenInitializer({ children }: { children: React.ReactNode }) {
   return (
     <SessionContext.Provider
       value={{
-        isSessionLoading: status === 'loading',
+        isSessionLoading: false, // Status is never 'loading' at this point due to early return above
         isAuthenticated: status === 'authenticated',
       }}
     >

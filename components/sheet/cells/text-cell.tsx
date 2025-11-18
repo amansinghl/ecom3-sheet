@@ -29,13 +29,27 @@ export function TextCell({
 }: TextCellProps) {
   const [editValue, setEditValue] = useState(value || '');
   const inputRef = useRef<HTMLInputElement>(null);
+  
+  // Store the current typed value in a ref to persist across re-renders
+  // Initialize with empty string, NOT with editValue (which changes on re-renders)
+  const currentValueRef = useRef('');
 
+  // Track previous isEditing state to detect when editing starts
+  const prevIsEditingRef = useRef(false);
+  
   useEffect(() => {
-    if (isEditing && inputRef.current) {
-      inputRef.current.focus();
-      inputRef.current.select();
+    // Only sync when transitioning from not editing to editing
+    if (isEditing && !prevIsEditingRef.current) {
+      const initialValue = value || '';
+      setEditValue(initialValue);
+      currentValueRef.current = initialValue;
+      if (inputRef.current) {
+        inputRef.current.focus();
+        inputRef.current.select();
+      }
     }
-  }, [isEditing]);
+    prevIsEditingRef.current = isEditing;
+  }, [isEditing, value]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
@@ -43,6 +57,12 @@ export function TextCell({
     } else if (e.key === 'Escape') {
       onCancel();
     }
+  };
+
+  const handleBlur = () => {
+    // Use the ref value which persists across re-renders
+    const inputValue = currentValueRef.current || '';
+    onSave(inputValue);
   };
 
   const textSizeClass = getCellTextSize(rowHeight);
@@ -53,9 +73,13 @@ export function TextCell({
       <Input
         ref={inputRef}
         value={editValue}
-        onChange={(e) => setEditValue(e.target.value)}
+        onChange={(e) => {
+          const newValue = e.target.value;
+          setEditValue(newValue);
+          currentValueRef.current = newValue; // Store in ref immediately
+        }}
         onKeyDown={handleKeyDown}
-        onBlur={() => onSave(editValue)}
+        onBlur={handleBlur}
         className={cn(
           'h-full w-full rounded-none border-0 focus-visible:ring-2 focus-visible:ring-primary',
           textSizeClass

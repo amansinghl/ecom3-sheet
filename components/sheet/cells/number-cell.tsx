@@ -32,13 +32,27 @@ export function NumberCell({
   const inputRef = useRef<HTMLInputElement>(null);
   const textSizeClass = getCellTextSize(rowHeight);
   const paddingClass = getCellPadding(rowHeight);
+  
+  // Store the current typed value in a ref to persist across re-renders
+  // Initialize with empty string, NOT with editValue (which changes on re-renders)
+  const currentValueRef = useRef('');
 
+  // Track previous isEditing state to detect when editing starts
+  const prevIsEditingRef = useRef(false);
+  
   useEffect(() => {
-    if (isEditing && inputRef.current) {
-      inputRef.current.focus();
-      inputRef.current.select();
+    // Only sync when transitioning from not editing to editing
+    if (isEditing && !prevIsEditingRef.current) {
+      const initialValue = value?.toString() || '';
+      setEditValue(initialValue);
+      currentValueRef.current = initialValue;
+      if (inputRef.current) {
+        inputRef.current.focus();
+        inputRef.current.select();
+      }
     }
-  }, [isEditing]);
+    prevIsEditingRef.current = isEditing;
+  }, [isEditing, value]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
@@ -49,18 +63,27 @@ export function NumberCell({
     }
   };
 
+  const handleBlur = () => {
+    // Use the actual DOM input value which is the source of truth
+    // This handles cases where the component remounts during editing
+    const inputValue = inputRef.current?.value || currentValueRef.current || '';
+    const numValue = inputValue === '' ? null : Number(inputValue);
+    onSave(numValue);
+  };
+
   if (isEditing) {
     return (
       <Input
         ref={inputRef}
         type="number"
         value={editValue}
-        onChange={(e) => setEditValue(e.target.value)}
-        onKeyDown={handleKeyDown}
-        onBlur={() => {
-          const numValue = editValue === '' ? null : Number(editValue);
-          onSave(numValue);
+        onChange={(e) => {
+          const newValue = e.target.value;
+          setEditValue(newValue);
+          currentValueRef.current = newValue; // Store in ref immediately
         }}
+        onKeyDown={handleKeyDown}
+        onBlur={handleBlur}
         className={cn(
           'h-full w-full rounded-none border-0 text-right focus-visible:ring-2 focus-visible:ring-primary [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none',
           textSizeClass

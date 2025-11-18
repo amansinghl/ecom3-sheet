@@ -134,7 +134,7 @@ class ApiClient {
         }
 
         // Check for token expiration error
-        const errorMessage = errorData.errors?.message || errorData.message || errorData.error || response.statusText;
+        const errorMessage = errorData.errors?.msg || errorData.errors?.message || errorData.message || errorData.error || response.statusText;
         const isTokenExpired = 
           errorMessage.toLowerCase().includes('blacklisted') ||
           errorMessage.toLowerCase().includes('re-login') ||
@@ -172,7 +172,8 @@ class ApiClient {
       if (error instanceof TokenExpiredError) {
         throw error;
       }
-      if (error instanceof Error && 'status' in error) {
+      // Check if it's an ApiError object (has status property)
+      if (error && typeof error === 'object' && 'status' in error) {
         throw error;
       }
 

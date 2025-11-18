@@ -16,6 +16,7 @@ import { useSheetData } from '@/hooks/use-sheet-data';
 import { toast } from 'sonner';
 import { sheetApiService } from '@/lib/api/sheets';
 import * as XLSX from 'xlsx';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface SheetViewProps {
   config: SheetConfig;
@@ -24,6 +25,7 @@ interface SheetViewProps {
 
 export function SheetView({ config, userRole }: SheetViewProps) {
   const [data, setData] = useState<RowData[]>([]);
+  const [globalSearch, setGlobalSearch] = useState('');
   const [localError, setLocalError] = useState<string | null>(null);
   const { 
     viewState, 
@@ -40,6 +42,8 @@ export function SheetView({ config, userRole }: SheetViewProps) {
   const [showBulkUploadModal, setShowBulkUploadModal] = useState(false);
   const toolbarRef = useRef<ToolbarRef>(null);
   const hasAppliedDefaultFilters = useRef(false);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const queryClient = useQueryClient();
 
   // Fetch sheet data from API based on sheet ID
   const { 
@@ -123,16 +127,70 @@ export function SheetView({ config, userRole }: SheetViewProps) {
   const filteredData = useMemo(() => {
     let result = data;
 
+    const isTemporaryRow = (row: RowData) => {
+      const idString = String(row.id);
+      return idString.startsWith('row-');
+    };
+
     // Apply column filters
     if (Object.keys(viewState.columnFilters).length > 0) {
       const { applyFilters } = require('@/lib/utils/filter-data');
-      result = applyFilters(result, viewState.columnFilters, config.columns);
+      const existingRows = result.filter((row) => !isTemporaryRow(row));
+      const filteredExistingRows = applyFilters(existingRows, viewState.columnFilters, config.columns);
+      const filteredIds = new Set(filteredExistingRows.map((row: RowData) => String(row.id)));
+      
+      result = result.filter((row) => isTemporaryRow(row) || filteredIds.has(String(row.id)));
     }
 
+    // Apply global search across visible data (excluding empty rows)
+    if (globalSearch.trim()) {
+      const searchTerm = globalSearch.trim().toLowerCase();
+      result = result.filter((row) => {
+        const idString = String(row.id);
+        // Skip placeholder empty rows
+        if (idString.startsWith('empty-')) return false;
+        // Always include temporary rows (new unsaved rows)
+        if (idString.startsWith('row-')) return true;
+
+        return config.columns.some((column) => {
+          const value = row[column.id];
+          if (value === null || value === undefined) return false;
+
+          let stringValue: string;
+          if (value instanceof Date) {
+            stringValue = value.toISOString();
+          } else if (typeof value === 'object') {
+            try {
+              stringValue = JSON.stringify(value);
+            } catch {
+              stringValue = String(value);
+            }
+          } else {
+            stringValue = String(value);
+          }
+
+          return stringValue.toLowerCase().includes(searchTerm);
+        });
+      });
+    }
+
+    // Get list of filled empty row IDs to skip
+    const filledEmptyIds = new Set(
+      data.filter(row => String(row.id).startsWith('empty-') && row._isFilled).map(row => row.id)
+    );
+
     // Add 50 empty editable rows at the bottom (virtual scrolling handles rendering)
+    // Skip rows that have been filled
     const emptyRows = Array.from({ length: 50 }, (_, i) => {
+      const emptyId = `empty-${i}`;
+      
+      // Skip if this empty row has been filled
+      if (filledEmptyIds.has(emptyId)) {
+        return null;
+      }
+      
       const emptyRow: any = {
-        id: `empty-${i}`,
+        id: emptyId,
         createdAt: new Date(),
         updatedAt: new Date(),
         createdBy: 'user-1',
@@ -151,17 +209,34 @@ export function SheetView({ config, userRole }: SheetViewProps) {
       }
 
       return emptyRow;
-    });
+    }).filter(Boolean); // Remove null entries
 
     return [...result, ...emptyRows];
-  }, [data, viewState.columnFilters, config.columns]);
+  }, [data, viewState.columnFilters, config.columns, config.id, globalSearch]);
+
+  const visibleRowCount = useMemo(() => {
+    return filteredData.filter((row) => !String(row.id).startsWith('empty-')).length;
+  }, [filteredData]);
 
   const handleCellUpdate = async (rowId: string, columnId: string, value: any) => {
     // Check if this is the shipment_no column for escalation sheet
-    const isShipmentNoUpdate = columnId === 'shipment_no' && config.id === 'escalations' && value;
+    // Check for null/undefined explicitly to allow 0 as a valid value
+    const isShipmentNoUpdate = columnId === 'shipment_no' && config.id === 'escalations' && (value !== null && value !== undefined && value !== '');
 
     // Convert rowId to string to handle cases where it might be a number from API
     const rowIdString = String(rowId);
+
+    // Prevent shipment_no updates for existing rows (rows with numeric IDs)
+    if (isShipmentNoUpdate) {
+      const currentRow = data.find((row) => String(row.id) === rowIdString);
+      const actualRowId = currentRow?.id;
+      const isExistingRow = typeof actualRowId === 'number' || (typeof actualRowId === 'string' && !actualRowId.startsWith('row-') && !actualRowId.startsWith('empty-'));
+      
+      if (isExistingRow) {
+        toast.error('Shipment number cannot be changed for existing escalations');
+        return;
+      }
+    }
 
     // Fields that should trigger the update-entries API call
     const updatableFields = [
@@ -180,36 +255,49 @@ export function SheetView({ config, userRole }: SheetViewProps) {
 
     // Check if this is an empty row being edited
     if (rowIdString.startsWith('empty-')) {
-      // Convert empty row to real row
-      const newRow: any = {
-        id: `row-${Date.now()}`,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        createdBy: 'user-1',
-        updatedBy: 'user-1',
-      };
-
-      config.columns.forEach((col) => {
-        newRow[col.id] = col.id === columnId ? value : col.defaultValue || null;
-      });
-
-      setData((prev) => [...prev, newRow]);
-
-      // If shipment number was entered in empty row, fetch details from backend
+      // Extract the empty row index
+      const emptyIndex = parseInt(rowIdString.replace('empty-', ''));
+      
+      // If shipment number was entered in empty row, fetch details from backend and create new row
       if (isShipmentNoUpdate) {
+        // First, immediately update the row with the entered value
+        const tempRow: any = {
+          id: rowIdString, // Keep the empty row ID temporarily
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          createdBy: 'user-1',
+          updatedBy: 'user-1',
+          _isFilled: true, // Mark as filled so it won't be regenerated
+        };
+        
+        config.columns.forEach((col) => {
+          tempRow[col.id] = col.id === columnId ? value : col.defaultValue || null;
+        });
+        
+        // Set is_closed to 0 (open) by default for escalation sheet
+        if (config.id === 'escalations') {
+          tempRow.is_closed = 0;
+        }
+        
+        // Add the filled row to data
+        setData((prev) => [...prev, tempRow]);
+        
+        // Then fetch the full data from API
         try {
           toast.loading('Fetching escalation details...', { id: 'fetch-escalation' });
           const response = await sheetApiService.updateEscalationSheet(String(value));
           
           if (response.data?.escalation) {
             // Update the newly created row with data from backend
+            // Use the backend ID so that subsequent updates can call the API
+            const backendId = response.data.escalation.id;
             setData((prev) =>
               prev.map((row) => {
-                if (String(row.id) === String(newRow.id)) {
+                if (String(row.id) === rowIdString) {
                   return {
                     ...row,
                     ...response.data.escalation,
-                    id: row.id, // Keep the generated ID
+                    id: backendId, // Use backend ID for API calls
                     updatedAt: new Date(),
                   };
                 }
@@ -217,11 +305,106 @@ export function SheetView({ config, userRole }: SheetViewProps) {
               })
             );
             toast.success('Escalation details loaded successfully', { id: 'fetch-escalation' });
+            
+            // Auto-focus on manual_case column after shipment_no is entered
+            setTimeout(() => {
+              const manualCaseColumn = config.columns.find((col) => col.id === 'manual_case');
+              if (manualCaseColumn) {
+                setEditingCell({ rowId: backendId, columnId: 'manual_case' });
+              }
+            }, 100);
+          } else {
+            toast.error('No escalation data received', { id: 'fetch-escalation' });
           }
         } catch (error: any) {
           console.error('Failed to fetch escalation details:', error);
           toast.error(error.message || 'Failed to fetch escalation details', { id: 'fetch-escalation' });
         }
+      } else {
+        // Not a shipment number update, just fill the empty row with the entered value
+        const filledRow: any = {
+          id: rowIdString, // Keep the empty row ID
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          createdBy: 'user-1',
+          updatedBy: 'user-1',
+          _isFilled: true, // Mark as filled
+        };
+
+        config.columns.forEach((col) => {
+          filledRow[col.id] = col.id === columnId ? value : col.defaultValue || null;
+        });
+
+        // Add the filled row to data
+        setData((prev) => [...prev, filledRow]);
+      }
+    } else if (rowIdString.startsWith('row-')) {
+      // This is a new row (not empty, but not saved to backend yet)
+      const currentRow = data.find((row) => String(row.id) === rowIdString);
+      
+      // If updating shipment_no in a new row, fetch details and auto-focus manual_case
+      if (isShipmentNoUpdate) {
+        setData((prev) =>
+          prev.map((row) => {
+            if (String(row.id) === rowIdString) {
+              return {
+                ...row,
+                [columnId]: value,
+                updatedAt: new Date(),
+              };
+            }
+            return row;
+          })
+        );
+
+        try {
+          toast.loading('Fetching escalation details...', { id: 'fetch-escalation' });
+          const response = await sheetApiService.updateEscalationSheet(String(value));
+          
+          if (response.data?.escalation) {
+            // Use the backend ID so that subsequent updates can call the API
+            const backendId = response.data.escalation.id;
+            setData((prev) =>
+              prev.map((row) => {
+                if (String(row.id) === rowIdString) {
+                  return {
+                    ...row,
+                    ...response.data.escalation,
+                    id: backendId, // Use backend ID for API calls
+                    updatedAt: new Date(),
+                  };
+                }
+                return row;
+              })
+            );
+            toast.success('Escalation details loaded successfully', { id: 'fetch-escalation' });
+            
+            // Auto-focus on manual_case column after shipment_no is entered
+            setTimeout(() => {
+              const manualCaseColumn = config.columns.find((col) => col.id === 'manual_case');
+              if (manualCaseColumn) {
+                setEditingCell({ rowId: backendId, columnId: 'manual_case' });
+              }
+            }, 100);
+          }
+        } catch (error: any) {
+          console.error('Failed to fetch escalation details:', error);
+          toast.error(error.message || 'Failed to fetch escalation details', { id: 'fetch-escalation' });
+        }
+      } else {
+        // For other columns in new row, just update the value
+        setData((prev) =>
+          prev.map((row) => {
+            if (String(row.id) === rowIdString) {
+              return {
+                ...row,
+                [columnId]: value,
+                updatedAt: new Date(),
+              };
+            }
+            return row;
+          })
+        );
       }
     } else {
       // Update existing row
@@ -290,60 +473,57 @@ export function SheetView({ config, userRole }: SheetViewProps) {
             }
           }
 
+          // Add vamashipper to the update payload
+          if (currentRow?.vamashipper) {
+            updatePayload.vamashipper = currentRow.vamashipper;
+          }
+
           // Call the update-entries API
           await sheetApiService.updateEscalationEntries(actualRowId, updatePayload);
-          // Success is handled silently - the UI is already updated
+          
+          // Show success message with row identifier
+          const columnLabel = config.columns.find((col) => col.id === columnId)?.label || columnId;
+          const rowIdentifier = currentRow?.shipment_no 
+            ? `shipment_no: ${currentRow.shipment_no}` 
+            : `row ID: ${actualRowId}`;
+          toast.success(`Updated ${columnLabel} for ${rowIdentifier}`, { 
+            id: `update-${actualRowId}-${columnId}` 
+          });
         } catch (error: any) {
-          console.error('Failed to update escalation entry:', error);
-          toast.error(error.message || 'Failed to update field');
+          // Extract error message from ApiError object or Error instance
+          const errorMessage = error?.message || error?.error || 'Failed to update field';
+          toast.error(errorMessage);
           
           // Revert the local change on error
           setData((prev) =>
             prev.map((row) => {
               if (String(row.id) === rowIdString) {
-                return {
+                const revertedRow: any = {
                   ...row,
                   [columnId]: currentRow?.[columnId], // Revert to previous value
                 };
+                
+                // If we changed manual_ticket_status, also revert is_closed
+                if (columnId === 'manual_ticket_status' && currentRow) {
+                  revertedRow.is_closed = currentRow.is_closed;
+                }
+                
+                return revertedRow;
               }
               return row;
             })
           );
         }
       }
-
-      // If shipment number was updated, fetch details from backend
-      if (isShipmentNoUpdate) {
-        try {
-          toast.loading('Fetching escalation details...', { id: 'fetch-escalation' });
-          const response = await sheetApiService.updateEscalationSheet(String(value));
-          
-          if (response.data?.escalation) {
-            // Update the row with data from backend
-            setData((prev) =>
-              prev.map((row) => {
-                if (String(row.id) === rowIdString) {
-                  return {
-                    ...row,
-                    ...response.data.escalation,
-                    id: rowId, // Keep the existing ID
-                    updatedAt: new Date(),
-                  };
-                }
-                return row;
-              })
-            );
-            toast.success('Escalation details loaded successfully', { id: 'fetch-escalation' });
-          }
-        } catch (error: any) {
-          console.error('Failed to fetch escalation details:', error);
-          toast.error(error.message || 'Failed to fetch escalation details', { id: 'fetch-escalation' });
-        }
-      }
     }
   };
 
   const handleAddRow = () => {
+    // Don't allow adding rows in the "Closed Escalations" view
+    if (config.id === 'escalations' && activeViewId === 'closed') {
+      return;
+    }
+
     const newRowId = `row-${Date.now()}`;
     const newRow: any = {
       id: newRowId,
@@ -365,6 +545,8 @@ export function SheetView({ config, userRole }: SheetViewProps) {
 
     setData((prev) => [...prev, newRow]); // Add at bottom
     
+    toast.success('New row added', { id: 'add-row' });
+    
     // Focus on the first cell of the newly created row
     setTimeout(() => {
       const firstColumn = config.columns[0];
@@ -374,9 +556,79 @@ export function SheetView({ config, userRole }: SheetViewProps) {
     }, 0);
   };
 
-  const handleDeleteRows = () => {
-    setData((prev) => prev.filter((row) => !selectedRows.has(row.id)));
-    clearSelection();
+  const handleDeleteRows = async () => {
+    const deletedCount = selectedRows.size;
+    const deletedRows = data.filter((row) => selectedRows.has(row.id));
+    
+    if (deletedCount === 0) return;
+    
+    // Filter rows that have shipment_no (existing rows from backend)
+    const rowsToDelete = deletedRows.filter((row) => {
+      const isExistingRow = typeof row.id === 'number' || (typeof row.id === 'string' && !row.id.startsWith('row-') && !row.id.startsWith('empty-'));
+      return isExistingRow && row.shipment_no;
+    });
+    
+    // Filter new rows (that don't need backend deletion)
+    const newRowsToDelete = deletedRows.filter((row) => {
+      const isExistingRow = typeof row.id === 'number' || (typeof row.id === 'string' && !row.id.startsWith('row-') && !row.id.startsWith('empty-'));
+      return !isExistingRow || !row.shipment_no;
+    });
+    
+    // Delete from backend if escalation sheet and rows have shipment_no and id
+    if (config.id === 'escalations' && rowsToDelete.length > 0) {
+      toast.loading(`Deleting ${rowsToDelete.length} row${rowsToDelete.length > 1 ? 's' : ''}...`, { id: 'delete-rows' });
+      
+      try {
+        // Delete all rows in parallel
+        await Promise.all(
+          rowsToDelete
+            .filter((row) => row.id) // Only delete rows that have an id
+            .map((row) => 
+              sheetApiService.deleteEscalation(row.id, row.shipment_no, row.vamashipper)
+            )
+        );
+        
+        // Only remove successfully deleted rows from UI
+        const deletedRowIds = new Set(rowsToDelete.map((row) => String(row.id)));
+        setData((prev) => prev.filter((row) => !deletedRowIds.has(String(row.id)) && !selectedRows.has(row.id)));
+        clearSelection();
+        
+        const shipmentNos = rowsToDelete
+          .map((row) => row.shipment_no)
+          .filter(Boolean)
+          .slice(0, 3)
+          .join(', ');
+        const moreText = rowsToDelete.length > 3 ? ` and ${rowsToDelete.length - 3} more` : '';
+        toast.success(`Deleted ${rowsToDelete.length} row${rowsToDelete.length > 1 ? 's' : ''}${shipmentNos ? ` (${shipmentNos}${moreText})` : ''}`, {
+          id: 'delete-rows'
+        });
+      } catch (error: any) {
+        // Extract error message from ApiError object or Error instance
+        const errorMessage = error?.message || error?.error || 'Failed to delete rows. Please refresh and try again.';
+        toast.error(errorMessage, {
+          id: 'delete-rows'
+        });
+        // Rows stay visible - no need to restore them since we never removed them
+        clearSelection();
+      }
+    }
+    
+    // Remove new rows optimistically (they don't need backend deletion)
+    if (newRowsToDelete.length > 0) {
+      const newRowIds = new Set(newRowsToDelete.map((row) => String(row.id)));
+      setData((prev) => prev.filter((row) => !newRowIds.has(String(row.id))));
+      clearSelection();
+      
+      const shipmentNos = newRowsToDelete
+        .map((row) => row.shipment_no)
+        .filter(Boolean)
+        .slice(0, 3)
+        .join(', ');
+      const moreText = newRowsToDelete.length > 3 ? ` and ${newRowsToDelete.length - 3} more` : '';
+      toast.success(`Deleted ${newRowsToDelete.length} row${newRowsToDelete.length > 1 ? 's' : ''}${shipmentNos ? ` (${shipmentNos}${moreText})` : ''}`, {
+        id: 'delete-rows'
+      });
+    }
   };
 
   const handleDuplicateRow = (rowId: string) => {
@@ -400,6 +652,11 @@ export function SheetView({ config, userRole }: SheetViewProps) {
       newRow,
       ...prev.slice(index + 1),
     ]);
+    
+    const rowIdentifier = rowToDuplicate.shipment_no 
+      ? `shipment_no: ${rowToDuplicate.shipment_no}` 
+      : `row ID: ${rowIdString}`;
+    toast.success(`Duplicated row (${rowIdentifier})`, { id: `duplicate-${rowIdString}` });
   };
 
   const handleCopyRow = (rowId: string) => {
@@ -440,15 +697,85 @@ export function SheetView({ config, userRole }: SheetViewProps) {
       // Fallback for older browsers
       navigator.clipboard.writeText(textData);
     }
+    
+    const rowIdentifier = rowToCopy.shipment_no 
+      ? `shipment_no: ${rowToCopy.shipment_no}` 
+      : `row ID: ${rowIdString}`;
+    toast.success(`Copied row data (${rowIdentifier}) to clipboard`, { id: `copy-${rowIdString}` });
   };
 
-  const handleDeleteRow = (rowId: string) => {
+  const handleDeleteRow = async (rowId: string) => {
     const rowIdString = String(rowId);
-    setData((prev) => prev.filter((row) => String(row.id) !== rowIdString));
+    const rowToDelete = data.find((row) => String(row.id) === rowIdString);
+    
+    if (!rowToDelete) return;
+    
+    const isExistingRow = typeof rowToDelete.id === 'number' || (typeof rowToDelete.id === 'string' && !rowToDelete.id.startsWith('row-') && !rowToDelete.id.startsWith('empty-'));
+    const hasShipmentNo = rowToDelete.shipment_no;
+    
+    // Delete from backend if escalation sheet and row has shipment_no and id
+    if (config.id === 'escalations' && isExistingRow && hasShipmentNo && rowToDelete.id) {
+      toast.loading('Deleting row...', { id: `delete-${rowIdString}` });
+      
+      try {
+        await sheetApiService.deleteEscalation(rowToDelete.id, rowToDelete.shipment_no, rowToDelete.vamashipper);
+        // Only remove from UI after successful deletion
+        setData((prev) => prev.filter((row) => String(row.id) !== rowIdString));
+        toast.success(`Deleted row (shipment_no: ${rowToDelete.shipment_no}, vamashipper: ${rowToDelete.vamashipper})`, { 
+          id: `delete-${rowIdString}` 
+        });
+      } catch (error: any) {
+        // Extract error message from ApiError object or Error instance
+        const errorMessage = error?.message || error?.error || 'Failed to delete row. Please refresh and try again.';
+        toast.error(errorMessage, {
+          id: `delete-${rowIdString}`
+        });
+        // Row stays visible - no need to restore it since we never removed it
+      }
+    } else {
+      // For new rows or non-escalation sheets, optimistically remove from UI
+      setData((prev) => prev.filter((row) => String(row.id) !== rowIdString));
+      const rowIdentifier = rowToDelete.shipment_no 
+        ? `shipment_no: ${rowToDelete.shipment_no}` 
+        : `row ID: ${rowIdString}`;
+      toast.success(`Deleted row (${rowIdentifier})`, { id: `delete-${rowIdString}` });
+    }
   };
 
   const handleBulkUpload = () => {
     setShowBulkUploadModal(true);
+  };
+
+  const handleRefresh = async () => {
+    // Save current scroll position
+    const scrollTop = scrollContainerRef.current?.scrollTop || 0;
+    
+    // Show loading toast
+    toast.loading('Refreshing escalation sheet...', { id: 'refresh' });
+    
+    // Invalidate query cache to force fresh fetch
+    const sheetName = config.id === 'escalations' ? 'escalation' : config.id;
+    await queryClient.invalidateQueries({ queryKey: ['sheet', sheetName] });
+    
+    // Refresh the data
+    if (refetch) {
+      try {
+        await refetch();
+        toast.success('Escalation sheet refreshed successfully', { id: 'refresh' });
+      } catch (error: any) {
+        toast.error('Failed to refresh escalation sheet', { id: 'refresh' });
+      }
+    }
+    
+    // Restore scroll position after data is loaded and DOM is updated
+    // Use requestAnimationFrame to ensure DOM has updated
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        if (scrollContainerRef.current) {
+          scrollContainerRef.current.scrollTop = scrollTop;
+        }
+      }, 50);
+    });
   };
 
   const processBulkUploadFile = async (file: File) => {
@@ -638,9 +965,16 @@ export function SheetView({ config, userRole }: SheetViewProps) {
           onAddRow={handleAddRow}
           onDeleteRows={handleDeleteRows}
           onBulkUpload={handleBulkUpload}
+          onRefresh={handleRefresh}
           columnVisibility={columnVisibility}
           onColumnVisibilityChange={handleColumnVisibilityChange}
           onOpenCommandPalette={() => setShowCommandPalette(true)}
+          {...({
+            globalSearch,
+            onGlobalSearchChange: setGlobalSearch,
+            visibleRowCount,
+            activeViewId,
+          } as any)}
         />
         <CommandPalette
           isOpen={showCommandPalette}
@@ -680,6 +1014,7 @@ export function SheetView({ config, userRole }: SheetViewProps) {
                 onAddRow={handleAddRow}
                 onClearFilters={handleClearFilters}
                 hasActiveFilters={Object.keys(viewState.columnFilters).length > 0}
+                scrollContainerRef={scrollContainerRef}
               />
             )}
           </div>

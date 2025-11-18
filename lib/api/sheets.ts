@@ -122,7 +122,7 @@ class SheetApiService {
 
       return response;
     } catch (error) {
-      console.error('Failed to update escalation entries:', error);
+      // Error is handled in the component with user-friendly toast messages
       throw error;
     }
   }
@@ -152,6 +152,27 @@ class SheetApiService {
       return response;
     } catch (error) {
       console.error('Failed to bulk upload escalations:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Delete escalation by id and shipment number
+   * 
+   * @param id The ID of the escalation record
+   * @param shipment_no Shipment number to delete
+   * @returns API response
+   * @throws Error if API request fails
+   */
+  async deleteEscalation(id: number | string, shipment_no: string | number, vamashipper: string | number): Promise<ApiResponse<any>> {
+    try {
+      const response = await apiClient.post<ApiResponse<any>>(
+        `/sheets/escalation/delete/${id}`,
+        { shipment_no: shipment_no, vamashipper: vamashipper }
+      );
+      return response;
+    } catch (error) {
+      // Error is handled in the component with user-friendly toast messages
       throw error;
     }
   }
