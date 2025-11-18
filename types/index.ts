@@ -1,4 +1,4 @@
-// User and Authentication Types
+// User and Authentication Types hai idhar
 export type UserRole = 'admin' | 'editor' | 'viewer';
 
 export interface User {
