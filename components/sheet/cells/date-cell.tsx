@@ -80,7 +80,7 @@ export function DateCell({
   const displayValue = value
     ? format(
         value instanceof Date ? value : new Date(value),
-        isDateTime ? 'MMM dd, yyyy HH:mm' : 'MMM dd, yyyy'
+        isDateTime ? 'MMM dd, yyyy hh:mm a' : 'MMM dd, yyyy'
       )
     : '';
 

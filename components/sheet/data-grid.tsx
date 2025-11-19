@@ -36,9 +36,10 @@ interface DataGridProps {
   onAddRow?: () => void;
   onClearFilters?: () => void;
   hasActiveFilters?: boolean;
+  scrollContainerRef?: React.RefObject<HTMLDivElement | null>;
 }
 
-export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibility: externalColumnVisibility, onColumnVisibilityChange, onDuplicateRow, onCopyRow, onDeleteRow, onAddRow, onClearFilters, hasActiveFilters }: DataGridProps) {
+export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibility: externalColumnVisibility, onColumnVisibilityChange, onDuplicateRow, onCopyRow, onDeleteRow, onAddRow, onClearFilters, hasActiveFilters, scrollContainerRef }: DataGridProps) {
   const { selectedRows, toggleRowSelection, editingCell, setEditingCell, viewState, rowHeight, columnWidths, setColumnWidth, setColumnFilter, toggleColumnPin } = useSheetStore();
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnResizeMode] = useState<ColumnResizeMode>('onChange');
@@ -47,7 +48,8 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
   const [openFilterPopover, setOpenFilterPopover] = useState<string | null>(null);
   
   // Ref for virtual scrolling container
-  const tableContainerRef = useRef<HTMLDivElement>(null);
+  const internalTableContainerRef = useRef<HTMLDivElement>(null);
+  const tableContainerRef = scrollContainerRef || internalTableContainerRef;
   const prevEditingCellRef = useRef(editingCell);
   
   // Initialize column visibility (empty on server to avoid hydration mismatch)
@@ -235,13 +237,24 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
           const isEditing =
             editingCell?.rowId === row.id && editingCell?.columnId === column.id;
           const value = row.getValue(column.id);
+          
+          // Check if this is shipment_no column and if row is existing (numeric ID)
+          const rowId = row.original.id;
+          const isExistingRow = typeof rowId === 'number' || (typeof rowId === 'string' && !rowId.startsWith('row-') && !rowId.startsWith('empty-'));
+          const isShipmentNoColumn = colConfig.id === 'shipment_no' && config.id === 'escalations';
+          
+          // shipment_no should only be editable for new rows (not existing ones)
+          const isEditable = colConfig.editable ?? true;
+          const canEditThisCell = isShipmentNoColumn 
+            ? (canEdit && isEditable && !isExistingRow)
+            : (canEdit && isEditable);
 
           return (
             <CellRenderer
               value={value}
               columnConfig={colConfig}
               isEditing={isEditing}
-              canEdit={canEdit && (colConfig.editable ?? true)}
+              canEdit={canEditThisCell}
               rowHeight={rowHeight}
               onEdit={() => setEditingCell({ rowId: row.id, columnId: column.id })}
               onSave={(newValue) => {
@@ -261,9 +274,7 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
     });
 
     return cols;
-    // Note: openFilterPopover is intentionally NOT in dependencies as it's UI state for popover visibility
-    // Including it would cause columns to regenerate unnecessarily
-  }, [orderedColumns, canEdit, editingCell, setEditingCell, onCellUpdate, columnWidths, viewState.columnFilters, viewState.pinnedColumns, setColumnFilter, toggleColumnPin, rowHeight]);
+  }, [orderedColumns, canEdit, editingCell, setEditingCell, onCellUpdate, columnWidths, viewState.columnFilters, viewState.pinnedColumns, setColumnFilter, toggleColumnPin, rowHeight, openFilterPopover]);
 
   const table = useReactTable({
     data,
@@ -354,12 +365,19 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
     overscan: 10, // Render 10 extra rows outside viewport
   });
 
-  // Scroll to editing cell when it changes
+  // Scroll to editing cell when it changes (only if not visible)
   useEffect(() => {
     if (editingCell && editingCell !== prevEditingCellRef.current) {
       const rowIndex = rows.findIndex(row => row.id === editingCell.rowId);
       if (rowIndex !== -1) {
-        rowVirtualizer.scrollToIndex(rowIndex, { align: 'center', behavior: 'smooth' });
+        // Check if the row is already visible in the viewport
+        const virtualItems = rowVirtualizer.getVirtualItems();
+        const isVisible = virtualItems.some(item => item.index === rowIndex);
+        
+        // Only scroll if the row is not visible, and use 'start' alignment to keep position
+        if (!isVisible) {
+          rowVirtualizer.scrollToIndex(rowIndex, { align: 'start', behavior: 'smooth' });
+        }
       }
     }
     prevEditingCellRef.current = editingCell;
@@ -429,7 +447,7 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
                       maxWidth: `${header.getSize()}px`,
                       ...(isPinned ? { 
                         left: `${stickyLeft}px`,
-                        backgroundColor: 'hsl(var(--muted))'
+                        backgroundColor: '#ffffff'
                       } : {})
                     }}
                   >
@@ -520,11 +538,11 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
                         if (selectedRows.has(row.id) && !isEmptyRow) {
                           return 'hsl(var(--primary) / 0.1)';
                         } else if (isEmptyRow) {
-                          return 'hsl(var(--muted) / 0.1)';
+                          return '#ffffff';
                         } else if (idx % 2 === 0) {
-                          return 'hsl(var(--background))';
+                          return '#ffffff';
                         } else {
-                          return 'hsl(var(--muted) / 0.3)';
+                          return '#ffffff';
                         }
                       };
                       
