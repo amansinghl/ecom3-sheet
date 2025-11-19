@@ -1,6 +1,6 @@
 'use client';
 
-import { forwardRef, useImperativeHandle, useRef } from 'react';
+import { forwardRef, useImperativeHandle, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -11,12 +11,19 @@ import {
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
 } from '@/components/ui/dropdown-menu';
-import { Search, FileDown, Plus, Settings, SplitSquareVertical, Eye, EyeOff, Download, FileSpreadsheet, RefreshCw, Sliders, ArrowUpNarrowWide, ArrowDownWideNarrow, Rows3, Upload, Pin, PinOff, X } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Search, FileDown, Plus, Info, SplitSquareVertical, Eye, EyeOff, Download, FileSpreadsheet, RefreshCw, Sliders, ArrowUpNarrowWide, ArrowDownWideNarrow, Rows3, Upload, Pin, PinOff, X } from 'lucide-react';
 import { useSheetStore, RowHeight } from '@/lib/store/sheet-store';
 import { SheetConfig, RowData, UserRole } from '@/types';
 import { exportToCSV, exportToExcel } from '@/lib/utils/export';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 export interface ToolbarProps {
   config: SheetConfig;
@@ -41,6 +48,8 @@ export interface ToolbarRef {
 
 export const Toolbar = forwardRef<ToolbarRef, ToolbarProps>(({ config, data, userRole, onAddRow, onDeleteRows, onBulkUpload, onRefresh, columnVisibility = {}, onColumnVisibilityChange, onOpenCommandPalette, globalSearch = '', onGlobalSearchChange, visibleRowCount = 0, activeViewId }, ref) => {
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const [showInfoDialog, setShowInfoDialog] = useState(false);
+  
   useImperativeHandle(ref, () => ({
     focusSearch: () => {
       if (searchInputRef.current) {
@@ -300,25 +309,135 @@ export const Toolbar = forwardRef<ToolbarRef, ToolbarProps>(({ config, data, use
           </DropdownMenu>
         )}
 
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm" className="h-7 w-7 shrink-0 px-0">
-              <Settings className="h-3.5 w-3.5" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem>
-              <RefreshCw className="mr-2 h-4 w-4" />
-              Refresh
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem>
-              <Sliders className="mr-2 h-4 w-4" />
-              View Settings
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        {config.id === 'escalations' && (
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="h-7 w-7 shrink-0 px-0"
+            onClick={() => setShowInfoDialog(true)}
+            title="Auto-Closure Logic Info"
+          >
+            <Info className="h-3.5 w-3.5" />
+          </Button>
+        )}
       </div>
+
+      {/* Info Dialog */}
+      <Dialog open={showInfoDialog} onOpenChange={setShowInfoDialog}>
+        <DialogContent className="max-w-3xl max-h-[90vh]">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold">Escalation Sheet Auto-Closure Logic</DialogTitle>
+          </DialogHeader>
+          <ScrollArea className="max-h-[calc(90vh-8rem)] pr-4">
+            <div className="space-y-6 text-sm">
+              {/* Overview */}
+              <div className="space-y-2">
+                <h3 className="font-semibold text-base text-foreground">Overview</h3>
+                <p className="text-muted-foreground leading-relaxed">
+                  The system automatically closes escalation tickets based on shipment tracking status changes. 
+                  Tickets are marked as either <span className="font-medium text-green-600 dark:text-green-400">Positive Closure</span> (resolved successfully) 
+                  or <span className="font-medium text-orange-600 dark:text-orange-400">Negative Closure</span> (resolved but with unfavorable outcome).
+                </p>
+              </div>
+
+              {/* Closure Rules */}
+              <div className="space-y-3">
+                <h3 className="font-semibold text-base text-foreground">Closure Rules by Case Type</h3>
+                
+                {/* Rule 1 */}
+                <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-2">
+                  <h4 className="font-medium text-foreground">1. Fake NDR Remark / Delivery Issue / Re-Attempt</h4>
+                  <div className="space-y-1 pl-4">
+                    <p className="text-muted-foreground">
+                      <span className="font-medium text-green-600 dark:text-green-400">Positive Closure:</span> Tracking status = <code className="px-1.5 py-0.5 rounded bg-background border text-xs">1900</code> (Delivered)
+                    </p>
+                    <p className="text-muted-foreground">
+                      <span className="font-medium text-orange-600 dark:text-orange-400">Negative Closure:</span> Tracking status &gt; <code className="px-1.5 py-0.5 rounded bg-background border text-xs">1900</code> (RTO/Failed states)
+                    </p>
+                  </div>
+                </div>
+
+                {/* Rule 2 */}
+                <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-2">
+                  <h4 className="font-medium text-foreground">2. Delayed RTO</h4>
+                  <div className="pl-4">
+                    <p className="text-muted-foreground">
+                      <span className="font-medium text-green-600 dark:text-green-400">Positive Closure:</span> Tracking status = <code className="px-1.5 py-0.5 rounded bg-background border text-xs">2030</code> (RTO Delivered)
+                    </p>
+                  </div>
+                </div>
+
+                {/* Rule 3 */}
+                <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-2">
+                  <h4 className="font-medium text-foreground">3. Reverse Pickup / Delayed Pickup</h4>
+                  <div className="pl-4">
+                    <p className="text-muted-foreground">
+                      <span className="font-medium text-green-600 dark:text-green-400">Positive Closure:</span> Tracking status ≥ <code className="px-1.5 py-0.5 rounded bg-background border text-xs">1200</code> (In Transit or beyond)
+                    </p>
+                  </div>
+                </div>
+
+                {/* Rule 4 */}
+                <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-2">
+                  <h4 className="font-medium text-foreground">4. Reverse Delivery Issue</h4>
+                  <div className="pl-4">
+                    <p className="text-muted-foreground">
+                      <span className="font-medium text-green-600 dark:text-green-400">Positive Closure:</span> Tracking status = <code className="px-1.5 py-0.5 rounded bg-background border text-xs">1900</code> (Delivered)
+                    </p>
+                  </div>
+                </div>
+
+                {/* Rule 5 */}
+                <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-2">
+                  <h4 className="font-medium text-foreground">5. COD Delay</h4>
+                  <div className="pl-4">
+                    <p className="text-muted-foreground">
+                      <span className="font-medium text-green-600 dark:text-green-400">Positive Closure:</span> When <code className="px-1.5 py-0.5 rounded bg-background border text-xs">paid_amount</code> ≥ <code className="px-1.5 py-0.5 rounded bg-background border text-xs">cod_value</code> (full COD amount received)
+                    </p>
+                  </div>
+                </div>
+
+                {/* Rule 6 */}
+                <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-2">
+                  <h4 className="font-medium text-foreground">6. EDD Breach / EDD Urgent</h4>
+                  <div className="pl-4">
+                    <p className="text-muted-foreground">
+                      <span className="font-medium text-green-600 dark:text-green-400">Positive Closure:</span> When shipment reaches status <code className="px-1.5 py-0.5 rounded bg-background border text-xs">1900</code> (Delivered) 
+                      or <code className="px-1.5 py-0.5 rounded bg-background border text-xs">1770</code> (Out for Delivery) after escalation was created
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Automation Details */}
+              <div className="space-y-3 pt-2 border-t border-border">
+                <h3 className="font-semibold text-base text-foreground">Automation Details</h3>
+                <div className="space-y-2 pl-4">
+                  <div className="flex items-start gap-2">
+                    <span className="font-medium text-foreground min-w-[100px]">Frequency:</span>
+                    <span className="text-muted-foreground">Runs every 15 minutes</span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <span className="font-medium text-foreground min-w-[100px]">Scope:</span>
+                    <span className="text-muted-foreground">Only processes tickets with <code className="px-1.5 py-0.5 rounded bg-background border text-xs">auto_ticket_status = 'Open'</code> and <code className="px-1.5 py-0.5 rounded bg-background border text-xs">is_closed = 0</code></span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <span className="font-medium text-foreground min-w-[100px]">Ticket Delay:</span>
+                    <span className="text-muted-foreground">Automatically calculated as days between ticket creation and current date/closure</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Footer Note */}
+              <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
+                <p className="text-sm text-muted-foreground italic">
+                  This logic ensures escalation tickets are automatically resolved when the underlying issue is addressed, reducing manual intervention.
+                </p>
+              </div>
+            </div>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 });
