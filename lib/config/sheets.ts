@@ -2,16 +2,16 @@ import { SheetConfig, StatusOption } from '@/types';
 
 // Manual Case Options
 const manualCaseOptions: StatusOption[] = [
-  { label: 'Fake NDR Remark', value: 'Fake NDR Remark', color: '#ef4444' },
-  { label: 'Delivery Issue', value: 'Delivery Issue', color: '#f97316' },
-  { label: 'Delayed RTO', value: 'Delayed RTO', color: '#f59e0b' },
-  { label: 'Reverse Pickup', value: 'Reverse Pickup', color: '#84cc16' },
-  { label: 'Reverse delivery issues', value: 'Reverse delivery issues', color: '#22c55e' },
-  { label: 'Delayed Pickup', value: 'Delayed Pickup', color: '#10b981' },
-  { label: 'Re-Attempt', value: 'Re-Attempt', color: '#14b8a6' },
   { label: 'COD Delay', value: 'COD Delay', color: '#06b6d4' },
+  { label: 'Delayed Pickup', value: 'Delayed Pickup', color: '#10b981' },
+  { label: 'Delayed RTO', value: 'Delayed RTO', color: '#f59e0b' },
+  { label: 'Delivery Issue', value: 'Delivery Issue', color: '#f97316' },
   { label: 'EDD Breach', value: 'EDD Breach', color: '#8b5cf6' },
   { label: 'EDD Urgent', value: 'EDD Urgent', color: '#d946ef' },
+  { label: 'Fake NDR Remark', value: 'Fake NDR Remark', color: '#ef4444' },
+  { label: 'Re-Attempt', value: 'Re-Attempt', color: '#14b8a6' },
+  { label: 'Reverse Pickup', value: 'Reverse Pickup', color: '#84cc16' },
+  { label: 'Reverse delivery issues', value: 'Reverse delivery issues', color: '#22c55e' },
 ];
 
 // Manual Ticket Status Options
@@ -23,7 +23,7 @@ const manualTicketStatusOptions: StatusOption[] = [
 // Escalation Sheet Configuration
 export const escalationSheetConfig: SheetConfig = {
   id: 'escalations',
-  name: 'Escalation Sheet',
+  name: 'Kalesh Bhandar',
   icon: 'AlertCircle',
   description: 'Manage shipment escalations and track resolution status',
   views: [
