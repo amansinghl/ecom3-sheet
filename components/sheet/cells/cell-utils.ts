@@ -56,20 +56,22 @@ export function highlightText(text: string, searchTerm: string): React.ReactNode
   const parts: React.ReactNode[] = [];
   let lastIndex = 0;
 
-  matches.forEach((match) => {
+  matches.forEach((match, index) => {
     // Add text before match
     if (match.start > lastIndex) {
       parts.push(textStr.substring(lastIndex, match.start));
     }
     
-    // Add highlighted match
+    // Add highlighted match using React.createElement (since this is a .ts file)
     parts.push(
-      <mark
-        key={`highlight-${match.start}`}
-        className="bg-yellow-200 dark:bg-yellow-800/50 rounded px-0.5"
-      >
-        {textStr.substring(match.start, match.end)}
-      </mark>
+      React.createElement(
+        'mark',
+        {
+          key: `highlight-${match.start}-${index}`,
+          className: 'bg-yellow-200 dark:bg-yellow-800/50 rounded px-0.5',
+        },
+        textStr.substring(match.start, match.end)
+      )
     );
     
     lastIndex = match.end;
@@ -80,6 +82,6 @@ export function highlightText(text: string, searchTerm: string): React.ReactNode
     parts.push(textStr.substring(lastIndex));
   }
 
-  return <>{parts}</>;
+  return React.createElement(React.Fragment, null, ...parts);
 }
 
