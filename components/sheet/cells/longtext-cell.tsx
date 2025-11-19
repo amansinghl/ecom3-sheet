@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
-import { getCellTextSize, getCellPadding } from './cell-utils';
+import { getCellTextSize, getCellPadding, highlightText } from './cell-utils';
 
 interface LongTextCellProps {
   value: any;
@@ -15,6 +15,7 @@ interface LongTextCellProps {
   isEditing: boolean;
   canEdit: boolean;
   rowHeight: RowHeight;
+  globalSearch?: string;
   onEdit: () => void;
   onSave: (value: any) => void;
   onCancel: () => void;
@@ -24,6 +25,7 @@ export function LongTextCell({
   value,
   canEdit,
   rowHeight,
+  globalSearch = '',
   onSave,
 }: LongTextCellProps) {
   const [isOpen, setIsOpen] = useState(false);
@@ -36,6 +38,11 @@ export function LongTextCell({
     setIsOpen(false);
   };
 
+  const displayValue = value || '';
+  const highlightedValue = globalSearch.trim() 
+    ? highlightText(displayValue, globalSearch.trim())
+    : displayValue;
+
   return (
     <>
       <div
@@ -47,7 +54,7 @@ export function LongTextCell({
         )}
         onClick={() => canEdit && setIsOpen(true)}
       >
-        {value || ''}
+        {highlightedValue}
       </div>
 
       <Dialog open={isOpen} onOpenChange={setIsOpen}>

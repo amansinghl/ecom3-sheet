@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { ColumnConfig } from '@/types';
 import { RowHeight } from '@/lib/store/sheet-store';
-import { getCellTextSize, getCellPadding } from './cell-utils';
+import { getCellTextSize, getCellPadding, highlightText } from './cell-utils';
 
 interface DateCellProps {
   value: any;
@@ -14,6 +14,7 @@ interface DateCellProps {
   isEditing: boolean;
   canEdit: boolean;
   rowHeight: RowHeight;
+  globalSearch?: string;
   onEdit: () => void;
   onSave: (value: any) => void;
   onCancel: () => void;
@@ -25,6 +26,7 @@ export function DateCell({
   isEditing,
   canEdit,
   rowHeight,
+  globalSearch = '',
   onEdit,
   onSave,
   onCancel,
@@ -84,6 +86,10 @@ export function DateCell({
       )
     : '';
 
+  const highlightedValue = !isEditing && globalSearch.trim() 
+    ? highlightText(displayValue, globalSearch.trim())
+    : displayValue;
+
   return (
     <div
       className={cn(
@@ -94,7 +100,7 @@ export function DateCell({
       )}
       onClick={canEdit ? onEdit : undefined}
     >
-      {displayValue}
+      {highlightedValue}
     </div>
   );
 }

@@ -5,7 +5,7 @@ import { RowHeight } from '@/lib/store/sheet-store';
 import { ColumnConfig } from '@/types';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
-import { getCellTextSize, getCellPadding } from './cell-utils';
+import { getCellTextSize, getCellPadding, highlightText } from './cell-utils';
 
 interface NumberCellProps {
   value: any;
@@ -13,6 +13,7 @@ interface NumberCellProps {
   isEditing: boolean;
   canEdit: boolean;
   rowHeight: RowHeight;
+  globalSearch?: string;
   onEdit: () => void;
   onSave: (value: any) => void;
   onCancel: () => void;
@@ -24,6 +25,7 @@ export function NumberCell({
   isEditing,
   canEdit,
   rowHeight,
+  globalSearch = '',
   onEdit,
   onSave,
   onCancel,
@@ -100,6 +102,10 @@ export function NumberCell({
     ? (isIdColumn ? value.toString() : value.toLocaleString())
     : '';
 
+  const highlightedValue = !isEditing && globalSearch.trim() 
+    ? highlightText(formattedValue, globalSearch.trim())
+    : formattedValue;
+
   return (
     <div
       className={cn(
@@ -110,7 +116,7 @@ export function NumberCell({
       )}
       onClick={canEdit ? onEdit : undefined}
     >
-      {formattedValue}
+      {highlightedValue}
     </div>
   );
 }

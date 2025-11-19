@@ -6,7 +6,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
 import { ColumnConfig, DropdownOption } from '@/types';
 import { RowHeight } from '@/lib/store/sheet-store';
-import { getCellTextSize, getCellPadding } from './cell-utils';
+import { getCellTextSize, getCellPadding, highlightText } from './cell-utils';
 
 interface UserCellProps {
   value: any;
@@ -14,12 +14,13 @@ interface UserCellProps {
   isEditing: boolean;
   canEdit: boolean;
   rowHeight: RowHeight;
+  globalSearch?: string;
   onEdit: () => void;
   onSave: (value: any) => void;
 }
 
 export function UserCell({ value, columnConfig, isEditing, canEdit,
-  rowHeight, onEdit, onSave }: UserCellProps) {
+  rowHeight, globalSearch = '', onEdit, onSave }: UserCellProps) {
   const [editValue, setEditValue] = useState(value || '');
   const textSizeClass = getCellTextSize(rowHeight);
   const paddingClass = getCellPadding(rowHeight);
@@ -41,6 +42,9 @@ export function UserCell({ value, columnConfig, isEditing, canEdit,
   };
 
   const currentUser = getUser(value);
+  const highlightedLabel = !isEditing && currentUser && globalSearch.trim()
+    ? highlightText(currentUser.label, globalSearch.trim())
+    : currentUser?.label;
   
   // Fun character mapping based on user value
   const getFunkyCharacter = (userValue: string, name: string) => {
@@ -123,7 +127,7 @@ export function UserCell({ value, columnConfig, isEditing, canEdit,
               {getFunkyCharacter(currentUser.value, currentUser.label)}
             </AvatarFallback>
           </Avatar>
-          <span className={cn(textSizeClass, 'font-medium truncate')}>{currentUser.label}</span>
+          <span className={cn(textSizeClass, 'font-medium truncate')}>{highlightedLabel}</span>
         </>
       ) : (
         <span className={cn(textSizeClass, 'text-muted-foreground')}>Unassigned</span>

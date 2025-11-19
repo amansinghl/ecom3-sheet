@@ -1015,6 +1015,7 @@ export function SheetView({ config, userRole }: SheetViewProps) {
                 onClearFilters={handleClearFilters}
                 hasActiveFilters={Object.keys(viewState.columnFilters).length > 0}
                 scrollContainerRef={scrollContainerRef}
+                globalSearch={globalSearch}
               />
             )}
           </div>

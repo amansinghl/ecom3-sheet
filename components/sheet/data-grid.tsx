@@ -37,9 +37,10 @@ interface DataGridProps {
   onClearFilters?: () => void;
   hasActiveFilters?: boolean;
   scrollContainerRef?: React.RefObject<HTMLDivElement | null>;
+  globalSearch?: string;
 }
 
-export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibility: externalColumnVisibility, onColumnVisibilityChange, onDuplicateRow, onCopyRow, onDeleteRow, onAddRow, onClearFilters, hasActiveFilters, scrollContainerRef }: DataGridProps) {
+export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibility: externalColumnVisibility, onColumnVisibilityChange, onDuplicateRow, onCopyRow, onDeleteRow, onAddRow, onClearFilters, hasActiveFilters, scrollContainerRef, globalSearch = '' }: DataGridProps) {
   const { selectedRows, toggleRowSelection, editingCell, setEditingCell, viewState, rowHeight, columnWidths, setColumnWidth, setColumnFilter, toggleColumnPin } = useSheetStore();
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnResizeMode] = useState<ColumnResizeMode>('onChange');
@@ -256,6 +257,7 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
               isEditing={isEditing}
               canEdit={canEditThisCell}
               rowHeight={rowHeight}
+              globalSearch={globalSearch}
               onEdit={() => setEditingCell({ rowId: row.id, columnId: column.id })}
               onSave={(newValue) => {
                 onCellUpdate(row.id, column.id, newValue);
@@ -274,7 +276,7 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
     });
 
     return cols;
-  }, [orderedColumns, canEdit, editingCell, setEditingCell, onCellUpdate, columnWidths, viewState.columnFilters, viewState.pinnedColumns, setColumnFilter, toggleColumnPin, rowHeight, openFilterPopover]);
+  }, [orderedColumns, canEdit, editingCell, setEditingCell, onCellUpdate, columnWidths, viewState.columnFilters, viewState.pinnedColumns, setColumnFilter, toggleColumnPin, rowHeight, openFilterPopover, globalSearch]);
 
   const table = useReactTable({
     data,

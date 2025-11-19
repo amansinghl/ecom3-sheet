@@ -5,7 +5,7 @@ import { ColumnConfig } from '@/types';
 import { RowHeight } from '@/lib/store/sheet-store';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
-import { getCellTextSize, getCellPadding } from './cell-utils';
+import { getCellTextSize, getCellPadding, highlightText } from './cell-utils';
 
 interface TextCellProps {
   value: any;
@@ -13,6 +13,7 @@ interface TextCellProps {
   isEditing: boolean;
   canEdit: boolean;
   rowHeight: RowHeight;
+  globalSearch?: string;
   onEdit: () => void;
   onSave: (value: any) => void;
   onCancel: () => void;
@@ -23,6 +24,7 @@ export function TextCell({
   isEditing,
   canEdit,
   rowHeight,
+  globalSearch = '',
   onEdit,
   onSave,
   onCancel,
@@ -88,6 +90,11 @@ export function TextCell({
     );
   }
 
+  const displayValue = value || '';
+  const highlightedValue = !isEditing && globalSearch.trim() 
+    ? highlightText(displayValue, globalSearch.trim())
+    : displayValue;
+
   return (
     <div
       className={cn(
@@ -98,7 +105,7 @@ export function TextCell({
       )}
       onClick={canEdit ? onEdit : undefined}
     >
-      {value || ''}
+      {highlightedValue}
     </div>
   );
 }

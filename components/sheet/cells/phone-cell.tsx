@@ -5,12 +5,14 @@ import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { Phone } from 'lucide-react';
 import { RowHeight } from '@/lib/store/sheet-store';
+import { highlightText } from './cell-utils';
 
 interface PhoneCellProps {
   value: any;
   isEditing: boolean;
   canEdit: boolean;
   rowHeight: RowHeight;
+  globalSearch?: string;
   onEdit: () => void;
   onSave: (value: any) => void;
   onCancel: () => void;
@@ -21,6 +23,7 @@ export function PhoneCell({
   isEditing,
   canEdit,
   rowHeight,
+  globalSearch = '',
   onEdit,
   onSave,
   onCancel,
@@ -57,6 +60,10 @@ export function PhoneCell({
     );
   }
 
+  const highlightedValue = !isEditing && value && globalSearch.trim()
+    ? highlightText(value, globalSearch.trim())
+    : value;
+
   return (
     <div
       className={cn(
@@ -73,7 +80,7 @@ export function PhoneCell({
             className="text-blue-600 hover:underline truncate"
             onClick={(e) => e.stopPropagation()}
           >
-            {value}
+            {highlightedValue}
           </a>
         </>
       )}

@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
-import { getCellTextSize, getCellPadding } from './cell-utils';
+import { getCellTextSize, getCellPadding, highlightText } from './cell-utils';
 
 interface StatusCellProps {
   value: any;
@@ -15,6 +15,7 @@ interface StatusCellProps {
   isEditing: boolean;
   canEdit: boolean;
   rowHeight: RowHeight;
+  globalSearch?: string;
   onEdit: () => void;
   onSave: (value: any) => void;
   onCancel: () => void;
@@ -26,6 +27,7 @@ export function StatusCell({
   isEditing,
   canEdit,
   rowHeight,
+  globalSearch = '',
   onEdit,
   onSave,
   onCancel,
@@ -58,6 +60,9 @@ export function StatusCell({
   };
 
   const currentOption = getOption(value);
+  const highlightedLabel = !isEditing && currentOption && globalSearch.trim()
+    ? highlightText(currentOption.label, globalSearch.trim())
+    : currentOption?.label;
   
   // Get fun emoji avatar for user
   const getFunkyAvatar = (optionValue: string, name: string) => {
@@ -158,7 +163,7 @@ export function StatusCell({
                 borderColor: currentOption.color,
               }}
             >
-              {currentOption.label}
+              {highlightedLabel}
             </Badge>
           </div>
         ) : (

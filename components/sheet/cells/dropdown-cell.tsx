@@ -5,6 +5,7 @@ import { ColumnConfig } from '@/types';
 import { RowHeight } from '@/lib/store/sheet-store';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
+import { highlightText } from './cell-utils';
 
 interface DropdownCellProps {
   value: any;
@@ -12,6 +13,7 @@ interface DropdownCellProps {
   isEditing: boolean;
   canEdit: boolean;
   rowHeight: RowHeight;
+  globalSearch?: string;
   onEdit: () => void;
   onSave: (value: any) => void;
   onCancel: () => void;
@@ -23,6 +25,7 @@ export function DropdownCell({
   isEditing,
   canEdit,
   rowHeight,
+  globalSearch = '',
   onEdit,
   onSave,
   onCancel,
@@ -45,6 +48,11 @@ export function DropdownCell({
     const option = options.find((opt) => opt.value === val);
     return option?.label || val || '';
   };
+
+  const label = getLabel(value);
+  const highlightedLabel = !isEditing && globalSearch.trim()
+    ? highlightText(label, globalSearch.trim())
+    : label;
 
   if (isEditing) {
     return (
@@ -88,7 +96,7 @@ export function DropdownCell({
       )}
       onClick={canEdit ? onEdit : undefined}
     >
-      {getLabel(value)}
+      {highlightedLabel}
     </div>
   );
 }

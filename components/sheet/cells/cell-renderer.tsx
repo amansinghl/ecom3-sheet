@@ -20,6 +20,7 @@ interface CellRendererProps {
   isEditing: boolean;
   canEdit: boolean;
   rowHeight: RowHeight;
+  globalSearch?: string;
   onEdit: () => void;
   onSave: (value: any) => void;
   onCancel: () => void;
@@ -31,6 +32,7 @@ export function CellRenderer({
   isEditing,
   canEdit,
   rowHeight,
+  globalSearch = '',
   onEdit,
   onSave,
   onCancel,
@@ -41,6 +43,7 @@ export function CellRenderer({
     isEditing,
     canEdit,
     rowHeight,
+    globalSearch,
     onEdit,
     onSave,
     onCancel,
