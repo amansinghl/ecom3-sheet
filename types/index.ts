@@ -23,7 +23,8 @@ export type CellType =
   | 'phone'
   | 'url'
   | 'status'
-  | 'user';
+  | 'user'
+  | 'highlights';
 
 export interface DropdownOption {
   label: string;

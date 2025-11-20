@@ -257,6 +257,7 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
               isEditing={isEditing}
               canEdit={canEditThisCell}
               rowHeight={rowHeight}
+              rowData={row.original}
               globalSearch={globalSearch}
               onEdit={() => setEditingCell({ rowId: row.id, columnId: column.id })}
               onSave={(newValue) => {
