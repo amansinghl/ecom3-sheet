@@ -72,6 +72,22 @@ export const escalationSheetConfig: SheetConfig = {
       editable: false,
     },
     {
+      id: 'created_at',
+      label: 'Created At',
+      type: 'datetime',
+      width: 150,
+      required: false,
+      editable: false,
+    },
+    {
+      id: 'highlights',
+      label: 'Highlights',
+      type: 'highlights',
+      width: 200,
+      required: false,
+      editable: false,
+    },
+    {
       id: 'notes',
       label: 'Notes',
       type: 'longtext',
@@ -144,14 +160,6 @@ export const escalationSheetConfig: SheetConfig = {
       required: false,
       editable: true,
       options: manualTicketStatusOptions,
-    },
-    {
-      id: 'created_at',
-      label: 'Created At',
-      type: 'datetime',
-      width: 150,
-      required: false,
-      editable: false,
     },
     {
       id: 'updated_at',
