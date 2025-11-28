@@ -9,6 +9,7 @@ import { TableSkeleton } from './table-skeleton';
 import { ViewsSidebar } from './views-sidebar';
 import { HeroSection } from './hero-section';
 import { BulkUploadModal } from './bulk-upload-modal';
+import { ManualCaseDialog } from './manual-case-dialog';
 import { useSheetStore } from '@/lib/store/sheet-store';
 import { useKeyboardShortcuts } from '@/hooks/use-keyboard-shortcuts';
 import { loadColumnVisibility, saveColumnVisibility } from '@/lib/utils/storage';
@@ -17,6 +18,7 @@ import { toast } from 'sonner';
 import { sheetApiService } from '@/lib/api/sheets';
 import * as XLSX from 'xlsx';
 import { useQueryClient } from '@tanstack/react-query';
+import { escalationSheetConfig } from '@/lib/config/sheets';
 
 interface SheetViewProps {
   config: SheetConfig;
@@ -40,6 +42,8 @@ export function SheetView({ config, userRole }: SheetViewProps) {
   } = useSheetStore();
   const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [showBulkUploadModal, setShowBulkUploadModal] = useState(false);
+  const [pendingShipments, setPendingShipments] = useState<Array<{ shipmentNo: string; rowId: string }>>([]);
+  const [currentShipmentIndex, setCurrentShipmentIndex] = useState(0);
   const toolbarRef = useRef<ToolbarRef>(null);
   const hasAppliedDefaultFilters = useRef(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -218,6 +222,134 @@ export function SheetView({ config, userRole }: SheetViewProps) {
     return filteredData.filter((row) => !String(row.id).startsWith('empty-')).length;
   }, [filteredData]);
 
+  /**
+   * Parse shipment numbers from comma or space separated string
+   */
+  const parseShipmentNumbers = (value: any): string[] => {
+    if (!value) return [];
+    const str = String(value).trim();
+    if (!str) return [];
+    
+    // Split by comma or space (or both)
+    const numbers = str
+      .split(/[,\s]+/)
+      .map(n => n.trim())
+      .filter(n => n.length > 0);
+    
+    return numbers;
+  };
+
+  /**
+   * Process a single shipment number with manual_case
+   */
+  const processShipmentWithManualCase = async (
+    shipmentNo: string,
+    rowId: string,
+    manualCase?: string
+  ) => {
+    try {
+      toast.loading(`Fetching details for shipment ${shipmentNo}...`, { id: `fetch-${shipmentNo}` });
+      const response = await sheetApiService.updateEscalationSheet(shipmentNo);
+      
+      if (response.data?.escalation) {
+        const backendId = response.data.escalation.id;
+        const vamashipper = response.data.escalation.vamashipper || '';
+        
+        // Update the row with data from backend
+        setData((prev) =>
+          prev.map((row) => {
+            if (String(row.id) === rowId) {
+              return {
+                ...row,
+                ...response.data.escalation,
+                id: backendId,
+                manual_case: manualCase || row.manual_case || null,
+                updatedAt: new Date(),
+              };
+            }
+            return row;
+          })
+        );
+        
+        // If manual_case was provided, update it in the database
+        if (manualCase) {
+          try {
+            toast.loading(`Updating manual case for shipment ${shipmentNo}...`, { id: `update-${shipmentNo}` });
+            await sheetApiService.updateEscalationEntries(backendId, {
+              manual_case: manualCase,
+              vamashipper: vamashipper,
+            });
+            toast.success(`Manual case updated for shipment ${shipmentNo}`, { id: `update-${shipmentNo}` });
+          } catch (updateError: any) {
+            console.error(`Failed to update manual case for ${shipmentNo}:`, updateError);
+            toast.error(updateError.message || `Failed to update manual case`, { id: `update-${shipmentNo}` });
+          }
+        }
+        
+        toast.success(`Shipment ${shipmentNo} loaded successfully`, { id: `fetch-${shipmentNo}` });
+        return backendId;
+      } else {
+        toast.error(`No data received for shipment ${shipmentNo}`, { id: `fetch-${shipmentNo}` });
+        return null;
+      }
+    } catch (error: any) {
+      console.error(`Failed to fetch escalation details for ${shipmentNo}:`, error);
+      toast.error(error.message || `Failed to fetch details for shipment ${shipmentNo}`, { id: `fetch-${shipmentNo}` });
+      return null;
+    }
+  };
+
+  /**
+   * Handle manual case selection for multiple shipments
+   */
+  const handleManualCaseSelect = async (manualCase: string) => {
+    if (pendingShipments.length === 0) return;
+    
+    const currentShipment = pendingShipments[currentShipmentIndex];
+    
+    // Process current shipment with selected manual_case
+    await processShipmentWithManualCase(
+      currentShipment.shipmentNo,
+      currentShipment.rowId,
+      manualCase
+    );
+    
+    // Move to next shipment
+    if (currentShipmentIndex < pendingShipments.length - 1) {
+      setCurrentShipmentIndex(currentShipmentIndex + 1);
+    } else {
+      // All shipments processed
+      setPendingShipments([]);
+      setCurrentShipmentIndex(0);
+      toast.success('All shipments processed successfully');
+    }
+  };
+
+  /**
+   * Skip manual case for current shipment
+   */
+  const handleManualCaseSkip = async () => {
+    if (pendingShipments.length === 0) return;
+    
+    const currentShipment = pendingShipments[currentShipmentIndex];
+    
+    // Process current shipment without manual_case
+    await processShipmentWithManualCase(
+      currentShipment.shipmentNo,
+      currentShipment.rowId
+    );
+    
+    // Move to next shipment
+    if (currentShipmentIndex < pendingShipments.length - 1) {
+      setCurrentShipmentIndex(currentShipmentIndex + 1);
+    } else {
+      // All shipments processed
+      setPendingShipments([]);
+      setCurrentShipmentIndex(0);
+      toast.success('All shipments processed successfully');
+    }
+  };
+
   const handleCellUpdate = async (rowId: string, columnId: string, value: any) => {
     // Check if this is the shipment_no column for escalation sheet
     // Check for null/undefined explicitly to allow 0 as a valid value
@@ -260,65 +392,101 @@ export function SheetView({ config, userRole }: SheetViewProps) {
       
       // If shipment number was entered in empty row, fetch details from backend and create new row
       if (isShipmentNoUpdate) {
-        // First, immediately update the row with the entered value
-        const tempRow: any = {
-          id: rowIdString, // Keep the empty row ID temporarily
-          createdAt: new Date(),
-          updatedAt: new Date(),
-          createdBy: 'user-1',
-          updatedBy: 'user-1',
-          _isFilled: true, // Mark as filled so it won't be regenerated
-        };
+        // Parse shipment numbers (handle comma/space separated)
+        const shipmentNumbers = parseShipmentNumbers(value);
         
-        config.columns.forEach((col) => {
-          tempRow[col.id] = col.id === columnId ? value : col.defaultValue || null;
-        });
-        
-        // Set is_closed to 0 (open) by default for escalation sheet
-        if (config.id === 'escalations') {
-          tempRow.is_closed = 0;
+        if (shipmentNumbers.length === 0) {
+          toast.error('Please enter at least one shipment number');
+          return;
         }
         
-        // Add the filled row to data
-        setData((prev) => [...prev, tempRow]);
-        
-        // Then fetch the full data from API
-        try {
-          toast.loading('Fetching escalation details...', { id: 'fetch-escalation' });
-          const response = await sheetApiService.updateEscalationSheet(String(value));
+        if (shipmentNumbers.length === 1) {
+          // Single shipment number - use existing flow
+          const tempRow: any = {
+            id: rowIdString,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            createdBy: 'user-1',
+            updatedBy: 'user-1',
+            _isFilled: true,
+          };
           
-          if (response.data?.escalation) {
-            // Update the newly created row with data from backend
-            // Use the backend ID so that subsequent updates can call the API
-            const backendId = response.data.escalation.id;
-            setData((prev) =>
-              prev.map((row) => {
-                if (String(row.id) === rowIdString) {
-                  return {
-                    ...row,
-                    ...response.data.escalation,
-                    id: backendId, // Use backend ID for API calls
-                    updatedAt: new Date(),
-                  };
-                }
-                return row;
-              })
-            );
-            toast.success('Escalation details loaded successfully', { id: 'fetch-escalation' });
-            
-            // Auto-focus on manual_case column after shipment_no is entered
-            setTimeout(() => {
-              const manualCaseColumn = config.columns.find((col) => col.id === 'manual_case');
-              if (manualCaseColumn) {
-                setEditingCell({ rowId: backendId, columnId: 'manual_case' });
-              }
-            }, 100);
-          } else {
-            toast.error('No escalation data received', { id: 'fetch-escalation' });
+          config.columns.forEach((col) => {
+            tempRow[col.id] = col.id === columnId ? shipmentNumbers[0] : col.defaultValue || null;
+          });
+          
+          if (config.id === 'escalations') {
+            tempRow.is_closed = 0;
           }
-        } catch (error: any) {
-          console.error('Failed to fetch escalation details:', error);
-          toast.error(error.message || 'Failed to fetch escalation details', { id: 'fetch-escalation' });
+          
+          setData((prev) => [...prev, tempRow]);
+          
+          // Fetch details and auto-focus manual_case
+          try {
+            toast.loading('Fetching escalation details...', { id: 'fetch-escalation' });
+            const response = await sheetApiService.updateEscalationSheet(shipmentNumbers[0]);
+            
+            if (response.data?.escalation) {
+              const backendId = response.data.escalation.id;
+              setData((prev) =>
+                prev.map((row) => {
+                  if (String(row.id) === rowIdString) {
+                    return {
+                      ...row,
+                      ...response.data.escalation,
+                      id: backendId,
+                      updatedAt: new Date(),
+                    };
+                  }
+                  return row;
+                })
+              );
+              toast.success('Escalation details loaded successfully', { id: 'fetch-escalation' });
+              
+              setTimeout(() => {
+                const manualCaseColumn = config.columns.find((col) => col.id === 'manual_case');
+                if (manualCaseColumn) {
+                  setEditingCell({ rowId: backendId, columnId: 'manual_case' });
+                }
+              }, 100);
+            } else {
+              toast.error('No escalation data received', { id: 'fetch-escalation' });
+            }
+          } catch (error: any) {
+            console.error('Failed to fetch escalation details:', error);
+            toast.error(error.message || 'Failed to fetch escalation details', { id: 'fetch-escalation' });
+          }
+        } else {
+          // Multiple shipment numbers - create rows and show dialog
+          const newRows: Array<{ shipmentNo: string; rowId: string }> = [];
+          
+          shipmentNumbers.forEach((shipmentNo, index) => {
+            const newRowId = index === 0 ? rowIdString : `row-${Date.now()}-${index}`;
+            const tempRow: any = {
+              id: newRowId,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+              createdBy: 'user-1',
+              updatedBy: 'user-1',
+              _isFilled: true,
+            };
+            
+            config.columns.forEach((col) => {
+              tempRow[col.id] = col.id === columnId ? shipmentNo : col.defaultValue || null;
+            });
+            
+            if (config.id === 'escalations') {
+              tempRow.is_closed = 0;
+            }
+            
+            setData((prev) => [...prev, tempRow]);
+            newRows.push({ shipmentNo, rowId: newRowId });
+          });
+          
+          // Set up pending shipments for dialog
+          setPendingShipments(newRows);
+          setCurrentShipmentIndex(0);
+          toast.info(`Processing ${shipmentNumbers.length} shipments. Please select manual case for each.`);
         }
       } else {
         // Not a shipment number update, just fill the empty row with the entered value
@@ -344,52 +512,108 @@ export function SheetView({ config, userRole }: SheetViewProps) {
       
       // If updating shipment_no in a new row, fetch details and auto-focus manual_case
       if (isShipmentNoUpdate) {
-        setData((prev) =>
-          prev.map((row) => {
-            if (String(row.id) === rowIdString) {
-              return {
-                ...row,
-                [columnId]: value,
-                updatedAt: new Date(),
-              };
-            }
-            return row;
-          })
-        );
-
-        try {
-          toast.loading('Fetching escalation details...', { id: 'fetch-escalation' });
-          const response = await sheetApiService.updateEscalationSheet(String(value));
-          
-          if (response.data?.escalation) {
-            // Use the backend ID so that subsequent updates can call the API
-            const backendId = response.data.escalation.id;
-            setData((prev) =>
-              prev.map((row) => {
-                if (String(row.id) === rowIdString) {
-                  return {
-                    ...row,
-                    ...response.data.escalation,
-                    id: backendId, // Use backend ID for API calls
-                    updatedAt: new Date(),
-                  };
-                }
-                return row;
-              })
-            );
-            toast.success('Escalation details loaded successfully', { id: 'fetch-escalation' });
-            
-            // Auto-focus on manual_case column after shipment_no is entered
-            setTimeout(() => {
-              const manualCaseColumn = config.columns.find((col) => col.id === 'manual_case');
-              if (manualCaseColumn) {
-                setEditingCell({ rowId: backendId, columnId: 'manual_case' });
+        // Parse shipment numbers (handle comma/space separated)
+        const shipmentNumbers = parseShipmentNumbers(value);
+        
+        if (shipmentNumbers.length === 0) {
+          toast.error('Please enter at least one shipment number');
+          return;
+        }
+        
+        if (shipmentNumbers.length === 1) {
+          // Single shipment number - use existing flow
+          setData((prev) =>
+            prev.map((row) => {
+              if (String(row.id) === rowIdString) {
+                return {
+                  ...row,
+                  [columnId]: shipmentNumbers[0],
+                  updatedAt: new Date(),
+                };
               }
-            }, 100);
+              return row;
+            })
+          );
+
+          try {
+            toast.loading('Fetching escalation details...', { id: 'fetch-escalation' });
+            const response = await sheetApiService.updateEscalationSheet(shipmentNumbers[0]);
+            
+            if (response.data?.escalation) {
+              const backendId = response.data.escalation.id;
+              setData((prev) =>
+                prev.map((row) => {
+                  if (String(row.id) === rowIdString) {
+                    return {
+                      ...row,
+                      ...response.data.escalation,
+                      id: backendId,
+                      updatedAt: new Date(),
+                    };
+                  }
+                  return row;
+                })
+              );
+              toast.success('Escalation details loaded successfully', { id: 'fetch-escalation' });
+              
+              setTimeout(() => {
+                const manualCaseColumn = config.columns.find((col) => col.id === 'manual_case');
+                if (manualCaseColumn) {
+                  setEditingCell({ rowId: backendId, columnId: 'manual_case' });
+                }
+              }, 100);
+            }
+          } catch (error: any) {
+            console.error('Failed to fetch escalation details:', error);
+            toast.error(error.message || 'Failed to fetch escalation details', { id: 'fetch-escalation' });
           }
-        } catch (error: any) {
-          console.error('Failed to fetch escalation details:', error);
-          toast.error(error.message || 'Failed to fetch escalation details', { id: 'fetch-escalation' });
+        } else {
+          // Multiple shipment numbers - create additional rows and show dialog
+          const newRows: Array<{ shipmentNo: string; rowId: string }> = [];
+          
+          // Update current row with first shipment
+          setData((prev) =>
+            prev.map((row) => {
+              if (String(row.id) === rowIdString) {
+                return {
+                  ...row,
+                  [columnId]: shipmentNumbers[0],
+                  updatedAt: new Date(),
+                };
+              }
+              return row;
+            })
+          );
+          newRows.push({ shipmentNo: shipmentNumbers[0], rowId: rowIdString });
+          
+          // Create additional rows for remaining shipments
+          shipmentNumbers.slice(1).forEach((shipmentNo, index) => {
+            const newRowId = `row-${Date.now()}-${index}`;
+            const tempRow: any = {
+              id: newRowId,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+              createdBy: 'user-1',
+              updatedBy: 'user-1',
+              _isFilled: true,
+            };
+            
+            config.columns.forEach((col) => {
+              tempRow[col.id] = col.id === columnId ? shipmentNo : col.defaultValue || null;
+            });
+            
+            if (config.id === 'escalations') {
+              tempRow.is_closed = 0;
+            }
+            
+            setData((prev) => [...prev, tempRow]);
+            newRows.push({ shipmentNo, rowId: newRowId });
+          });
+          
+          // Set up pending shipments for dialog
+          setPendingShipments(newRows);
+          setCurrentShipmentIndex(0);
+          toast.info(`Processing ${shipmentNumbers.length} shipments. Please select manual case for each.`);
         }
       } else {
         // For other columns in new row, just update the value
@@ -988,6 +1212,18 @@ export function SheetView({ config, userRole }: SheetViewProps) {
           onClose={() => setShowBulkUploadModal(false)}
           onUpload={processBulkUploadFile}
         />
+        
+        {config.id === 'escalations' && pendingShipments.length > 0 && (
+          <ManualCaseDialog
+            open={true}
+            shipmentNo={pendingShipments[currentShipmentIndex]?.shipmentNo || ''}
+            shipmentIndex={currentShipmentIndex}
+            totalShipments={pendingShipments.length}
+            manualCaseOptions={escalationSheetConfig.columns.find(col => col.id === 'manual_case')?.options as any || []}
+            onSelect={handleManualCaseSelect}
+            onSkip={handleManualCaseSkip}
+          />
+        )}
         <div className="flex-1 overflow-hidden animate-in fade-in duration-300">
           {/* Show hero section for portfolio sheet */}
           {config.id === 'portfolio' && data.length === 0 && !isLoading && (
