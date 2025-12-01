@@ -12,6 +12,17 @@ const manualCaseOptions: StatusOption[] = [
   { label: 'Re-Attempt', value: 'Re-Attempt', color: '#14b8a6' },
   { label: 'Reverse Pickup', value: 'Reverse Pickup', color: '#84cc16' },
   { label: 'Reverse delivery issues', value: 'Reverse delivery issues', color: '#22c55e' },
+  { label: 'POD (prove of delivery)', value: 'POD (prove of delivery)', color: '#ec4899' },
+  { label: 'RTO the Shipment', value: 'RTO the Shipment', color: '#14b8a6' },
+  { label: 'Lost/Damaged', value: 'Lost/Damaged', color: '#8b5cf6' },
+  { label: 'Self-collection', value: 'Self-collection', color: '#8b5cf6' },
+  { label: 'Address/Contact no update', value: 'Address/Contact no update', color: '#6b7280' },
+  { label: 'Service Failure', value: 'Service Failure', color: '#eab308' },
+  { label: 'Wrong Delivery', value: 'Wrong Delivery', color: '#f43f5e' },
+  { label: 'Post-Pickup Dispute', value: 'Post-Pickup Dispute', color: '#10b981' },
+  { label: 'Prepaid/COD Change', value: 'Prepaid/COD Change', color: '#8b5cf6' },
+  { label: 'Wrong RTO', value: 'Wrong RTO', color: '#f43f5e' },
+  { label: 'Misrouted Shipment', value: 'Misrouted Shipment', color: '#fbbf24' },
 ];
 
 // Manual Ticket Status Options
