@@ -405,9 +405,22 @@ export const Toolbar = forwardRef<ToolbarRef, ToolbarProps>(({ config, data, use
                   </div>
                 </div>
 
+                {/* Rule 5 */}
+                <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-2">
+                  <h4 className="font-medium text-foreground">6. EDD - Breach</h4>
+                  <div className="space-y-1 pl-4">
+                    <p className="text-muted-foreground">
+                      <span className="font-medium text-green-600 dark:text-green-400">Positive Closure:</span> Tracking = <code className="px-1.5 py-0.5 rounded bg-background border text-xs">1900</code> or becomes <code className="px-1.5 py-0.5 rounded bg-background border text-xs">1770</code> after ticket creation
+                    </p>
+                    <p className="text-muted-foreground">
+                      <span className="font-medium text-orange-600 dark:text-orange-400">Negative Closure:</span> Tracking &gt; <code className="px-1.5 py-0.5 rounded bg-background border text-xs">1900</code>
+                    </p>
+                  </div>
+                </div>
+
                 {/* Rule 6 */}
                 <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-2">
-                  <h4 className="font-medium text-foreground">6. Re-attempt</h4>
+                  <h4 className="font-medium text-foreground">7. Re-attempt</h4>
                   <div className="space-y-1 pl-4">
                     <p className="text-muted-foreground">
                       <span className="font-medium text-green-600 dark:text-green-400">Positive Closure:</span> Tracking Status = <code className="px-1.5 py-0.5 rounded bg-background border text-xs">1900</code>
@@ -420,7 +433,7 @@ export const Toolbar = forwardRef<ToolbarRef, ToolbarProps>(({ config, data, use
 
                 {/* Rule 7 */}
                 <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-2">
-                  <h4 className="font-medium text-foreground">7. POD (Proof of Delivery) within 48 hrs.</h4>
+                  <h4 className="font-medium text-foreground">8. POD (Proof of Delivery) within 48 hrs.</h4>
                   <div className="pl-4">
                     <p className="text-muted-foreground">
                       <span className="font-medium text-foreground">Manual Closure:</span> To be manually closed only by the Ticket creator
@@ -430,7 +443,7 @@ export const Toolbar = forwardRef<ToolbarRef, ToolbarProps>(({ config, data, use
 
                 {/* Rule 8 */}
                 <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-2">
-                  <h4 className="font-medium text-foreground">8. RTO the Shipment</h4>
+                  <h4 className="font-medium text-foreground">9. RTO the Shipment</h4>
                   <div className="pl-4">
                     <p className="text-muted-foreground">
                       <span className="font-medium text-green-600 dark:text-green-400">Positive Closure:</span> Tracking &gt; <code className="px-1.5 py-0.5 rounded bg-background border text-xs">1900</code>
@@ -440,7 +453,7 @@ export const Toolbar = forwardRef<ToolbarRef, ToolbarProps>(({ config, data, use
 
                 {/* Rule 9 */}
                 <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-2">
-                  <h4 className="font-medium text-foreground">9. Lost/ Damaged</h4>
+                  <h4 className="font-medium text-foreground">10. Lost/ Damaged</h4>
                   <div className="space-y-1 pl-4">
                     <p className="text-muted-foreground">
                       <span className="font-medium text-green-600 dark:text-green-400">Positive Closure:</span> Tracking = <code className="px-1.5 py-0.5 rounded bg-background border text-xs">1500</code> or <code className="px-1.5 py-0.5 rounded bg-background border text-xs">1550</code>
@@ -453,7 +466,7 @@ export const Toolbar = forwardRef<ToolbarRef, ToolbarProps>(({ config, data, use
 
                 {/* Rule 10 */}
                 <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-2">
-                  <h4 className="font-medium text-foreground">10. Self-collection</h4>
+                  <h4 className="font-medium text-foreground">11. Self-collection</h4>
                   <div className="space-y-1 pl-4">
                     <p className="text-muted-foreground">
                       <span className="font-medium text-green-600 dark:text-green-400">Positive Closure:</span> Tracking = <code className="px-1.5 py-0.5 rounded bg-background border text-xs">1900</code>
@@ -466,7 +479,7 @@ export const Toolbar = forwardRef<ToolbarRef, ToolbarProps>(({ config, data, use
 
                 {/* Rule 11 */}
                 <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-2">
-                  <h4 className="font-medium text-foreground">11. Delayed RTO</h4>
+                  <h4 className="font-medium text-foreground">12. Delayed RTO</h4>
                   <div className="space-y-1 pl-4">
                     <p className="text-muted-foreground">
                       <span className="font-medium text-green-600 dark:text-green-400">Positive Closure:</span> Tracking = <code className="px-1.5 py-0.5 rounded bg-background border text-xs">2030</code>
@@ -479,7 +492,7 @@ export const Toolbar = forwardRef<ToolbarRef, ToolbarProps>(({ config, data, use
 
                 {/* Rule 12 */}
                 <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-2">
-                  <h4 className="font-medium text-foreground">12. Address/ Contact No Update</h4>
+                  <h4 className="font-medium text-foreground">13. Address/ Contact No Update</h4>
                   <div className="space-y-1 pl-4">
                     <p className="text-muted-foreground">
                       <span className="font-medium text-green-600 dark:text-green-400">Positive Closure:</span> Tracking = <code className="px-1.5 py-0.5 rounded bg-background border text-xs">1900</code>
@@ -492,7 +505,7 @@ export const Toolbar = forwardRef<ToolbarRef, ToolbarProps>(({ config, data, use
 
                 {/* Rule 13 */}
                 <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-2">
-                  <h4 className="font-medium text-foreground">13. Reverse Delivery Issues</h4>
+                  <h4 className="font-medium text-foreground">14. Reverse Delivery Issues</h4>
                   <div className="space-y-1 pl-4">
                     <p className="text-muted-foreground">
                       <span className="font-medium text-green-600 dark:text-green-400">Positive Closure:</span> Tracking = <code className="px-1.5 py-0.5 rounded bg-background border text-xs">1900</code>
@@ -505,7 +518,7 @@ export const Toolbar = forwardRef<ToolbarRef, ToolbarProps>(({ config, data, use
 
                 {/* Rule 14 */}
                 <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-2">
-                  <h4 className="font-medium text-foreground">14. Service Failure</h4>
+                  <h4 className="font-medium text-foreground">15. Service Failure</h4>
                   <div className="pl-4">
                     <p className="text-muted-foreground">
                       <span className="font-medium text-foreground">Manual Closure:</span> To be manually closed only by the Ticket creator
@@ -515,7 +528,7 @@ export const Toolbar = forwardRef<ToolbarRef, ToolbarProps>(({ config, data, use
 
                 {/* Rule 15 */}
                 <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-2">
-                  <h4 className="font-medium text-foreground">15. Wrong Delivery</h4>
+                  <h4 className="font-medium text-foreground">16. Wrong Delivery</h4>
                   <div className="space-y-1 pl-4">
                     <p className="text-muted-foreground">
                       <span className="font-medium text-green-600 dark:text-green-400">Positive Closure:</span> Tracking = <code className="px-1.5 py-0.5 rounded bg-background border text-xs">1500</code> or <code className="px-1.5 py-0.5 rounded bg-background border text-xs">1550</code>
@@ -528,7 +541,7 @@ export const Toolbar = forwardRef<ToolbarRef, ToolbarProps>(({ config, data, use
 
                 {/* Rule 16 */}
                 <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-2">
-                  <h4 className="font-medium text-foreground">16. Post-Pickup Dispute</h4>
+                  <h4 className="font-medium text-foreground">17. Post-Pickup Dispute</h4>
                   <div className="space-y-1 pl-4">
                     <p className="text-muted-foreground">
                       <span className="font-medium text-green-600 dark:text-green-400">Positive Closure:</span> Tracking ≥ <code className="px-1.5 py-0.5 rounded bg-background border text-xs">1200</code>
@@ -541,7 +554,7 @@ export const Toolbar = forwardRef<ToolbarRef, ToolbarProps>(({ config, data, use
 
                 {/* Rule 17 */}
                 <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-2">
-                  <h4 className="font-medium text-foreground">17. COD to Prepaid Change</h4>
+                  <h4 className="font-medium text-foreground">18. COD to Prepaid Change</h4>
                   <div className="pl-4">
                     <p className="text-muted-foreground">
                       <span className="font-medium text-green-600 dark:text-green-400">Positive Closure:</span> <code className="px-1.5 py-0.5 rounded bg-background border text-xs">COD_value</code> becomes <code className="px-1.5 py-0.5 rounded bg-background border text-xs">0</code> for the shipment
@@ -551,7 +564,7 @@ export const Toolbar = forwardRef<ToolbarRef, ToolbarProps>(({ config, data, use
 
                 {/* Rule 18 */}
                 <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-2">
-                  <h4 className="font-medium text-foreground">18. Wrong RTO</h4>
+                  <h4 className="font-medium text-foreground">19. Wrong RTO</h4>
                   <div className="space-y-1 pl-4">
                     <p className="text-muted-foreground">
                       <span className="font-medium text-green-600 dark:text-green-400">Positive Closure:</span> Tracking = <code className="px-1.5 py-0.5 rounded bg-background border text-xs">1500</code> or <code className="px-1.5 py-0.5 rounded bg-background border text-xs">1550</code>
@@ -564,7 +577,7 @@ export const Toolbar = forwardRef<ToolbarRef, ToolbarProps>(({ config, data, use
 
                 {/* Rule 19 */}
                 <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-2">
-                  <h4 className="font-medium text-foreground">19. Misrouted Shipment</h4>
+                  <h4 className="font-medium text-foreground">20. Misrouted Shipment</h4>
                   <div className="space-y-1 pl-4">
                     <p className="text-muted-foreground">
                       <span className="font-medium text-green-600 dark:text-green-400">Positive Closure:</span> Tracking = <code className="px-1.5 py-0.5 rounded bg-background border text-xs">1900</code>
