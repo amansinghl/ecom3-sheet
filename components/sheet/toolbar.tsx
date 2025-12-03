@@ -342,64 +342,235 @@ export const Toolbar = forwardRef<ToolbarRef, ToolbarProps>(({ config, data, use
                 
                 {/* Rule 1 */}
                 <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-2">
-                  <h4 className="font-medium text-foreground">1. Fake NDR Remark / Delivery Issue / Re-Attempt</h4>
+                  <h4 className="font-medium text-foreground">1. Delivery Issue</h4>
                   <div className="space-y-1 pl-4">
                     <p className="text-muted-foreground">
-                      <span className="font-medium text-green-600 dark:text-green-400">Positive Closure:</span> Tracking status = <code className="px-1.5 py-0.5 rounded bg-background border text-xs">1900</code> (Delivered)
+                      <span className="font-medium text-green-600 dark:text-green-400">Positive Closure:</span> Tracking = <code className="px-1.5 py-0.5 rounded bg-background border text-xs">1900</code>
                     </p>
                     <p className="text-muted-foreground">
-                      <span className="font-medium text-orange-600 dark:text-orange-400">Negative Closure:</span> Tracking status &gt; <code className="px-1.5 py-0.5 rounded bg-background border text-xs">1900</code> (RTO/Failed states)
+                      <span className="font-medium text-orange-600 dark:text-orange-400">Negative Closure:</span> Tracking &gt; <code className="px-1.5 py-0.5 rounded bg-background border text-xs">1900</code>
                     </p>
                   </div>
                 </div>
 
                 {/* Rule 2 */}
                 <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-2">
-                  <h4 className="font-medium text-foreground">2. Delayed RTO</h4>
-                  <div className="pl-4">
+                  <h4 className="font-medium text-foreground">2. Delayed Pickup</h4>
+                  <div className="space-y-1 pl-4">
                     <p className="text-muted-foreground">
-                      <span className="font-medium text-green-600 dark:text-green-400">Positive Closure:</span> Tracking status = <code className="px-1.5 py-0.5 rounded bg-background border text-xs">2030</code> (RTO Delivered)
+                      <span className="font-medium text-green-600 dark:text-green-400">Positive Closure:</span> Tracking ≥ <code className="px-1.5 py-0.5 rounded bg-background border text-xs">1200</code>
+                    </p>
+                    <p className="text-muted-foreground">
+                      <span className="font-medium text-orange-600 dark:text-orange-400">Negative Closure:</span> Tracking &lt; <code className="px-1.5 py-0.5 rounded bg-background border text-xs">1200</code> till 10 days of ticket creation
                     </p>
                   </div>
                 </div>
 
                 {/* Rule 3 */}
                 <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-2">
-                  <h4 className="font-medium text-foreground">3. Reverse Pickup / Delayed Pickup</h4>
-                  <div className="pl-4">
+                  <h4 className="font-medium text-foreground">3. Reverse Pickup</h4>
+                  <div className="space-y-1 pl-4">
                     <p className="text-muted-foreground">
-                      <span className="font-medium text-green-600 dark:text-green-400">Positive Closure:</span> Tracking status ≥ <code className="px-1.5 py-0.5 rounded bg-background border text-xs">1200</code> (In Transit or beyond)
+                      <span className="font-medium text-green-600 dark:text-green-400">Positive Closure:</span> Tracking ≥ <code className="px-1.5 py-0.5 rounded bg-background border text-xs">1200</code>
+                    </p>
+                    <p className="text-muted-foreground">
+                      <span className="font-medium text-orange-600 dark:text-orange-400">Negative Closure:</span> Tracking &lt; <code className="px-1.5 py-0.5 rounded bg-background border text-xs">1200</code> till 10 days of ticket creation
                     </p>
                   </div>
                 </div>
 
                 {/* Rule 4 */}
                 <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-2">
-                  <h4 className="font-medium text-foreground">4. Reverse Delivery Issue</h4>
-                  <div className="pl-4">
+                  <h4 className="font-medium text-foreground">4. Fake NDR Remark</h4>
+                  <div className="space-y-1 pl-4">
                     <p className="text-muted-foreground">
-                      <span className="font-medium text-green-600 dark:text-green-400">Positive Closure:</span> Tracking status = <code className="px-1.5 py-0.5 rounded bg-background border text-xs">1900</code> (Delivered)
+                      <span className="font-medium text-green-600 dark:text-green-400">Positive Closure:</span> Tracking = <code className="px-1.5 py-0.5 rounded bg-background border text-xs">1900</code>
+                    </p>
+                    <p className="text-muted-foreground">
+                      <span className="font-medium text-orange-600 dark:text-orange-400">Negative Closure:</span> Tracking &gt; <code className="px-1.5 py-0.5 rounded bg-background border text-xs">1900</code>
                     </p>
                   </div>
                 </div>
 
                 {/* Rule 5 */}
                 <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-2">
-                  <h4 className="font-medium text-foreground">5. COD Delay</h4>
-                  <div className="pl-4">
+                  <h4 className="font-medium text-foreground">5. EDD - URGENT</h4>
+                  <div className="space-y-1 pl-4">
                     <p className="text-muted-foreground">
-                      <span className="font-medium text-green-600 dark:text-green-400">Positive Closure:</span> When <code className="px-1.5 py-0.5 rounded bg-background border text-xs">paid_amount</code> ≥ <code className="px-1.5 py-0.5 rounded bg-background border text-xs">cod_value</code> (full COD amount received)
+                      <span className="font-medium text-green-600 dark:text-green-400">Positive Closure:</span> Tracking = <code className="px-1.5 py-0.5 rounded bg-background border text-xs">1900</code> or becomes <code className="px-1.5 py-0.5 rounded bg-background border text-xs">1770</code> after ticket creation
+                    </p>
+                    <p className="text-muted-foreground">
+                      <span className="font-medium text-orange-600 dark:text-orange-400">Negative Closure:</span> Tracking &gt; <code className="px-1.5 py-0.5 rounded bg-background border text-xs">1900</code>
                     </p>
                   </div>
                 </div>
 
                 {/* Rule 6 */}
                 <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-2">
-                  <h4 className="font-medium text-foreground">6. EDD Breach / EDD Urgent</h4>
+                  <h4 className="font-medium text-foreground">6. Re-attempt</h4>
+                  <div className="space-y-1 pl-4">
+                    <p className="text-muted-foreground">
+                      <span className="font-medium text-green-600 dark:text-green-400">Positive Closure:</span> Tracking Status = <code className="px-1.5 py-0.5 rounded bg-background border text-xs">1900</code>
+                    </p>
+                    <p className="text-muted-foreground">
+                      <span className="font-medium text-orange-600 dark:text-orange-400">Negative Closure:</span> Tracking &gt; <code className="px-1.5 py-0.5 rounded bg-background border text-xs">1900</code>
+                    </p>
+                  </div>
+                </div>
+
+                {/* Rule 7 */}
+                <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-2">
+                  <h4 className="font-medium text-foreground">7. POD (Proof of Delivery) within 48 hrs.</h4>
                   <div className="pl-4">
                     <p className="text-muted-foreground">
-                      <span className="font-medium text-green-600 dark:text-green-400">Positive Closure:</span> When shipment reaches status <code className="px-1.5 py-0.5 rounded bg-background border text-xs">1900</code> (Delivered) 
-                      or <code className="px-1.5 py-0.5 rounded bg-background border text-xs">1770</code> (Out for Delivery) after escalation was created
+                      <span className="font-medium text-foreground">Manual Closure:</span> To be manually closed only by the Ticket creator
+                    </p>
+                  </div>
+                </div>
+
+                {/* Rule 8 */}
+                <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-2">
+                  <h4 className="font-medium text-foreground">8. RTO the Shipment</h4>
+                  <div className="pl-4">
+                    <p className="text-muted-foreground">
+                      <span className="font-medium text-green-600 dark:text-green-400">Positive Closure:</span> Tracking &gt; <code className="px-1.5 py-0.5 rounded bg-background border text-xs">1900</code>
+                    </p>
+                  </div>
+                </div>
+
+                {/* Rule 9 */}
+                <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-2">
+                  <h4 className="font-medium text-foreground">9. Lost/ Damaged</h4>
+                  <div className="space-y-1 pl-4">
+                    <p className="text-muted-foreground">
+                      <span className="font-medium text-green-600 dark:text-green-400">Positive Closure:</span> Tracking = <code className="px-1.5 py-0.5 rounded bg-background border text-xs">1500</code> or <code className="px-1.5 py-0.5 rounded bg-background border text-xs">1550</code>
+                    </p>
+                    <p className="text-muted-foreground">
+                      <span className="font-medium text-orange-600 dark:text-orange-400">Negative Closure:</span> Tracking doesn't change to <code className="px-1.5 py-0.5 rounded bg-background border text-xs">1500</code> or <code className="px-1.5 py-0.5 rounded bg-background border text-xs">1550</code> after 2 months of ticket creation
+                    </p>
+                  </div>
+                </div>
+
+                {/* Rule 10 */}
+                <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-2">
+                  <h4 className="font-medium text-foreground">10. Self-collection</h4>
+                  <div className="space-y-1 pl-4">
+                    <p className="text-muted-foreground">
+                      <span className="font-medium text-green-600 dark:text-green-400">Positive Closure:</span> Tracking = <code className="px-1.5 py-0.5 rounded bg-background border text-xs">1900</code>
+                    </p>
+                    <p className="text-muted-foreground">
+                      <span className="font-medium text-orange-600 dark:text-orange-400">Negative Closure:</span> Tracking &gt; <code className="px-1.5 py-0.5 rounded bg-background border text-xs">1900</code>
+                    </p>
+                  </div>
+                </div>
+
+                {/* Rule 11 */}
+                <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-2">
+                  <h4 className="font-medium text-foreground">11. Delayed RTO</h4>
+                  <div className="space-y-1 pl-4">
+                    <p className="text-muted-foreground">
+                      <span className="font-medium text-green-600 dark:text-green-400">Positive Closure:</span> Tracking = <code className="px-1.5 py-0.5 rounded bg-background border text-xs">2030</code>
+                    </p>
+                    <p className="text-muted-foreground">
+                      <span className="font-medium text-orange-600 dark:text-orange-400">Negative Closure:</span> Tracking doesn't become <code className="px-1.5 py-0.5 rounded bg-background border text-xs">2030</code> after 2 months of ticket creation
+                    </p>
+                  </div>
+                </div>
+
+                {/* Rule 12 */}
+                <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-2">
+                  <h4 className="font-medium text-foreground">12. Address/ Contact No Update</h4>
+                  <div className="space-y-1 pl-4">
+                    <p className="text-muted-foreground">
+                      <span className="font-medium text-green-600 dark:text-green-400">Positive Closure:</span> Tracking = <code className="px-1.5 py-0.5 rounded bg-background border text-xs">1900</code>
+                    </p>
+                    <p className="text-muted-foreground">
+                      <span className="font-medium text-orange-600 dark:text-orange-400">Negative Closure:</span> Tracking &gt; <code className="px-1.5 py-0.5 rounded bg-background border text-xs">1900</code>
+                    </p>
+                  </div>
+                </div>
+
+                {/* Rule 13 */}
+                <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-2">
+                  <h4 className="font-medium text-foreground">13. Reverse Delivery Issues</h4>
+                  <div className="space-y-1 pl-4">
+                    <p className="text-muted-foreground">
+                      <span className="font-medium text-green-600 dark:text-green-400">Positive Closure:</span> Tracking = <code className="px-1.5 py-0.5 rounded bg-background border text-xs">1900</code>
+                    </p>
+                    <p className="text-muted-foreground">
+                      <span className="font-medium text-orange-600 dark:text-orange-400">Negative Closure:</span> No tracking change after 2 months of ticket creation
+                    </p>
+                  </div>
+                </div>
+
+                {/* Rule 14 */}
+                <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-2">
+                  <h4 className="font-medium text-foreground">14. Service Failure</h4>
+                  <div className="pl-4">
+                    <p className="text-muted-foreground">
+                      <span className="font-medium text-foreground">Manual Closure:</span> To be manually closed only by the Ticket creator
+                    </p>
+                  </div>
+                </div>
+
+                {/* Rule 15 */}
+                <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-2">
+                  <h4 className="font-medium text-foreground">15. Wrong Delivery</h4>
+                  <div className="space-y-1 pl-4">
+                    <p className="text-muted-foreground">
+                      <span className="font-medium text-green-600 dark:text-green-400">Positive Closure:</span> Tracking = <code className="px-1.5 py-0.5 rounded bg-background border text-xs">1500</code> or <code className="px-1.5 py-0.5 rounded bg-background border text-xs">1550</code>
+                    </p>
+                    <p className="text-muted-foreground">
+                      <span className="font-medium text-orange-600 dark:text-orange-400">Negative Closure:</span> No tracking change after 2 months of ticket creation
+                    </p>
+                  </div>
+                </div>
+
+                {/* Rule 16 */}
+                <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-2">
+                  <h4 className="font-medium text-foreground">16. Post-Pickup Dispute</h4>
+                  <div className="space-y-1 pl-4">
+                    <p className="text-muted-foreground">
+                      <span className="font-medium text-green-600 dark:text-green-400">Positive Closure:</span> Tracking ≥ <code className="px-1.5 py-0.5 rounded bg-background border text-xs">1200</code>
+                    </p>
+                    <p className="text-muted-foreground">
+                      <span className="font-medium text-orange-600 dark:text-orange-400">Negative Closure:</span> Tracking &lt; <code className="px-1.5 py-0.5 rounded bg-background border text-xs">1200</code> till 10 days of ticket creation
+                    </p>
+                  </div>
+                </div>
+
+                {/* Rule 17 */}
+                <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-2">
+                  <h4 className="font-medium text-foreground">17. COD to Prepaid Change</h4>
+                  <div className="pl-4">
+                    <p className="text-muted-foreground">
+                      <span className="font-medium text-green-600 dark:text-green-400">Positive Closure:</span> <code className="px-1.5 py-0.5 rounded bg-background border text-xs">COD_value</code> becomes <code className="px-1.5 py-0.5 rounded bg-background border text-xs">0</code> for the shipment
+                    </p>
+                  </div>
+                </div>
+
+                {/* Rule 18 */}
+                <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-2">
+                  <h4 className="font-medium text-foreground">18. Wrong RTO</h4>
+                  <div className="space-y-1 pl-4">
+                    <p className="text-muted-foreground">
+                      <span className="font-medium text-green-600 dark:text-green-400">Positive Closure:</span> Tracking = <code className="px-1.5 py-0.5 rounded bg-background border text-xs">1500</code> or <code className="px-1.5 py-0.5 rounded bg-background border text-xs">1550</code>
+                    </p>
+                    <p className="text-muted-foreground">
+                      <span className="font-medium text-orange-600 dark:text-orange-400">Negative Closure:</span> No tracking change after 2 months of ticket creation
+                    </p>
+                  </div>
+                </div>
+
+                {/* Rule 19 */}
+                <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-2">
+                  <h4 className="font-medium text-foreground">19. Misrouted Shipment</h4>
+                  <div className="space-y-1 pl-4">
+                    <p className="text-muted-foreground">
+                      <span className="font-medium text-green-600 dark:text-green-400">Positive Closure:</span> Tracking = <code className="px-1.5 py-0.5 rounded bg-background border text-xs">1900</code>
+                    </p>
+                    <p className="text-muted-foreground">
+                      <span className="font-medium text-orange-600 dark:text-orange-400">Negative Closure:</span> Tracking &gt; <code className="px-1.5 py-0.5 rounded bg-background border text-xs">1900</code>
                     </p>
                   </div>
                 </div>
