@@ -1155,7 +1155,6 @@ export function SheetView({ config, userRole }: SheetViewProps) {
   useKeyboardShortcuts({
     onCommandPalette: () => setShowCommandPalette(true),
     onNewRow: handleAddRow,
-    onSearch: () => setShowCommandPalette(true), // Open command palette for search
     onEscape: () => {
       // Cancel editing cell or close command palette
       setEditingCell(null);
