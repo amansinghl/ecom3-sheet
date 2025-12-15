@@ -56,10 +56,28 @@ export function NumberCell({
     prevIsEditingRef.current = isEditing;
   }, [isEditing, value]);
 
+  // Check if this is shipment_no column (for multiple shipment support)
+  const isShipmentNoColumn = columnConfig.id === 'shipment_no';
+  
+  // Check if value contains comma or space (multiple shipments)
+  const containsMultipleValues = (val: string): boolean => {
+    if (!val) return false;
+    return /[,\s]/.test(val);
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
-      const numValue = editValue === '' ? null : Number(editValue);
-      onSave(numValue);
+      const inputValue = editValue.trim();
+      if (inputValue === '') {
+        onSave(null);
+      } else if (isShipmentNoColumn && containsMultipleValues(inputValue)) {
+        // For shipment_no with multiple values, pass as string
+        onSave(inputValue);
+      } else {
+        // Single number value
+        const numValue = Number(inputValue);
+        onSave(isNaN(numValue) ? null : numValue);
+      }
     } else if (e.key === 'Escape') {
       onCancel();
     }
@@ -68,16 +86,28 @@ export function NumberCell({
   const handleBlur = () => {
     // Use the actual DOM input value which is the source of truth
     // This handles cases where the component remounts during editing
-    const inputValue = inputRef.current?.value || currentValueRef.current || '';
-    const numValue = inputValue === '' ? null : Number(inputValue);
-    onSave(numValue);
+    const inputValue = (inputRef.current?.value || currentValueRef.current || '').trim();
+    if (inputValue === '') {
+      onSave(null);
+    } else if (isShipmentNoColumn && containsMultipleValues(inputValue)) {
+      // For shipment_no with multiple values, pass as string
+      onSave(inputValue);
+    } else {
+      // Single number value
+      const numValue = Number(inputValue);
+      onSave(isNaN(numValue) ? null : numValue);
+    }
   };
 
   if (isEditing) {
+    // Use text input for shipment_no to allow comma/space separated values
+    // Use number input for other number columns
+    const inputType = isShipmentNoColumn ? 'text' : 'number';
+    
     return (
       <Input
         ref={inputRef}
-        type="number"
+        type={inputType}
         value={editValue}
         onChange={(e) => {
           const newValue = e.target.value;
@@ -86,8 +116,10 @@ export function NumberCell({
         }}
         onKeyDown={handleKeyDown}
         onBlur={handleBlur}
+        placeholder={isShipmentNoColumn ? "e.g., 123456, 789012" : undefined}
         className={cn(
-          'h-full w-full rounded-none border-0 text-right focus-visible:ring-2 focus-visible:ring-primary [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none',
+          'h-full w-full rounded-none border-0 text-right focus-visible:ring-2 focus-visible:ring-primary',
+          inputType === 'number' && '[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none',
           textSizeClass
         )}
       />

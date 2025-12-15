@@ -13,6 +13,7 @@ import { EmailCell } from './email-cell';
 import { PhoneCell } from './phone-cell';
 import { UrlCell } from './url-cell';
 import { LongTextCell } from './longtext-cell';
+import { HighlightsCell } from './highlights-cell';
 
 interface CellRendererProps {
   value: any;
@@ -20,6 +21,7 @@ interface CellRendererProps {
   isEditing: boolean;
   canEdit: boolean;
   rowHeight: RowHeight;
+  rowData?: any; // Full row data for highlights cell
   globalSearch?: string;
   onEdit: () => void;
   onSave: (value: any) => void;
@@ -32,6 +34,7 @@ export function CellRenderer({
   isEditing,
   canEdit,
   rowHeight,
+  rowData,
   globalSearch = '',
   onEdit,
   onSave,
@@ -74,6 +77,8 @@ export function CellRenderer({
       return <PhoneCell {...cellProps} />;
     case 'url':
       return <UrlCell {...cellProps} />;
+    case 'highlights':
+      return <HighlightsCell {...cellProps} rowData={rowData} />;
     default:
       return <TextCell {...cellProps} />;
   }
