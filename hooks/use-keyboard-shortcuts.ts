@@ -58,12 +58,8 @@ export function useKeyboardShortcuts(config: KeyboardShortcutsConfig) {
         return;
       }
 
-      // Search: Cmd/Ctrl+F
-      if (modifier && event.key === 'f' && onSearch) {
-        event.preventDefault();
-        onSearch();
-        return;
-      }
+      // Note: Ctrl+F is intentionally not intercepted to allow browser's default search
+      // The onSearch callback is kept for backward compatibility but not used for Ctrl+F
 
       // Delete: Backspace or Delete (when not in input)
       if ((event.key === 'Backspace' || event.key === 'Delete') && onDelete) {
@@ -72,7 +68,7 @@ export function useKeyboardShortcuts(config: KeyboardShortcutsConfig) {
         return;
       }
     },
-    [onCommandPalette, onNewRow, onSearch, onEscape, onDelete]
+    [onCommandPalette, onNewRow, onEscape, onDelete]
   );
 
   useEffect(() => {
