@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { signOut, useSession } from 'next-auth/react';
 import { Button } from '@/components/ui/button';
 import {
@@ -15,10 +16,12 @@ import { LogOut, User, Settings, Sparkles, Shield, Eye } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { ThemeToggle } from './theme-toggle';
 import { getRandomAvatar } from '@/lib/config/user-avatar';
+import { motion, AnimatePresence } from 'framer-motion';
 
 export function Header() {
   const { data: session } = useSession();
   const user = session?.user as any;
+  const [isHovering, setIsHovering] = useState(false);
 
   const getRoleConfig = (role: string) => {
     switch (role) {
@@ -80,23 +83,68 @@ export function Header() {
           {user && (
             <>
               {/* User Menu */}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="relative h-8 w-8 rounded-full">
-                    <Avatar className="h-8 w-8">
-                      {avatarPath && (
-                        <AvatarImage src={avatarPath} alt={user.name || 'User'} />
-                      )}
-                      <AvatarFallback className="bg-gradient-to-br from-primary to-purple-600 text-primary-foreground font-semibold text-xs">
-                        {user.name
-                          ?.split(' ')
-                          .map((n: string) => n[0])
-                          .join('')
-                          .toUpperCase() || 'U'}
-                      </AvatarFallback>
-                    </Avatar>
-                  </Button>
-                </DropdownMenuTrigger>
+              <div 
+                className="relative"
+                onMouseEnter={() => setIsHovering(true)}
+                onMouseLeave={() => setIsHovering(false)}
+              >
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button 
+                      variant="ghost" 
+                      className="relative h-8 w-8 rounded-full"
+                    >
+                      <Avatar className="h-8 w-8">
+                        {avatarPath && (
+                          <AvatarImage src={avatarPath} alt={user.name || 'User'} />
+                        )}
+                        <AvatarFallback className="bg-gradient-to-br from-primary to-purple-600 text-primary-foreground font-semibold text-xs">
+                          {user.name
+                            ?.split(' ')
+                            .map((n: string) => n[0])
+                            .join('')
+                            .toUpperCase() || 'U'}
+                        </AvatarFallback>
+                      </Avatar>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  
+                  {/* Enlarged Avatar on Hover */}
+                  <AnimatePresence>
+                    {isHovering && (
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.8, y: 10 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.8, y: 10 }}
+                        transition={{ duration: 0.2, ease: 'easeOut' }}
+                        className="absolute right-0 top-12 z-[60]"
+                      >
+                        <div className="relative bg-background border-2 border-border rounded-lg shadow-2xl p-3">
+                          <div className="absolute -top-2 right-4 w-4 h-4 bg-background border-l-2 border-t-2 border-border rotate-45"></div>
+                          <Avatar className="h-32 w-32 ring-4 ring-primary/20 shadow-lg">
+                            {avatarPath && (
+                              <AvatarImage src={avatarPath} alt={user.name || 'User'} className="object-cover" />
+                            )}
+                            <AvatarFallback className="bg-gradient-to-br from-primary to-purple-600 text-primary-foreground font-bold text-3xl">
+                              {user.name
+                                ?.split(' ')
+                                .map((n: string) => n[0])
+                                .join('')
+                                .toUpperCase() || 'U'}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="mt-2 text-center">
+                            <p className="text-sm font-semibold text-foreground truncate max-w-[200px]">
+                              {user.name}
+                            </p>
+                            <p className="text-xs text-muted-foreground truncate max-w-[200px]">
+                              {user.email}
+                            </p>
+                          </div>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 <DropdownMenuContent align="end" className="w-64 p-2">
                   <DropdownMenuLabel className="p-3">
                     <div className="flex items-center gap-3">
@@ -143,7 +191,8 @@ export function Header() {
                     <span className="font-medium">Log out</span>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
-              </DropdownMenu>
+                </DropdownMenu>
+              </div>
             </>
           )}
         </div>
