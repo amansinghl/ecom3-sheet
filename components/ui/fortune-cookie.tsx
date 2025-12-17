@@ -96,14 +96,14 @@ export function FortuneCookie() {
       <motion.button
         initial={{ scale: 0 }}
         animate={{ scale: 1 }}
-        whileHover={{ scale: 1.1 }}
+        whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
         onClick={handleOpenManually}
-        className="fixed bottom-4 right-4 z-50 h-12 w-12 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 shadow-lg hover:shadow-xl transition-shadow flex items-center justify-center group"
+        className="fixed bottom-4 right-4 z-50 h-10 w-10 rounded-full bg-background border border-border shadow-md hover:shadow-lg transition-all flex items-center justify-center group hover:bg-muted"
         aria-label="Open fortune cookie"
         title="Get your daily fortune!"
       >
-        <Cookie className="h-6 w-6 text-white group-hover:rotate-12 transition-transform" />
+        <Cookie className="h-5 w-5 text-foreground group-hover:text-primary transition-colors" />
       </motion.button>
     );
   }
@@ -115,14 +115,14 @@ export function FortuneCookie() {
         <motion.button
           initial={{ scale: 0 }}
           animate={{ scale: 1 }}
-          whileHover={{ scale: 1.1 }}
+          whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
           onClick={handleOpenManually}
-          className="fixed bottom-4 right-4 z-50 h-12 w-12 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 shadow-lg hover:shadow-xl transition-shadow flex items-center justify-center group"
+          className="fixed bottom-4 right-4 z-50 h-10 w-10 rounded-full bg-background border border-border shadow-md hover:shadow-lg transition-all flex items-center justify-center group hover:bg-muted"
           aria-label="Open fortune cookie"
           title="Get your daily fortune!"
         >
-          <Cookie className="h-6 w-6 text-white group-hover:rotate-12 transition-transform" />
+          <Cookie className="h-5 w-5 text-foreground group-hover:text-primary transition-colors" />
         </motion.button>
       )}
 
@@ -136,30 +136,30 @@ export function FortuneCookie() {
             transition={{ type: 'spring', damping: 20, stiffness: 300 }}
             className="fixed bottom-4 right-4 z-50 max-w-sm"
           >
-            <Card className="p-4 bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50 dark:from-amber-950 dark:via-orange-950 dark:to-yellow-950 border-2 border-amber-300 dark:border-amber-700 shadow-2xl">
+            <Card className="p-4 shadow-lg">
               <div className="flex items-start gap-3">
                 <motion.div
-                  initial={{ rotate: -10 }}
-                  animate={{ rotate: [0, -10, 10, -10, 0] }}
-                  transition={{ duration: 0.5, delay: 0.2 }}
-                  className="flex-shrink-0"
+                  initial={{ scale: 0.8, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ duration: 0.3, delay: 0.1 }}
+                  className="flex-shrink-0 rounded-full bg-primary/10 dark:bg-primary/20 p-2"
                 >
-                  <Cookie className="h-6 w-6 text-amber-600 dark:text-amber-400" />
+                  <Cookie className="h-5 w-5 text-primary" />
                 </motion.div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-2">
-                    <Sparkles className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-                    <p className="text-xs font-semibold text-amber-900 dark:text-amber-100 uppercase tracking-wide">
+                    <Sparkles className="h-3.5 w-3.5 text-primary" />
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                       Daily Fortune
                     </p>
                   </div>
                   <motion.p
                     key={fortune}
-                    initial={{ opacity: 0, x: -10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: 10 }}
+                    initial={{ opacity: 0, y: 5 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -5 }}
                     transition={{ duration: 0.3 }}
-                    className="text-sm font-medium text-gray-900 dark:text-gray-100 leading-relaxed"
+                    className="text-sm font-medium text-foreground leading-relaxed"
                   >
                     {fortune}
                   </motion.p>
@@ -167,11 +167,11 @@ export function FortuneCookie() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-6 w-6 p-0 flex-shrink-0 hover:bg-amber-200 dark:hover:bg-amber-800"
+                  className="h-6 w-6 p-0 flex-shrink-0 hover:bg-muted"
                   onClick={handleClose}
                   aria-label="Close fortune cookie"
                 >
-                  <X className="h-4 w-4 text-amber-700 dark:text-amber-300" />
+                  <X className="h-4 w-4 text-muted-foreground" />
                 </Button>
               </div>
             </Card>
