@@ -61,7 +61,7 @@ export function HighlightsCell({
               <span className="text-muted-foreground/70 mr-0.5">
                 {highlight.label}:
               </span>
-              <span className="font-semibold text-foreground">
+              <span className="font-semibold text-gray-900">
                 {highlight.value}
               </span>
             </Badge>

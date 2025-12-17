@@ -127,7 +127,7 @@ export function UserCell({ value, columnConfig, isEditing, canEdit,
               {getFunkyCharacter(currentUser.value, currentUser.label)}
             </AvatarFallback>
           </Avatar>
-          <span className={cn(textSizeClass, 'font-medium truncate')}>{highlightedLabel}</span>
+          <span className={cn(textSizeClass, 'font-medium truncate text-gray-900')}>{highlightedLabel}</span>
         </>
       ) : (
         <span className={cn(textSizeClass, 'text-muted-foreground')}>Unassigned</span>

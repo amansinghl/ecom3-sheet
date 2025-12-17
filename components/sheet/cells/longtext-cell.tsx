@@ -47,7 +47,7 @@ export function LongTextCell({
     <>
       <div
         className={cn(
-          'h-full w-full truncate',
+          'h-full w-full truncate text-gray-900',
           textSizeClass,
           paddingClass,
           canEdit ? 'cursor-pointer hover:bg-muted/50' : 'cursor-not-allowed'
