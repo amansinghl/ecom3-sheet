@@ -12,7 +12,7 @@ export function Marquee({ className, children, pauseOnHover = true }: MarqueePro
   return (
     <div
       className={cn(
-        'group flex overflow-hidden [--duration:40s] [--gap:1rem] [gap:var(--gap)]',
+        'group flex overflow-hidden [--duration:20s] [--gap:1rem] [gap:var(--gap)]',
         className
       )}
     >

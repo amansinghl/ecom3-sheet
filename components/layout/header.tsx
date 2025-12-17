@@ -61,12 +61,12 @@ export function Header() {
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/80 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60">
       {/* Marquee Announcement */}
-      <div className="h-7 bg-muted/30 dark:bg-muted/20 border-b border-border overflow-hidden">
+      <div className="h-8 bg-primary/10 dark:bg-primary/20 border-b border-border/60 overflow-hidden">
         <Marquee pauseOnHover className="h-full">
-          <div className="flex items-center gap-3 px-4 text-xs font-medium text-muted-foreground whitespace-nowrap">
-            <PartyPopper className="h-3.5 w-3.5 text-muted-foreground/70 flex-shrink-0" />
+          <div className="flex items-center gap-3 px-6 text-sm font-semibold text-foreground whitespace-nowrap">
+            <PartyPopper className="h-4 w-4 text-primary flex-shrink-0" />
             <span>
-              On launching of this app Rahul ji is giving Pizza party to everyone. -- Requested by tech team
+              🎉 Celebrating Launch!🚀 Rahul ji is treating everyone to a Pizza Party! 🍕 -- Requested by Tech Team. 
             </span>
           </div>
         </Marquee>
@@ -186,11 +186,6 @@ export function Header() {
                     </div>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator className="my-2" />
-                  <DropdownMenuItem className="cursor-pointer rounded-md py-2.5">
-                    <Settings className="mr-2 h-4 w-4" />
-                    <span className="font-medium">Settings</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator className="my-2" />
                   <div className="px-2 py-2">
                     <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 px-2">
                       Theme
@@ -231,6 +226,11 @@ export function Header() {
                       </button>
                     </div>
                   </div>
+                  <DropdownMenuSeparator className="my-2" />
+                  <DropdownMenuItem className="cursor-pointer rounded-md py-2.5">
+                    <Settings className="mr-2 h-4 w-4" />
+                    <span className="font-medium">Settings</span>
+                  </DropdownMenuItem>
                   <DropdownMenuSeparator className="my-2" />
                   <DropdownMenuItem 
                     onClick={() => signOut({ callbackUrl: '/' })}
