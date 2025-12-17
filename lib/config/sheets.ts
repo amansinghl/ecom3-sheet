@@ -94,7 +94,7 @@ export const escalationSheetConfig: SheetConfig = {
       id: 'highlights',
       label: 'Highlights',
       type: 'highlights',
-      width: 200,
+      width: 350,
       required: false,
       editable: false,
     },
