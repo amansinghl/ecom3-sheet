@@ -16,10 +16,10 @@ export function TableSkeleton({ rows = 10, columns = 8 }: TableSkeletonProps) {
   };
 
   return (
-    <div className="w-full overflow-auto rounded-md border border-border bg-background">
+    <div className="w-full overflow-auto rounded-md border border-border bg-white">
       <table className="w-full border-collapse">
         {/* Header Skeleton */}
-        <thead className="sticky top-0 z-10 bg-muted/50 backdrop-blur">
+        <thead className="sticky top-0 z-10 bg-white border-b-2 border-gray-200">
           <tr className="border-b border-border">
             {/* Checkbox column */}
             <th className="h-10 w-[60px] border-r border-border px-3">
@@ -40,7 +40,7 @@ export function TableSkeleton({ rows = 10, columns = 8 }: TableSkeletonProps) {
               key={rowIndex}
               className={cn(
                 'border-b border-border',
-                rowIndex % 2 === 0 ? 'bg-background' : 'bg-muted/30'
+                rowIndex % 2 === 0 ? 'bg-white' : 'bg-gray-50'
               )}
             >
               {/* Checkbox column */}

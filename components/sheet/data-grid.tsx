@@ -424,10 +424,10 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
   return (
     <div 
       ref={tableContainerRef}
-      className="relative h-full w-full overflow-auto rounded-md border border-border bg-background"
+      className="relative h-full w-full overflow-auto rounded-md border border-border bg-white"
     >
       <table className="border-collapse" style={{ width: table.getCenterTotalSize(), tableLayout: 'fixed' }}>
-        <thead className="sticky top-0 z-30 bg-muted/50 backdrop-blur">
+        <thead className="sticky top-0 z-30 bg-white border-b-2 border-gray-200">
           {table.getHeaderGroups().map((headerGroup) => (
             <tr key={headerGroup.id} className="border-b border-border">
               {headerGroup.headers.map((header, index) => {
@@ -442,7 +442,7 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
                     className={cn(
                       'relative border-r border-border px-3 text-left text-xs font-medium overflow-hidden',
                       rowHeightClasses[rowHeight],
-                      isPinned ? 'sticky z-40' : 'bg-muted/50 backdrop-blur',
+                      isPinned ? 'sticky z-40 bg-white' : 'bg-white',
                       isLastPinned && 'shadow-[2px_0_4px_rgba(0,0,0,0.1)]'
                     )}
                     style={{ 
@@ -450,7 +450,7 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
                       maxWidth: `${header.getSize()}px`,
                       ...(isPinned ? { 
                         left: `${stickyLeft}px`,
-                        backgroundColor: '#ffffff'
+                        backgroundColor: '#ffffff' // Pure white for pinned headers
                       } : {})
                     }}
                   >
@@ -514,15 +514,15 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
                     }}
                     className={cn(
                       'border-b border-border group/row',
-                      // Base zebra striping
-                      idx % 2 === 0 ? 'bg-background' : 'bg-muted/30',
-                      // Hover states with zebra striping maintained (using primary color)
-                      !isEmptyRow && !selectedRows.has(row.id) && idx % 2 === 0 && 'hover:bg-primary/5',
-                      !isEmptyRow && !selectedRows.has(row.id) && idx % 2 !== 0 && 'hover:bg-primary/10',
+                      // Base zebra striping - pure white for even, light gray for odd
+                      idx % 2 === 0 ? 'bg-white' : 'bg-gray-50',
+                      // Hover states with zebra striping maintained
+                      !isEmptyRow && !selectedRows.has(row.id) && idx % 2 === 0 && 'hover:bg-gray-100',
+                      !isEmptyRow && !selectedRows.has(row.id) && idx % 2 !== 0 && 'hover:bg-gray-100',
                       // Empty row styling
-                      isEmptyRow && 'bg-muted/10',
+                      isEmptyRow && 'bg-gray-50',
                       // Selected row styling
-                      selectedRows.has(row.id) && !isEmptyRow && 'bg-primary/10 hover:bg-primary/20',
+                      selectedRows.has(row.id) && !isEmptyRow && 'bg-blue-50 hover:bg-blue-100',
                       rowHeightClasses[rowHeight]
                     )}
                   >
@@ -539,13 +539,13 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
                         if (!isPinned) return undefined;
                         
                         if (selectedRows.has(row.id) && !isEmptyRow) {
-                          return 'hsl(var(--primary) / 0.1)';
+                          return '#dbeafe'; // blue-50
                         } else if (isEmptyRow) {
-                          return '#ffffff';
+                          return '#f9fafb'; // gray-50
                         } else if (idx % 2 === 0) {
-                          return '#ffffff';
+                          return '#ffffff'; // white
                         } else {
-                          return '#ffffff';
+                          return '#f9fafb'; // gray-50
                         }
                       };
                       
