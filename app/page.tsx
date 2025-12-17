@@ -4,6 +4,7 @@ import { useState, useEffect, Suspense, useCallback } from 'react';
 import { signIn } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ThemeToggle } from '@/components/layout/theme-toggle';
+import { LoadingState } from '@/components/ui/loading-state';
 
 function LandingPage() {
   const router = useRouter();
@@ -58,10 +59,10 @@ function LandingPage() {
   if (tokenLoading) {
     return (
       <div className="relative flex min-h-screen items-center justify-center bg-background p-6 overflow-hidden">
-        <div className="text-center space-y-4">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-          <p className="text-sm text-muted-foreground">Authenticating...</p>
-        </div>
+        <LoadingState 
+          message="Authenticating your session... 🔐"
+          variant="fullscreen"
+        />
       </div>
     );
   }
@@ -109,10 +110,7 @@ export default function HomePage() {
     <Suspense
       fallback={
         <div className="relative flex min-h-screen items-center justify-center bg-background p-6 overflow-hidden">
-          <div className="text-center space-y-4">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-            <p className="text-sm text-muted-foreground">Loading...</p>
-          </div>
+          <LoadingState variant="fullscreen" />
         </div>
       }
     >

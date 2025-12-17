@@ -8,6 +8,7 @@ import { useRouter } from 'next/navigation';
 import { Toaster, toast } from 'sonner';
 import { signOut } from 'next-auth/react';
 import { apiClient } from '@/lib/api/client';
+import { LoadingState } from '@/components/ui/loading-state';
 
 // Create context for session status
 interface SessionContextType {
@@ -57,10 +58,10 @@ function ApiTokenInitializer({ children }: { children: React.ReactNode }) {
   if (status === 'loading' || !tokenSet) {
     return (
       <div className="flex min-h-screen items-center justify-center">
-        <div className="text-center space-y-4">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-          <p className="text-sm text-muted-foreground">Loading session...</p>
-        </div>
+        <LoadingState 
+          message="Setting up your session... 🎯"
+          variant="fullscreen"
+        />
       </div>
     );
   }
