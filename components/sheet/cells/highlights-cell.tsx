@@ -4,6 +4,7 @@ import { ColumnConfig } from '@/types';
 import { RowHeight } from '@/lib/store/sheet-store';
 import { cn } from '@/lib/utils';
 import { getCellTextSize, getCellPadding } from './cell-utils';
+import { Badge } from '@/components/ui/badge';
 
 interface HighlightsCellProps {
   value: any;
@@ -26,12 +27,12 @@ export function HighlightsCell({
   const textSizeClass = getCellTextSize(rowHeight);
   const paddingClass = getCellPadding(rowHeight);
 
-  // Extract the four highlight values
+  // Extract the four highlight values with shorter labels
   const highlights = [
-    { label: 'Calls Count', value: rowData?.count_of_calls },
-    { label: 'NDR Count', value: rowData?.count_of_ndr },
-    { label: 'OTP Verified NDR', value: rowData?.otp_verified_ndr },
-    { label: 'OTP Verified Delivery', value: rowData?.otp_verified_delivery },
+    { label: 'Calls', value: rowData?.count_of_calls },
+    { label: 'NDR', value: rowData?.count_of_ndr },
+    { label: 'OTP NDR', value: rowData?.otp_verified_ndr },
+    { label: 'OTP Del', value: rowData?.otp_verified_delivery },
   ];
 
   // Filter out null/undefined/empty string values
@@ -47,22 +48,23 @@ export function HighlightsCell({
       )}
     >
       {visibleHighlights.length > 0 ? (
-        <div className="flex items-center gap-4 flex-wrap w-full">
+        <div className="flex items-center gap-1.5 flex-wrap w-full">
           {visibleHighlights.map((highlight, index) => (
-            <span
+            <Badge
               key={`${highlight.label}-${index}`}
-              className="flex items-center gap-1.5 whitespace-nowrap"
+              variant="outline"
+              className={cn(
+                "h-5 px-1.5 py-0 font-normal border-border/60",
+                textSizeClass
+              )}
             >
-              <span className={cn("text-muted-foreground", textSizeClass)}>
+              <span className="text-muted-foreground/70 mr-0.5">
                 {highlight.label}:
               </span>
-              <span className={cn("font-medium", textSizeClass)}>
+              <span className="font-semibold text-foreground">
                 {highlight.value}
               </span>
-              {index < visibleHighlights.length - 1 && (
-                <span className="text-muted-foreground/40 mx-1">-</span>
-              )}
-            </span>
+            </Badge>
           ))}
         </div>
       ) : (
