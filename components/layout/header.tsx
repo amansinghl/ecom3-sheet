@@ -187,48 +187,49 @@ export function Header() {
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator className="my-2" />
                   <DropdownMenuItem className="cursor-pointer rounded-md py-2.5">
-                    <User className="mr-2 h-4 w-4" />
-                    <span className="font-medium">Profile</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem className="cursor-pointer rounded-md py-2.5">
                     <Settings className="mr-2 h-4 w-4" />
                     <span className="font-medium">Settings</span>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator className="my-2" />
-                  <div className="px-2 py-1.5">
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 px-2">
+                  <div className="px-2 py-2">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 px-2">
                       Theme
                     </p>
-                    <DropdownMenuItem 
-                      onClick={() => setTheme('light')}
-                      className="cursor-pointer rounded-md py-2.5"
-                    >
-                      <Sun className="mr-2 h-4 w-4" />
-                      <span className="font-medium flex-1">Light</span>
-                      {theme === 'light' && (
-                        <Check className="h-4 w-4 text-primary ml-2" />
-                      )}
-                    </DropdownMenuItem>
-                    <DropdownMenuItem 
-                      onClick={() => setTheme('dark')}
-                      className="cursor-pointer rounded-md py-2.5"
-                    >
-                      <Moon className="mr-2 h-4 w-4" />
-                      <span className="font-medium flex-1">Dark</span>
-                      {theme === 'dark' && (
-                        <Check className="h-4 w-4 text-primary ml-2" />
-                      )}
-                    </DropdownMenuItem>
-                    <DropdownMenuItem 
-                      onClick={() => setTheme('system')}
-                      className="cursor-pointer rounded-md py-2.5"
-                    >
-                      <Monitor className="mr-2 h-4 w-4" />
-                      <span className="font-medium flex-1">System</span>
-                      {(theme === 'system' || !theme) && (
-                        <Check className="h-4 w-4 text-primary ml-2" />
-                      )}
-                    </DropdownMenuItem>
+                    <div className="flex gap-1 p-1 bg-muted rounded-md">
+                      <button
+                        onClick={() => setTheme('light')}
+                        className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                          theme === 'light'
+                            ? 'bg-background text-foreground shadow-sm'
+                            : 'text-muted-foreground hover:text-foreground hover:bg-background/50'
+                        }`}
+                      >
+                        <Sun className="h-3.5 w-3.5" />
+                        <span>Light</span>
+                      </button>
+                      <button
+                        onClick={() => setTheme('dark')}
+                        className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                          theme === 'dark'
+                            ? 'bg-background text-foreground shadow-sm'
+                            : 'text-muted-foreground hover:text-foreground hover:bg-background/50'
+                        }`}
+                      >
+                        <Moon className="h-3.5 w-3.5" />
+                        <span>Dark</span>
+                      </button>
+                      <button
+                        onClick={() => setTheme('system')}
+                        className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                          theme === 'system' || !theme
+                            ? 'bg-background text-foreground shadow-sm'
+                            : 'text-muted-foreground hover:text-foreground hover:bg-background/50'
+                        }`}
+                      >
+                        <Monitor className="h-3.5 w-3.5" />
+                        <span>System</span>
+                      </button>
+                    </div>
                   </div>
                   <DropdownMenuSeparator className="my-2" />
                   <DropdownMenuItem 
