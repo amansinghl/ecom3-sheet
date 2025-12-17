@@ -265,6 +265,19 @@
   background-size: 1000px 100%;
 }
 
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(calc(-100% - var(--gap)));
+  }
+}
+
+.animate-marquee {
+  animation: marquee var(--duration) linear infinite;
+}
+
 /* Smooth page transitions */
 @keyframes fadeIn {
   from {

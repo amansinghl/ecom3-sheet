@@ -12,11 +12,12 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
-import { LogOut, User, Settings, Sparkles, Shield, Eye, Sun, Moon, Monitor, Check } from 'lucide-react';
+import { LogOut, User, Settings, Sparkles, Shield, Eye, Sun, Moon, Monitor, Check, PartyPopper } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { getRandomAvatar } from '@/lib/config/user-avatar';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTheme } from 'next-themes';
+import { Marquee } from '@/components/ui/marquee';
 
 export function Header() {
   const { data: session } = useSession();
@@ -59,6 +60,17 @@ export function Header() {
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/80 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60">
+      {/* Marquee Announcement */}
+      <div className="h-7 bg-muted/30 dark:bg-muted/20 border-b border-border overflow-hidden">
+        <Marquee pauseOnHover className="h-full">
+          <div className="flex items-center gap-3 px-4 text-xs font-medium text-muted-foreground whitespace-nowrap">
+            <PartyPopper className="h-3.5 w-3.5 text-muted-foreground/70 flex-shrink-0" />
+            <span>
+              On launching of this app Rahul ji is giving Pizza party to everyone. -- Requested by tech team
+            </span>
+          </div>
+        </Marquee>
+      </div>
       <div className="flex h-12 items-center justify-between px-4">
         {/* Logo Section */}
         <div className="flex items-center gap-2">
