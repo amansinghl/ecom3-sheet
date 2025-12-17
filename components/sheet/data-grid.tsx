@@ -427,7 +427,7 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
       className="relative h-full w-full overflow-auto rounded-md border border-border bg-white"
     >
       <table className="border-collapse" style={{ width: table.getCenterTotalSize(), tableLayout: 'fixed' }}>
-        <thead className="sticky top-0 z-30 bg-white border-b-2 border-gray-200">
+        <thead className="sticky top-0 z-30 bg-gray-100 border-b-2 border-gray-300">
           {table.getHeaderGroups().map((headerGroup) => (
             <tr key={headerGroup.id} className="border-b border-border">
               {headerGroup.headers.map((header, index) => {
@@ -442,7 +442,7 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
                     className={cn(
                       'relative border-r border-border px-3 text-left text-xs font-medium overflow-hidden',
                       rowHeightClasses[rowHeight],
-                      isPinned ? 'sticky z-40 bg-white' : 'bg-white',
+                      isPinned ? 'sticky z-40 bg-gray-100' : 'bg-gray-100',
                       isLastPinned && 'shadow-[2px_0_4px_rgba(0,0,0,0.1)]'
                     )}
                     style={{ 
@@ -450,7 +450,7 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
                       maxWidth: `${header.getSize()}px`,
                       ...(isPinned ? { 
                         left: `${stickyLeft}px`,
-                        backgroundColor: '#ffffff' // Pure white for pinned headers
+                        backgroundColor: '#f3f4f6' // Gray-100 for pinned headers
                       } : {})
                     }}
                   >

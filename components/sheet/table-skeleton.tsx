@@ -19,7 +19,7 @@ export function TableSkeleton({ rows = 10, columns = 8 }: TableSkeletonProps) {
     <div className="w-full overflow-auto rounded-md border border-border bg-white">
       <table className="w-full border-collapse">
         {/* Header Skeleton */}
-        <thead className="sticky top-0 z-10 bg-white border-b-2 border-gray-200">
+        <thead className="sticky top-0 z-10 bg-gray-100 border-b-2 border-gray-300">
           <tr className="border-b border-border">
             {/* Checkbox column */}
             <th className="h-10 w-[60px] border-r border-border px-3">
