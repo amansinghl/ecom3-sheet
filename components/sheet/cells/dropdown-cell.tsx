@@ -91,7 +91,7 @@ export function DropdownCell({
   return (
     <div
       className={cn(
-        'h-full w-full px-3 py-2 text-sm truncate text-gray-900',
+        'h-full w-full px-3 py-2 text-sm truncate text-gray-900 font-semibold',
         canEdit ? 'cursor-pointer hover:bg-muted/50' : 'cursor-not-allowed'
       )}
       onClick={canEdit ? onEdit : undefined}

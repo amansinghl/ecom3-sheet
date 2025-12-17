@@ -79,7 +79,7 @@ export function UrlCell({
             href={value}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-gray-900 hover:underline truncate"
+            className="text-gray-900 font-semibold hover:underline truncate"
             onClick={(e) => e.stopPropagation()}
           >
             {highlightedValue}

@@ -93,7 +93,7 @@ export function DateCell({
   return (
     <div
       className={cn(
-        'h-full w-full truncate text-gray-900',
+        'h-full w-full truncate text-gray-900 font-semibold',
         textSizeClass,
         paddingClass,
         canEdit ? 'cursor-text hover:bg-muted/50' : 'cursor-not-allowed'

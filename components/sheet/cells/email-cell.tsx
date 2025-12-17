@@ -77,7 +77,7 @@ export function EmailCell({
           <Mail className="h-3 w-3 text-muted-foreground flex-shrink-0" />
           <a
             href={`mailto:${value}`}
-            className="text-gray-900 hover:underline truncate"
+            className="text-gray-900 font-semibold hover:underline truncate"
             onClick={(e) => e.stopPropagation()}
           >
             {highlightedValue}
