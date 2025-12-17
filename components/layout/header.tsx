@@ -12,16 +12,17 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
-import { LogOut, User, Settings, Sparkles, Shield, Eye } from 'lucide-react';
+import { LogOut, User, Settings, Sparkles, Shield, Eye, Sun, Moon, Monitor, Check } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { ThemeToggle } from './theme-toggle';
 import { getRandomAvatar } from '@/lib/config/user-avatar';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useTheme } from 'next-themes';
 
 export function Header() {
   const { data: session } = useSession();
   const user = session?.user as any;
   const [isHovering, setIsHovering] = useState(false);
+  const { theme, setTheme } = useTheme();
 
   const getRoleConfig = (role: string) => {
     switch (role) {
@@ -79,7 +80,6 @@ export function Header() {
 
         {/* User Section */}
         <div className="flex items-center gap-2">
-          <ThemeToggle />
           {user && (
             <>
               {/* User Menu */}
@@ -182,6 +182,42 @@ export function Header() {
                     <Settings className="mr-2 h-4 w-4" />
                     <span className="font-medium">Settings</span>
                   </DropdownMenuItem>
+                  <DropdownMenuSeparator className="my-2" />
+                  <div className="px-2 py-1.5">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5 px-2">
+                      Theme
+                    </p>
+                    <DropdownMenuItem 
+                      onClick={() => setTheme('light')}
+                      className="cursor-pointer rounded-md py-2.5"
+                    >
+                      <Sun className="mr-2 h-4 w-4" />
+                      <span className="font-medium flex-1">Light</span>
+                      {theme === 'light' && (
+                        <Check className="h-4 w-4 text-primary ml-2" />
+                      )}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem 
+                      onClick={() => setTheme('dark')}
+                      className="cursor-pointer rounded-md py-2.5"
+                    >
+                      <Moon className="mr-2 h-4 w-4" />
+                      <span className="font-medium flex-1">Dark</span>
+                      {theme === 'dark' && (
+                        <Check className="h-4 w-4 text-primary ml-2" />
+                      )}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem 
+                      onClick={() => setTheme('system')}
+                      className="cursor-pointer rounded-md py-2.5"
+                    >
+                      <Monitor className="mr-2 h-4 w-4" />
+                      <span className="font-medium flex-1">System</span>
+                      {(theme === 'system' || !theme) && (
+                        <Check className="h-4 w-4 text-primary ml-2" />
+                      )}
+                    </DropdownMenuItem>
+                  </div>
                   <DropdownMenuSeparator className="my-2" />
                   <DropdownMenuItem 
                     onClick={() => signOut({ callbackUrl: '/' })}
