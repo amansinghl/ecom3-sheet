@@ -83,12 +83,12 @@ export const escalationSheetConfig: SheetConfig = {
       editable: false,
     },
     {
-      id: 'created_at',
-      label: 'Created At',
-      type: 'datetime',
-      width: 150,
+      id: 'notes',
+      label: 'Notes',
+      type: 'longtext',
+      width: 200,
       required: false,
-      editable: false,
+      editable: true,
     },
     {
       id: 'highlights',
@@ -97,14 +97,6 @@ export const escalationSheetConfig: SheetConfig = {
       width: 350,
       required: false,
       editable: false,
-    },
-    {
-      id: 'notes',
-      label: 'Notes',
-      type: 'longtext',
-      width: 200,
-      required: false,
-      editable: true,
     },
     {
       id: 'partner_name',
@@ -138,6 +130,14 @@ export const escalationSheetConfig: SheetConfig = {
       width: 200,
       required: false,
       editable: true,
+    },
+    {
+      id: 'created_at',
+      label: 'Created At',
+      type: 'datetime',
+      width: 150,
+      required: false,
+      editable: false,
     },
     {
       id: 'vamashipper',
