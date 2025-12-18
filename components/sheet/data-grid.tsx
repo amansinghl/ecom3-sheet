@@ -441,7 +441,7 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
         default: return 24;
       }
     },
-    overscan: 15, // Render extra rows for smooth scrolling during rapid navigation
+    overscan: 25, // Render extra rows for smooth scrolling during rapid navigation
   });
 
   // Scroll to editing cell when it changes (only if not visible)
