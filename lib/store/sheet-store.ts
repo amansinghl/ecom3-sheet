@@ -15,6 +15,20 @@ import {
 
 export type RowHeight = 'compact' | 'comfortable' | 'spacious';
 
+// Cell position for navigation and selection
+export interface CellPosition {
+  rowIndex: number;
+  colIndex: number;
+}
+
+// Selection range for multi-cell selection
+export interface SelectionRange {
+  start: CellPosition;
+  end: CellPosition;
+}
+
+export type NavigationDirection = 'up' | 'down' | 'left' | 'right';
+
 interface SheetStore {
   // Current active sheet
   activeSheetId: string;
@@ -56,6 +70,18 @@ interface SheetStore {
   // Filter panel visibility
   showFilterPanel: boolean;
   setShowFilterPanel: (show: boolean) => void;
+
+  // Cell navigation and selection (Excel-like)
+  focusedCell: CellPosition | null;
+  selectionRange: SelectionRange | null;
+  selectedCells: Set<string>; // For Ctrl+click multi-select (stores "rowIndex,colIndex" keys)
+  gridDimensions: { rows: number; cols: number };
+  setFocusedCell: (cell: CellPosition | null) => void;
+  setSelectionRange: (range: SelectionRange | null) => void;
+  toggleCellSelection: (cell: CellPosition) => void; // For Ctrl+click
+  setGridDimensions: (dimensions: { rows: number; cols: number }) => void;
+  clearCellSelection: () => void;
+  moveFocus: (direction: NavigationDirection, extend: boolean) => void;
 }
 
 const defaultViewState: ViewState = {
@@ -222,4 +248,80 @@ export const useSheetStore = create<SheetStore>((set, get) => ({
 
   showFilterPanel: false,
   setShowFilterPanel: (show) => set({ showFilterPanel: show }),
+
+  // Cell navigation and selection (Excel-like)
+  focusedCell: null,
+  selectionRange: null,
+  selectedCells: new Set(),
+  gridDimensions: { rows: 0, cols: 0 },
+  
+  setFocusedCell: (cell) => set({ focusedCell: cell }),
+  
+  setSelectionRange: (range) => set({ selectionRange: range }),
+  
+  toggleCellSelection: (cell) => set((state) => {
+    const key = `${cell.rowIndex},${cell.colIndex}`;
+    const newSelection = new Set(state.selectedCells);
+    if (newSelection.has(key)) {
+      newSelection.delete(key);
+    } else {
+      newSelection.add(key);
+    }
+    return { selectedCells: newSelection, focusedCell: cell };
+  }),
+  
+  setGridDimensions: (dimensions) => set({ gridDimensions: dimensions }),
+  
+  clearCellSelection: () => set({ 
+    focusedCell: null, 
+    selectionRange: null,
+    selectedCells: new Set(),
+  }),
+  
+  moveFocus: (direction, extend) => {
+    const { focusedCell, selectionRange, gridDimensions } = get();
+    
+    if (!focusedCell) return;
+    
+    const { rowIndex, colIndex } = focusedCell;
+    const { rows, cols } = gridDimensions;
+    
+    let newRowIndex = rowIndex;
+    let newColIndex = colIndex;
+    
+    switch (direction) {
+      case 'up':
+        newRowIndex = Math.max(0, rowIndex - 1);
+        break;
+      case 'down':
+        newRowIndex = Math.min(rows - 1, rowIndex + 1);
+        break;
+      case 'left':
+        newColIndex = Math.max(0, colIndex - 1);
+        break;
+      case 'right':
+        newColIndex = Math.min(cols - 1, colIndex + 1);
+        break;
+    }
+    
+    const newFocusedCell = { rowIndex: newRowIndex, colIndex: newColIndex };
+    
+    if (extend) {
+      // Extend selection from the anchor point (start of selection or original focused cell)
+      const anchor = selectionRange?.start || focusedCell;
+      set({
+        focusedCell: newFocusedCell,
+        selectionRange: {
+          start: anchor,
+          end: newFocusedCell,
+        },
+      });
+    } else {
+      // Move focus without selection
+      set({
+        focusedCell: newFocusedCell,
+        selectionRange: null,
+      });
+    }
+  },
 }));

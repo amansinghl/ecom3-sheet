@@ -179,8 +179,8 @@
     border-collapse: separate;
   }
 
-  /* Smooth transitions */
-  * {
+  /* Smooth transitions - exclude table cells for instant selection feedback */
+  *:not(td):not(th) {
     @apply transition-colors duration-200;
   }
 
@@ -310,4 +310,36 @@ button:active {
 
 .card-hover:hover {
   @apply shadow-lg scale-[1.02];
+}
+
+/* Excel-like cell selection styles - GPU accelerated */
+.cell-selected {
+  background-color: rgba(99, 102, 241, 0.08) !important;
+}
+
+.cell-focused-ring {
+  box-shadow: inset 0 0 0 2px rgb(99, 102, 241);
+  z-index: 30;
+  position: relative;
+}
+
+/* Optimize table scrolling performance */
+table {
+  contain: layout style;
+}
+
+tbody {
+  contain: layout;
+}
+
+/* Data cells - optimized for fast rendering */
+td, th {
+  contain: layout style;
+  will-change: auto;
+}
+
+/* Only apply will-change when actually selected/focused */
+td.cell-selected,
+td.cell-focused-ring {
+  will-change: background-color, box-shadow;
 }

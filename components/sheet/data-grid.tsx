@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, useEffect, useRef } from 'react';
+import { useMemo, useState, useEffect, useRef, useCallback, memo } from 'react';
 import {
   useReactTable,
   getCoreRowModel,
@@ -13,7 +13,7 @@ import {
 } from '@tanstack/react-table';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { SheetConfig, RowData, UserRole, ColumnFilter } from '@/types';
-import { useSheetStore } from '@/lib/store/sheet-store';
+import { useSheetStore, CellPosition, SelectionRange } from '@/lib/store/sheet-store';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { CellRenderer } from './cells/cell-renderer';
@@ -41,12 +41,88 @@ interface DataGridProps {
 }
 
 export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibility: externalColumnVisibility, onColumnVisibilityChange, onDuplicateRow, onCopyRow, onDeleteRow, onAddRow, onClearFilters, hasActiveFilters, scrollContainerRef, globalSearch = '' }: DataGridProps) {
-  const { selectedRows, toggleRowSelection, editingCell, setEditingCell, viewState, rowHeight, columnWidths, setColumnWidth, setColumnFilter, toggleColumnPin } = useSheetStore();
+  const { 
+    selectedRows, 
+    toggleRowSelection, 
+    editingCell, 
+    setEditingCell, 
+    viewState, 
+    rowHeight, 
+    columnWidths, 
+    setColumnWidth, 
+    setColumnFilter, 
+    toggleColumnPin,
+    // Cell navigation
+    focusedCell,
+    selectionRange,
+    selectedCells,
+    setFocusedCell,
+    setSelectionRange,
+    toggleCellSelection,
+    setGridDimensions,
+    clearCellSelection,
+    moveFocus,
+  } = useSheetStore();
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnResizeMode] = useState<ColumnResizeMode>('onChange');
   const [hoveredRow, setHoveredRow] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; rowId: string } | null>(null);
   const [openFilterPopover, setOpenFilterPopover] = useState<string | null>(null);
+
+  // Memoized selection state for fast O(1) lookups - prevents lag
+  const selectionState = useMemo(() => {
+    // Pre-compute range bounds
+    let rangeBounds: { minRow: number; maxRow: number; minCol: number; maxCol: number } | null = null;
+    if (selectionRange) {
+      rangeBounds = {
+        minRow: Math.min(selectionRange.start.rowIndex, selectionRange.end.rowIndex),
+        maxRow: Math.max(selectionRange.start.rowIndex, selectionRange.end.rowIndex),
+        minCol: Math.min(selectionRange.start.colIndex, selectionRange.end.colIndex),
+        maxCol: Math.max(selectionRange.start.colIndex, selectionRange.end.colIndex),
+      };
+    }
+
+    // Pre-compute highlighted columns (using Set for O(1) lookup)
+    const highlightedColumns = new Set<number>();
+    if (rangeBounds) {
+      for (let c = rangeBounds.minCol; c <= rangeBounds.maxCol; c++) {
+        highlightedColumns.add(c);
+      }
+    }
+    if (focusedCell) {
+      highlightedColumns.add(focusedCell.colIndex);
+    }
+    // Add columns from Ctrl+selected cells
+    selectedCells.forEach(key => {
+      const colIdx = parseInt(key.split(',')[1], 10);
+      highlightedColumns.add(colIdx);
+    });
+
+    return {
+      rangeBounds,
+      highlightedColumns,
+      focusedKey: focusedCell ? `${focusedCell.rowIndex},${focusedCell.colIndex}` : null,
+    };
+  }, [selectionRange, focusedCell, selectedCells]);
+
+  // Fast cell selection check
+  const isCellSelected = useCallback((rowIndex: number, colIndex: number): boolean => {
+    const key = `${rowIndex},${colIndex}`;
+    // Check Ctrl+selected
+    if (selectedCells.has(key)) return true;
+    // Check range selection
+    const { rangeBounds } = selectionState;
+    if (rangeBounds) {
+      return rowIndex >= rangeBounds.minRow && rowIndex <= rangeBounds.maxRow &&
+             colIndex >= rangeBounds.minCol && colIndex <= rangeBounds.maxCol;
+    }
+    return false;
+  }, [selectedCells, selectionState]);
+
+  // Fast focused cell check
+  const isCellFocused = useCallback((rowIndex: number, colIndex: number): boolean => {
+    return selectionState.focusedKey === `${rowIndex},${colIndex}`;
+  }, [selectionState.focusedKey]);
   
   // Ref for virtual scrolling container
   const internalTableContainerRef = useRef<HTMLDivElement>(null);
@@ -365,7 +441,7 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
         default: return 24;
       }
     },
-    overscan: 10, // Render 10 extra rows outside viewport
+    overscan: 15, // Render extra rows for smooth scrolling during rapid navigation
   });
 
   // Scroll to editing cell when it changes (only if not visible)
@@ -386,19 +462,31 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
     prevEditingCellRef.current = editingCell;
   }, [editingCell, rows, rowVirtualizer]);
 
-  // Save scroll position to localStorage
+  // Save scroll position to localStorage (throttled to avoid lag during rapid scroll)
+  const scrollSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     const container = tableContainerRef.current;
     if (!container) return;
 
     const handleScroll = () => {
-      const scrollTop = container.scrollTop;
-      const scrollLeft = container.scrollLeft;
-      localStorage.setItem(`scroll-position-${config.id}`, JSON.stringify({ scrollTop, scrollLeft }));
+      // Throttle saves to once per 200ms
+      if (scrollSaveTimeoutRef.current) return;
+      
+      scrollSaveTimeoutRef.current = setTimeout(() => {
+        const scrollTop = container.scrollTop;
+        const scrollLeft = container.scrollLeft;
+        localStorage.setItem(`scroll-position-${config.id}`, JSON.stringify({ scrollTop, scrollLeft }));
+        scrollSaveTimeoutRef.current = null;
+      }, 200);
     };
 
-    container.addEventListener('scroll', handleScroll);
-    return () => container.removeEventListener('scroll', handleScroll);
+    container.addEventListener('scroll', handleScroll, { passive: true });
+    return () => {
+      container.removeEventListener('scroll', handleScroll);
+      if (scrollSaveTimeoutRef.current) {
+        clearTimeout(scrollSaveTimeoutRef.current);
+      }
+    };
   }, [config.id]);
 
   // Restore scroll position on mount
@@ -421,20 +509,261 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
     }
   }, [config.id]);
 
+  // Update grid dimensions when data or columns change
+  useEffect(() => {
+    const numCols = orderedColumns.length;
+    const numRows = rows.length;
+    setGridDimensions({ rows: numRows, cols: numCols });
+  }, [orderedColumns.length, rows.length, setGridDimensions]);
+
+  // Track rapid navigation state
+  const isRapidNavRef = useRef(false);
+  const pendingScrollRef = useRef<{ rowIndex: number; colIndex: number } | null>(null);
+
+  // Fast scroll using virtualizer - optimized for speed
+  const scrollToCell = useCallback((rowIndex: number, colIndex: number, immediate: boolean) => {
+    if (!tableContainerRef.current) return;
+    
+    const container = tableContainerRef.current;
+    
+    // Always use virtualizer for vertical - it's optimized
+    rowVirtualizer.scrollToIndex(rowIndex, { 
+      align: 'auto',
+      behavior: 'auto'
+    });
+
+    if (immediate) {
+      // For immediate scroll, find cell and use scrollIntoView (fast native method)
+      requestAnimationFrame(() => {
+        const cellElement = container.querySelector(`td[data-cell="${rowIndex}-${colIndex}"]`);
+        if (cellElement) {
+          cellElement.scrollIntoView({ 
+            block: 'nearest', 
+            inline: 'nearest',
+            behavior: 'auto' 
+          });
+        }
+      });
+    }
+  }, [rowVirtualizer]);
+
+  // Scroll effect - minimal during rapid nav, precise otherwise
+  useEffect(() => {
+    if (!focusedCell) return;
+    
+    const { rowIndex, colIndex } = focusedCell;
+
+    if (isRapidNavRef.current) {
+      // During rapid nav: only use fast virtualizer scroll, skip DOM queries
+      rowVirtualizer.scrollToIndex(rowIndex, { align: 'auto', behavior: 'auto' });
+      // Store for precise scroll when rapid nav ends
+      pendingScrollRef.current = { rowIndex, colIndex };
+    } else {
+      // Normal navigation: precise scroll
+      scrollToCell(rowIndex, colIndex, true);
+    }
+  }, [focusedCell, rowVirtualizer, scrollToCell]);
+
+  // Copy selected cells to clipboard
+  const handleCopy = useCallback(() => {
+    if (!focusedCell && !selectionRange && selectedCells.size === 0) return;
+    
+    let textToCopy = '';
+    
+    if (selectionRange) {
+      // Copy range of cells (Shift+selection)
+      const minRow = Math.min(selectionRange.start.rowIndex, selectionRange.end.rowIndex);
+      const maxRow = Math.max(selectionRange.start.rowIndex, selectionRange.end.rowIndex);
+      const minCol = Math.min(selectionRange.start.colIndex, selectionRange.end.colIndex);
+      const maxCol = Math.max(selectionRange.start.colIndex, selectionRange.end.colIndex);
+      
+      const rowTexts: string[] = [];
+      for (let r = minRow; r <= maxRow; r++) {
+        const row = rows[r];
+        if (!row) continue;
+        
+        const cellTexts: string[] = [];
+        for (let c = minCol; c <= maxCol; c++) {
+          const columnId = orderedColumns[c]?.id;
+          if (columnId) {
+            const value = row.original[columnId];
+            cellTexts.push(value != null ? String(value) : '');
+          }
+        }
+        rowTexts.push(cellTexts.join('\t'));
+      }
+      textToCopy = rowTexts.join('\n');
+    } else if (selectedCells.size > 0) {
+      // Copy Ctrl+click selected cells
+      // Parse selected cells and organize by row
+      const cellsByRow = new Map<number, number[]>();
+      selectedCells.forEach(key => {
+        const [rowStr, colStr] = key.split(',');
+        const rowIdx = parseInt(rowStr, 10);
+        const colIdx = parseInt(colStr, 10);
+        if (!cellsByRow.has(rowIdx)) {
+          cellsByRow.set(rowIdx, []);
+        }
+        cellsByRow.get(rowIdx)!.push(colIdx);
+      });
+      
+      // Sort rows and columns
+      const sortedRows = Array.from(cellsByRow.keys()).sort((a, b) => a - b);
+      const rowTexts: string[] = [];
+      
+      for (const rowIdx of sortedRows) {
+        const row = rows[rowIdx];
+        if (!row) continue;
+        
+        const cols = cellsByRow.get(rowIdx)!.sort((a, b) => a - b);
+        const cellTexts: string[] = [];
+        for (const colIdx of cols) {
+          const columnId = orderedColumns[colIdx]?.id;
+          if (columnId) {
+            const value = row.original[columnId];
+            cellTexts.push(value != null ? String(value) : '');
+          }
+        }
+        rowTexts.push(cellTexts.join('\t'));
+      }
+      textToCopy = rowTexts.join('\n');
+    } else if (focusedCell) {
+      // Copy single focused cell
+      const row = rows[focusedCell.rowIndex];
+      const columnId = orderedColumns[focusedCell.colIndex]?.id;
+      if (row && columnId) {
+        const value = row.original[columnId];
+        textToCopy = value != null ? String(value) : '';
+      }
+    }
+    
+    if (textToCopy) {
+      navigator.clipboard.writeText(textToCopy).catch(err => {
+        console.error('Failed to copy to clipboard:', err);
+      });
+    }
+  }, [focusedCell, selectionRange, selectedCells, rows, orderedColumns]);
+
+  // Track when rapid navigation ends
+  const rapidNavTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Finish rapid navigation - do precise scroll to final position
+  const finishRapidNav = useCallback(() => {
+    isRapidNavRef.current = false;
+    
+    // Do precise scroll to final position
+    if (pendingScrollRef.current) {
+      const { rowIndex, colIndex } = pendingScrollRef.current;
+      scrollToCell(rowIndex, colIndex, true);
+      pendingScrollRef.current = null;
+    }
+  }, [scrollToCell]);
+
+  // Keyboard navigation handler
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    // Don't handle navigation when editing a cell
+    if (editingCell) return;
+    
+    const isArrowKey = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key);
+    const isCopy = (e.ctrlKey || e.metaKey) && e.key === 'c';
+    
+    // Handle copy (Ctrl+C / Cmd+C)
+    if (isCopy) {
+      e.preventDefault();
+      handleCopy();
+      return;
+    }
+    
+    if (isArrowKey) {
+      e.preventDefault();
+      
+      // Track rapid navigation (key being held down)
+      if (e.repeat) {
+        isRapidNavRef.current = true;
+      }
+      
+      // Reset rapid nav flag after navigation stops
+      if (rapidNavTimeoutRef.current) {
+        clearTimeout(rapidNavTimeoutRef.current);
+      }
+      rapidNavTimeoutRef.current = setTimeout(finishRapidNav, 50);
+      
+      // If no cell is focused yet, focus the first cell
+      if (!focusedCell) {
+        setFocusedCell({ rowIndex: 0, colIndex: 0 });
+        return;
+      }
+      
+      const direction = e.key.replace('Arrow', '').toLowerCase() as 'up' | 'down' | 'left' | 'right';
+      moveFocus(direction, e.shiftKey);
+    }
+    
+    // Enter key to start editing
+    if (e.key === 'Enter' && focusedCell) {
+      e.preventDefault();
+      const row = rows[focusedCell.rowIndex];
+      const columnId = orderedColumns[focusedCell.colIndex]?.id;
+      if (row && columnId) {
+        setEditingCell({ rowId: row.id, columnId });
+      }
+    }
+    
+    // Escape to clear selection
+    if (e.key === 'Escape') {
+      clearCellSelection();
+    }
+  }, [editingCell, focusedCell, setFocusedCell, moveFocus, rows, orderedColumns, setEditingCell, clearCellSelection, handleCopy, finishRapidNav]);
+
+  // Track if we have multi-selected cells (avoid recalculating on every render)
+  const hasSelectedCells = selectedCells.size > 0;
+
+  // Handle cell click for focus
+  const handleCellClick = useCallback((rowIndex: number, colIndex: number, e: React.MouseEvent) => {
+    // Don't interfere with editing mode
+    if (editingCell) return;
+    
+    if (e.shiftKey && focusedCell) {
+      // Extend selection from focused cell to clicked cell
+      setSelectionRange({
+        start: focusedCell,
+        end: { rowIndex, colIndex },
+      });
+    } else if (e.ctrlKey || e.metaKey) {
+      // Ctrl+click - toggle this cell in multi-selection
+      toggleCellSelection({ rowIndex, colIndex });
+      // Clear range selection when using Ctrl+click
+      setSelectionRange(null);
+    } else {
+      // Single click - just focus this cell, clear other selections
+      if (hasSelectedCells) {
+        clearCellSelection();
+      }
+      setFocusedCell({ rowIndex, colIndex });
+      setSelectionRange(null);
+    }
+  }, [editingCell, focusedCell, setFocusedCell, setSelectionRange, toggleCellSelection, hasSelectedCells, clearCellSelection]);
+
   return (
     <div 
       ref={tableContainerRef}
-      className="relative h-full w-full overflow-auto rounded-md border border-border bg-white"
+      tabIndex={0}
+      onKeyDown={handleKeyDown}
+      className="relative h-full w-full overflow-auto rounded-md border border-border bg-white focus:outline-none scroll-auto"
+      style={{ contain: 'strict' }}
     >
       <table className="border-collapse" style={{ width: table.getCenterTotalSize(), tableLayout: 'fixed' }}>
         <thead className="sticky top-0 z-30 bg-gray-100 border-b-2 border-gray-300">
           {table.getHeaderGroups().map((headerGroup) => (
             <tr key={headerGroup.id} className="border-b border-border">
-              {headerGroup.headers.map((header, index) => {
+              {headerGroup.headers.map((header, headerIndex) => {
                 const columnId = header.column.id;
                 const isPinned = columnId === 'select' || viewState.pinnedColumns.includes(columnId);
                 const stickyLeft = columnId === 'select' ? 0 : stickyPositions[columnId];
                 const isLastPinned = columnId === lastPinnedColumn;
+                
+                // Check if this column should be highlighted (skip select column)
+                const colIndex = columnId === 'select' ? -1 : orderedColumns.findIndex(c => c.id === columnId);
+                const isColumnHighlighted = colIndex >= 0 && selectionState.highlightedColumns.has(colIndex);
                 
                 return (
                   <th
@@ -442,15 +771,19 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
                     className={cn(
                       'relative border-r border-border px-3 text-left text-xs font-medium overflow-hidden',
                       rowHeightClasses[rowHeight],
-                      isPinned ? 'sticky z-40 bg-gray-100' : 'bg-gray-100',
-                      isLastPinned && 'shadow-[2px_0_4px_rgba(0,0,0,0.1)]'
+                      isPinned ? 'sticky z-40' : '',
+                      isLastPinned && 'shadow-[2px_0_4px_rgba(0,0,0,0.1)]',
+                      // Column highlight styling
+                      isColumnHighlighted 
+                        ? 'bg-primary/15 border-b-2 border-b-primary' 
+                        : 'bg-gray-100'
                     )}
                     style={{ 
                       width: `${header.getSize()}px`, 
                       maxWidth: `${header.getSize()}px`,
                       ...(isPinned ? { 
                         left: `${stickyLeft}px`,
-                        backgroundColor: '#f3f4f6' // Gray-100 for pinned headers
+                        backgroundColor: isColumnHighlighted ? 'rgba(99, 102, 241, 0.15)' : '#f3f4f6'
                       } : {})
                     }}
                   >
@@ -534,9 +867,23 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
                       const stickyLeft = columnId === 'select' ? 0 : stickyPositions[columnId];
                       const isLastPinned = columnId === lastPinnedColumn;
                       
+                      // Calculate column index for cell navigation (skip select column)
+                      const colIndex = columnId === 'select' ? -1 : orderedColumns.findIndex(c => c.id === columnId);
+                      const rowIndex = virtualRow.index;
+                      
+                      // Check if this cell is focused or in selection range (using memoized fast lookups)
+                      const cellIsFocused = isCellFocused(rowIndex, colIndex);
+                      const cellIsSelected = isCellSelected(rowIndex, colIndex);
+                      const isDataCell = columnId !== 'select';
+                      
                       // Determine background color for pinned cells
                       const getBgColor = () => {
                         if (!isPinned) return undefined;
+                        
+                        // Cell selection takes precedence
+                        if (cellIsSelected && isDataCell) {
+                          return 'rgba(99, 102, 241, 0.1)'; // primary/10
+                        }
                         
                         if (selectedRows.has(row.id) && !isEmptyRow) {
                           return '#dbeafe'; // blue-50
@@ -552,12 +899,18 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
                       return (
                       <td
                         key={cell.id}
+                        data-cell={isDataCell ? `${rowIndex}-${colIndex}` : undefined}
+                        onClick={isDataCell ? (e) => handleCellClick(rowIndex, colIndex, e) : undefined}
                         className={cn(
-                          'border-r border-border p-0 overflow-hidden',
+                          'border-r border-border p-0 overflow-hidden relative',
                           rowHeightClasses[rowHeight],
                           !isEditable && 'cursor-not-allowed',
                           isPinned && 'sticky z-20',
-                          isLastPinned && 'shadow-[2px_0_4px_rgba(0,0,0,0.1)]'
+                          isLastPinned && 'shadow-[2px_0_4px_rgba(0,0,0,0.1)]',
+                          // Selection styling (Shift+select or Ctrl+click)
+                          cellIsSelected && isDataCell && 'cell-selected',
+                          // Focus styling - primary border ring
+                          cellIsFocused && isDataCell && 'cell-focused-ring'
                         )}
                         style={{ 
                           width: `${cell.column.getSize()}px`, 
