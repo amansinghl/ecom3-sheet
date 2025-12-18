@@ -53,6 +53,13 @@ interface SheetStore {
   editingCell: { rowId: string; columnId: string } | null;
   setEditingCell: (cell: { rowId: string; columnId: string } | null) => void;
 
+  // Cell selection state
+  selectedCellRange: { startRowId: string; startColumnId: string; endRowId: string; endColumnId: string } | null;
+  setSelectedCellRange: (range: { startRowId: string; startColumnId: string; endRowId: string; endColumnId: string } | null) => void;
+  clearCellSelection: () => void;
+  copiedCellData: string[][] | null; // 2D array of cell values for clipboard
+  setCopiedCellData: (data: string[][] | null) => void;
+
   // Filter panel visibility
   showFilterPanel: boolean;
   setShowFilterPanel: (show: boolean) => void;
@@ -219,6 +226,12 @@ export const useSheetStore = create<SheetStore>((set, get) => ({
 
   editingCell: null,
   setEditingCell: (cell) => set({ editingCell: cell }),
+
+  selectedCellRange: null,
+  setSelectedCellRange: (range) => set({ selectedCellRange: range }),
+  clearCellSelection: () => set({ selectedCellRange: null }),
+  copiedCellData: null,
+  setCopiedCellData: (data) => set({ copiedCellData: data }),
 
   showFilterPanel: false,
   setShowFilterPanel: (show) => set({ showFilterPanel: show }),
