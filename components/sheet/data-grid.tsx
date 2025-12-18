@@ -49,6 +49,7 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
   const [openFilterPopover, setOpenFilterPopover] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [dragStartCell, setDragStartCell] = useState<{ rowId: string; columnId: string } | null>(null);
+  const [mouseDownPos, setMouseDownPos] = useState<{ x: number; y: number } | null>(null);
   
   // Ref for virtual scrolling container
   const internalTableContainerRef = useRef<HTMLDivElement>(null);
@@ -86,10 +87,12 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
       return;
     }
     
-    e.preventDefault();
+    // Store mouse position to detect drag vs click
+    setMouseDownPos({ x: e.clientX, y: e.clientY });
     
     if (e.shiftKey && selectedCellRange) {
-      // Extend selection from existing range
+      // Extend selection from existing range (Shift+Click)
+      e.preventDefault();
       setSelectedCellRange({
         startRowId: selectedCellRange.startRowId,
         startColumnId: selectedCellRange.startColumnId,
@@ -97,21 +100,27 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
         endColumnId: columnId,
       });
     } else {
-      // Start new selection
+      // Store drag start but don't set selection yet - wait for drag
+      // This allows single clicks to work for editing
       setDragStartCell({ rowId, columnId });
-      setIsDragging(true);
-      setSelectedCellRange({
-        startRowId: rowId,
-        startColumnId: columnId,
-        endRowId: rowId,
-        endColumnId: columnId,
-      });
+      // Clear any existing selection on new click (unless Shift is held)
+      clearCellSelection();
     }
   };
 
-  // Handle cell mouse enter - extend selection while dragging
-  const handleCellMouseEnter = (rowId: string, columnId: string) => {
-    if (isDragging && dragStartCell && columnId !== 'select') {
+  // Handle cell mouse move - detect drag and start selection
+  const handleCellMouseMove = (e: React.MouseEvent, rowId: string, columnId: string) => {
+    if (!dragStartCell || !mouseDownPos || columnId === 'select') return;
+    
+    // Check if mouse has moved enough to be considered a drag
+    const moveThreshold = 3; // pixels
+    const deltaX = Math.abs(e.clientX - mouseDownPos.x);
+    const deltaY = Math.abs(e.clientY - mouseDownPos.y);
+    
+    if (deltaX > moveThreshold || deltaY > moveThreshold) {
+      // This is a drag, start selection
+      e.preventDefault();
+      setIsDragging(true);
       setSelectedCellRange({
         startRowId: dragStartCell.rowId,
         startColumnId: dragStartCell.columnId,
@@ -121,10 +130,28 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
     }
   };
 
+  // Handle cell mouse enter - extend selection while dragging
+  const handleCellMouseEnter = (e: React.MouseEvent, rowId: string, columnId: string) => {
+    if (isDragging && dragStartCell && columnId !== 'select') {
+      setSelectedCellRange({
+        startRowId: dragStartCell.rowId,
+        startColumnId: dragStartCell.columnId,
+        endRowId: rowId,
+        endColumnId: columnId,
+      });
+    } else if (dragStartCell && mouseDownPos) {
+      // Check if this should be treated as a drag
+      handleCellMouseMove(e, rowId, columnId);
+    }
+  };
+
   // Handle mouse up - end selection
-  const handleMouseUp = () => {
+  const handleMouseUp = (e?: MouseEvent) => {
+    // If we didn't drag, this was just a click - allow editing to work
+    // Selection will be cleared by the click handler if needed
     setIsDragging(false);
     setDragStartCell(null);
+    setMouseDownPos(null);
   };
 
   // Clear selection when clicking outside
@@ -136,14 +163,18 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
       }
     };
     
-    document.addEventListener('mouseup', handleMouseUp);
+    const handleMouseUpGlobal = (e: MouseEvent) => {
+      handleMouseUp(e);
+    };
+    
+    document.addEventListener('mouseup', handleMouseUpGlobal);
     document.addEventListener('click', handleClickOutside);
     
     return () => {
-      document.removeEventListener('mouseup', handleMouseUp);
+      document.removeEventListener('mouseup', handleMouseUpGlobal);
       document.removeEventListener('click', handleClickOutside);
     };
-  }, [editingCell, clearCellSelection]);
+  }, [editingCell, clearCellSelection, isDragging, dragStartCell, mouseDownPos]);
 
   // Row height classes
   const rowHeightClasses = {
@@ -879,7 +910,8 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
                           } : {})
                         }}
                         onMouseDown={(e) => handleCellMouseDown(e, row.id, columnId)}
-                        onMouseEnter={() => handleCellMouseEnter(row.id, columnId)}
+                        onMouseMove={(e) => handleCellMouseMove(e, row.id, columnId)}
+                        onMouseEnter={(e) => handleCellMouseEnter(e, row.id, columnId)}
                       >
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
                       </td>
