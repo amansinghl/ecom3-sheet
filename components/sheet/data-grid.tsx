@@ -31,8 +31,11 @@ interface DataGridProps {
   columnVisibility?: Record<string, boolean>;
   onColumnVisibilityChange?: (visibility: Record<string, boolean>) => void;
   onDuplicateRow?: (rowId: string) => void;
+  onDuplicateRows?: (rowIds: string[]) => void;
   onCopyRow?: (rowId: string) => void;
+  onCopyRows?: (rowIds: string[]) => void;
   onDeleteRow?: (rowId: string) => void;
+  onDeleteRows?: (rowIds: string[]) => void;
   onAddRow?: () => void;
   onClearFilters?: () => void;
   hasActiveFilters?: boolean;
@@ -42,7 +45,7 @@ interface DataGridProps {
   onRedo?: () => void;
 }
 
-export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibility: externalColumnVisibility, onColumnVisibilityChange, onDuplicateRow, onCopyRow, onDeleteRow, onAddRow, onClearFilters, hasActiveFilters, scrollContainerRef, globalSearch = '', onUndo, onRedo }: DataGridProps) {
+export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibility: externalColumnVisibility, onColumnVisibilityChange, onDuplicateRow, onDuplicateRows, onCopyRow, onCopyRows, onDeleteRow, onDeleteRows, onAddRow, onClearFilters, hasActiveFilters, scrollContainerRef, globalSearch = '', onUndo, onRedo }: DataGridProps) {
   const { 
     selectedRows, 
     toggleRowSelection, 
@@ -1086,18 +1089,34 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
         <RowContextMenu
           x={contextMenu.x}
           y={contextMenu.y}
+          selectedCount={selectedRows.size > 1 && selectedRows.has(contextMenu.rowId) ? selectedRows.size : 1}
           onDuplicate={() => {
-            if (onDuplicateRow) {
+            // If multiple rows are selected and right-clicked row is one of them, duplicate all
+            if (selectedRows.size > 1 && selectedRows.has(contextMenu.rowId)) {
+              if (onDuplicateRows) {
+                onDuplicateRows(Array.from(selectedRows));
+              }
+            } else if (onDuplicateRow) {
               onDuplicateRow(contextMenu.rowId);
             }
           }}
           onCopy={() => {
-            if (onCopyRow) {
+            // If multiple rows are selected and right-clicked row is one of them, copy all
+            if (selectedRows.size > 1 && selectedRows.has(contextMenu.rowId)) {
+              if (onCopyRows) {
+                onCopyRows(Array.from(selectedRows));
+              }
+            } else if (onCopyRow) {
               onCopyRow(contextMenu.rowId);
             }
           }}
           onDelete={() => {
-            if (onDeleteRow) {
+            // If multiple rows are selected and right-clicked row is one of them, delete all
+            if (selectedRows.size > 1 && selectedRows.has(contextMenu.rowId)) {
+              if (onDeleteRows) {
+                onDeleteRows(Array.from(selectedRows));
+              }
+            } else if (onDeleteRow) {
               onDeleteRow(contextMenu.rowId);
             }
           }}

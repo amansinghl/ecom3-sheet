@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 interface RowContextMenuProps {
   x: number;
   y: number;
+  selectedCount?: number; // Number of selected rows (for bulk actions)
   onDuplicate: () => void;
   onCopy: () => void;
   onDelete: () => void;
@@ -17,12 +18,14 @@ interface RowContextMenuProps {
 export function RowContextMenu({
   x,
   y,
+  selectedCount = 1,
   onDuplicate,
   onCopy,
   onDelete,
   onClose,
 }: RowContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
+  const isBulk = selectedCount > 1;
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -72,7 +75,7 @@ export function RowContextMenu({
   const menuItems = [
     {
       icon: Files,
-      label: 'Duplicate row',
+      label: isBulk ? `Duplicate ${selectedCount} rows` : 'Duplicate row',
       onClick: () => {
         onDuplicate();
         onClose();
@@ -80,7 +83,7 @@ export function RowContextMenu({
     },
     {
       icon: Copy,
-      label: 'Copy row',
+      label: isBulk ? `Copy ${selectedCount} rows` : 'Copy row',
       onClick: () => {
         onCopy();
         onClose();
@@ -88,7 +91,7 @@ export function RowContextMenu({
     },
     {
       icon: Trash2,
-      label: 'Delete row',
+      label: isBulk ? `Delete ${selectedCount} rows` : 'Delete row',
       onClick: () => {
         onDelete();
         onClose();

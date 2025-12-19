@@ -9,7 +9,6 @@ import { TableSkeleton } from './table-skeleton';
 import { ViewsSidebar } from './views-sidebar';
 import { HeroSection } from './hero-section';
 import { BulkUploadModal } from './bulk-upload-modal';
-import { ManualCaseDialog } from './manual-case-dialog';
 import { useSheetStore } from '@/lib/store/sheet-store';
 import { useKeyboardShortcuts } from '@/hooks/use-keyboard-shortcuts';
 import { loadColumnVisibility, saveColumnVisibility } from '@/lib/utils/storage';
@@ -18,7 +17,6 @@ import { toast } from 'sonner';
 import { sheetApiService } from '@/lib/api/sheets';
 import * as XLSX from 'xlsx';
 import { useQueryClient } from '@tanstack/react-query';
-import { escalationSheetConfig } from '@/lib/config/sheets';
 
 interface SheetViewProps {
   config: SheetConfig;
@@ -45,8 +43,6 @@ export function SheetView({ config, userRole }: SheetViewProps) {
   } = useSheetStore();
   const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [showBulkUploadModal, setShowBulkUploadModal] = useState(false);
-  const [pendingShipments, setPendingShipments] = useState<Array<{ shipmentNo: string; rowId: string }>>([]);
-  const [currentShipmentIndex, setCurrentShipmentIndex] = useState(0);
   const toolbarRef = useRef<ToolbarRef>(null);
   const hasAppliedDefaultFilters = useRef(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -302,57 +298,6 @@ export function SheetView({ config, userRole }: SheetViewProps) {
     }
   };
 
-  /**
-   * Handle manual case selection for multiple shipments
-   */
-  const handleManualCaseSelect = async (manualCase: string) => {
-    if (pendingShipments.length === 0) return;
-    
-    const currentShipment = pendingShipments[currentShipmentIndex];
-    
-    // Process current shipment with selected manual_case
-    await processShipmentWithManualCase(
-      currentShipment.shipmentNo,
-      currentShipment.rowId,
-      manualCase
-    );
-    
-    // Move to next shipment
-    if (currentShipmentIndex < pendingShipments.length - 1) {
-      setCurrentShipmentIndex(currentShipmentIndex + 1);
-    } else {
-      // All shipments processed
-      setPendingShipments([]);
-      setCurrentShipmentIndex(0);
-      toast.success('All shipments processed successfully');
-    }
-  };
-
-  /**
-   * Skip manual case for current shipment
-   */
-  const handleManualCaseSkip = async () => {
-    if (pendingShipments.length === 0) return;
-    
-    const currentShipment = pendingShipments[currentShipmentIndex];
-    
-    // Process current shipment without manual_case
-    await processShipmentWithManualCase(
-      currentShipment.shipmentNo,
-      currentShipment.rowId
-    );
-    
-    // Move to next shipment
-    if (currentShipmentIndex < pendingShipments.length - 1) {
-      setCurrentShipmentIndex(currentShipmentIndex + 1);
-    } else {
-      // All shipments processed
-      setPendingShipments([]);
-      setCurrentShipmentIndex(0);
-      toast.success('All shipments processed successfully');
-    }
-  };
-
   const handleCellUpdate = async (rowId: string, columnId: string, value: any) => {
     // Check if this is the shipment_no column for escalation sheet
     // Check for null/undefined explicitly to allow 0 as a valid value
@@ -474,10 +419,11 @@ export function SheetView({ config, userRole }: SheetViewProps) {
             toast.error(error.message || 'Failed to fetch escalation details', { id: 'fetch-escalation' });
           }
         } else {
-          // Multiple shipment numbers - create rows and show dialog
-          const newRows: Array<{ shipmentNo: string; rowId: string }> = [];
+          // Multiple shipment numbers - create rows and process all directly
+          toast.info(`Processing ${shipmentNumbers.length} shipments...`);
           
-          shipmentNumbers.forEach((shipmentNo, index) => {
+          for (let index = 0; index < shipmentNumbers.length; index++) {
+            const shipmentNo = shipmentNumbers[index];
             const newRowId = index === 0 ? rowIdString : `row-${Date.now()}-${index}`;
             const tempRow: any = {
               id: newRowId,
@@ -497,13 +443,10 @@ export function SheetView({ config, userRole }: SheetViewProps) {
             }
             
             setData((prev) => [...prev, tempRow]);
-            newRows.push({ shipmentNo, rowId: newRowId });
-          });
-          
-          // Set up pending shipments for dialog
-          setPendingShipments(newRows);
-          setCurrentShipmentIndex(0);
-          toast.info(`Processing ${shipmentNumbers.length} shipments. Please select manual case for each.`);
+            
+            // Process each shipment directly without showing dialog
+            processShipmentWithManualCase(shipmentNo, newRowId);
+          }
         }
       } else {
         // Not a shipment number update, just fill the empty row with the entered value
@@ -585,8 +528,8 @@ export function SheetView({ config, userRole }: SheetViewProps) {
             toast.error(error.message || 'Failed to fetch escalation details', { id: 'fetch-escalation' });
           }
         } else {
-          // Multiple shipment numbers - create additional rows and show dialog
-          const newRows: Array<{ shipmentNo: string; rowId: string }> = [];
+          // Multiple shipment numbers - create additional rows and process all directly
+          toast.info(`Processing ${shipmentNumbers.length} shipments...`);
           
           // Update current row with first shipment
           setData((prev) =>
@@ -601,9 +544,11 @@ export function SheetView({ config, userRole }: SheetViewProps) {
               return row;
             })
           );
-          newRows.push({ shipmentNo: shipmentNumbers[0], rowId: rowIdString });
           
-          // Create additional rows for remaining shipments
+          // Process first shipment
+          processShipmentWithManualCase(shipmentNumbers[0], rowIdString);
+          
+          // Create additional rows for remaining shipments and process them
           shipmentNumbers.slice(1).forEach((shipmentNo, index) => {
             const newRowId = `row-${Date.now()}-${index}`;
             const tempRow: any = {
@@ -624,13 +569,10 @@ export function SheetView({ config, userRole }: SheetViewProps) {
             }
             
             setData((prev) => [...prev, tempRow]);
-            newRows.push({ shipmentNo, rowId: newRowId });
+            
+            // Process this shipment directly without showing dialog
+            processShipmentWithManualCase(shipmentNo, newRowId);
           });
-          
-          // Set up pending shipments for dialog
-          setPendingShipments(newRows);
-          setCurrentShipmentIndex(0);
-          toast.info(`Processing ${shipmentNumbers.length} shipments. Please select manual case for each.`);
         }
       } else {
         // For other columns in new row, just update the value
@@ -900,6 +842,33 @@ export function SheetView({ config, userRole }: SheetViewProps) {
     toast.success(`Duplicated row (${rowIdentifier})`, { id: `duplicate-${rowIdString}` });
   };
 
+  const handleDuplicateRows = (rowIds: string[]) => {
+    const newRows: any[] = [];
+    
+    rowIds.forEach((rowId) => {
+      const rowIdString = String(rowId);
+      const rowToDuplicate = data.find((row) => String(row.id) === rowIdString);
+      if (!rowToDuplicate) return;
+
+      const newRow: any = {
+        ...rowToDuplicate,
+        id: `row-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        createdBy: 'user-1',
+        updatedBy: 'user-1',
+      };
+      newRows.push(newRow);
+    });
+
+    if (newRows.length === 0) return;
+
+    // Add all duplicated rows at the end
+    setData((prev) => [...prev, ...newRows]);
+    
+    toast.success(`Duplicated ${newRows.length} rows`, { id: 'duplicate-bulk' });
+  };
+
   const handleCopyRow = (rowId: string) => {
     const rowIdString = String(rowId);
     const rowToCopy = data.find((row) => String(row.id) === rowIdString);
@@ -945,6 +914,61 @@ export function SheetView({ config, userRole }: SheetViewProps) {
     toast.success(`Copied row data (${rowIdentifier}) to clipboard`, { id: `copy-${rowIdString}` });
   };
 
+  const handleCopyRows = (rowIds: string[]) => {
+    const rowsToCopy = rowIds
+      .map((rowId) => data.find((row) => String(row.id) === String(rowId)))
+      .filter(Boolean) as RowData[];
+
+    if (rowsToCopy.length === 0) return;
+
+    // Create header row
+    const headers = config.columns.map((col) => col.label).join('\t');
+
+    // Create data rows as tab-separated values (compatible with spreadsheets)
+    const textRows = rowsToCopy.map((row) =>
+      config.columns
+        .map((col) => {
+          const value = row[col.id];
+          if (value === null || value === undefined) return '';
+          if (value instanceof Date) return value.toISOString();
+          return String(value);
+        })
+        .join('\t')
+    );
+
+    const textData = [headers, ...textRows].join('\n');
+
+    // Copy as JSON for programmatic use
+    const jsonData = JSON.stringify(
+      rowsToCopy.map((row) => {
+        const rowData: any = {};
+        config.columns.forEach((col) => {
+          rowData[col.label] = row[col.id];
+        });
+        return rowData;
+      }),
+      null,
+      2
+    );
+
+    // Try to copy both formats
+    if (navigator.clipboard && window.ClipboardItem) {
+      const item = new ClipboardItem({
+        'text/plain': new Blob([textData], { type: 'text/plain' }),
+        'application/json': new Blob([jsonData], { type: 'application/json' }),
+      });
+      navigator.clipboard.write([item]).catch(() => {
+        // Fallback to text only
+        navigator.clipboard.writeText(textData);
+      });
+    } else {
+      // Fallback for older browsers
+      navigator.clipboard.writeText(textData);
+    }
+
+    toast.success(`Copied ${rowsToCopy.length} rows to clipboard`, { id: 'copy-bulk' });
+  };
+
   const handleDeleteRow = async (rowId: string) => {
     const rowIdString = String(rowId);
     const rowToDelete = data.find((row) => String(row.id) === rowIdString);
@@ -980,6 +1004,75 @@ export function SheetView({ config, userRole }: SheetViewProps) {
         ? `shipment_no: ${rowToDelete.shipment_no}` 
         : `row ID: ${rowIdString}`;
       toast.success(`Deleted row (${rowIdentifier})`, { id: `delete-${rowIdString}` });
+    }
+  };
+
+  const handleDeleteRowsBulk = async (rowIds: string[]) => {
+    const rowsToProcess = rowIds
+      .map((rowId) => data.find((row) => String(row.id) === String(rowId)))
+      .filter(Boolean) as RowData[];
+
+    if (rowsToProcess.length === 0) return;
+
+    // Filter rows that have shipment_no (existing rows from backend)
+    const rowsToDelete = rowsToProcess.filter((row) => {
+      const isExistingRow = typeof row.id === 'number' || (typeof row.id === 'string' && !row.id.startsWith('row-') && !row.id.startsWith('empty-'));
+      return isExistingRow && row.shipment_no;
+    });
+
+    // Filter new rows (that don't need backend deletion)
+    const newRowsToDelete = rowsToProcess.filter((row) => {
+      const isExistingRow = typeof row.id === 'number' || (typeof row.id === 'string' && !row.id.startsWith('row-') && !row.id.startsWith('empty-'));
+      return !isExistingRow || !row.shipment_no;
+    });
+
+    // Delete from backend if escalation sheet and rows have shipment_no and id
+    if (config.id === 'escalations' && rowsToDelete.length > 0) {
+      toast.loading(`Deleting ${rowsToDelete.length} row${rowsToDelete.length > 1 ? 's' : ''}...`, { id: 'delete-rows-bulk' });
+
+      try {
+        // Delete all rows in parallel
+        await Promise.all(
+          rowsToDelete
+            .filter((row) => row.id)
+            .map((row) =>
+              sheetApiService.deleteEscalation(row.id, row.shipment_no, row.vamashipper)
+            )
+        );
+
+        // Only remove successfully deleted rows from UI
+        const deletedRowIds = new Set(rowsToDelete.map((row) => String(row.id)));
+        setData((prev) => prev.filter((row) => !deletedRowIds.has(String(row.id))));
+        clearSelection();
+
+        const shipmentNos = rowsToDelete
+          .map((row) => row.shipment_no)
+          .filter(Boolean)
+          .slice(0, 3)
+          .join(', ');
+        const moreText = rowsToDelete.length > 3 ? ` and ${rowsToDelete.length - 3} more` : '';
+        toast.success(`Deleted ${rowsToDelete.length} row${rowsToDelete.length > 1 ? 's' : ''}${shipmentNos ? ` (${shipmentNos}${moreText})` : ''}`, {
+          id: 'delete-rows-bulk'
+        });
+      } catch (error: any) {
+        const errorMessage = error?.message || error?.error || 'Failed to delete rows. Please refresh and try again.';
+        toast.error(errorMessage, { id: 'delete-rows-bulk' });
+        clearSelection();
+      }
+    }
+
+    // Remove new rows optimistically (they don't need backend deletion)
+    if (newRowsToDelete.length > 0) {
+      const newRowIds = new Set(newRowsToDelete.map((row) => String(row.id)));
+      setData((prev) => prev.filter((row) => !newRowIds.has(String(row.id))));
+      clearSelection();
+
+      if (rowsToDelete.length === 0) {
+        // Only show this toast if we didn't already show one for backend deletion
+        toast.success(`Deleted ${newRowsToDelete.length} row${newRowsToDelete.length > 1 ? 's' : ''}`, {
+          id: 'delete-rows-bulk'
+        });
+      }
     }
   };
 
@@ -1282,17 +1375,6 @@ export function SheetView({ config, userRole }: SheetViewProps) {
           onUpload={processBulkUploadFile}
         />
         
-        {config.id === 'escalations' && pendingShipments.length > 0 && (
-          <ManualCaseDialog
-            open={true}
-            shipmentNo={pendingShipments[currentShipmentIndex]?.shipmentNo || ''}
-            shipmentIndex={currentShipmentIndex}
-            totalShipments={pendingShipments.length}
-            manualCaseOptions={escalationSheetConfig.columns.find(col => col.id === 'manual_case')?.options as any || []}
-            onSelect={handleManualCaseSelect}
-            onSkip={handleManualCaseSkip}
-          />
-        )}
         <div className="flex-1 overflow-hidden animate-in fade-in duration-300">
           {/* Show hero section for portfolio sheet */}
           {config.id === 'portfolio' && data.length === 0 && !isLoading && (
@@ -1314,8 +1396,11 @@ export function SheetView({ config, userRole }: SheetViewProps) {
                 columnVisibility={columnVisibility}
                 onColumnVisibilityChange={handleColumnVisibilityChange}
                 onDuplicateRow={handleDuplicateRow}
+                onDuplicateRows={handleDuplicateRows}
                 onCopyRow={handleCopyRow}
+                onCopyRows={handleCopyRows}
                 onDeleteRow={handleDeleteRow}
+                onDeleteRows={handleDeleteRowsBulk}
                 onAddRow={handleAddRow}
                 onClearFilters={handleClearFilters}
                 hasActiveFilters={Object.keys(viewState.columnFilters).length > 0}
