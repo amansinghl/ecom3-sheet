@@ -62,6 +62,11 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
     setGridDimensions,
     clearCellSelection,
     moveFocus,
+    // Fill drag
+    fillDragState,
+    startFillDrag,
+    updateFillDrag,
+    endFillDrag,
   } = useSheetStore();
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnResizeMode] = useState<ColumnResizeMode>('onChange');
@@ -743,6 +748,64 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
     }
   }, [editingCell, focusedCell, setFocusedCell, setSelectionRange, toggleCellSelection, hasSelectedCells, clearCellSelection]);
 
+  // Fill drag handlers
+  const handleFillDragMove = useCallback((e: MouseEvent) => {
+    if (!fillDragState || !tableContainerRef.current) return;
+    
+    // Find which row the mouse is over
+    const container = tableContainerRef.current;
+    const rows = container.querySelectorAll('tbody tr[data-index]');
+    
+    for (const row of rows) {
+      const rect = row.getBoundingClientRect();
+      if (e.clientY >= rect.top && e.clientY <= rect.bottom) {
+        const rowIndex = parseInt(row.getAttribute('data-index') || '0', 10);
+        if (rowIndex !== fillDragState.targetEndRow) {
+          updateFillDrag(rowIndex);
+        }
+        break;
+      }
+    }
+  }, [fillDragState, updateFillDrag]);
+
+  const handleFillDragEnd = useCallback(() => {
+    if (!fillDragState) return;
+    
+    const { sourceCell, columnId, targetEndRow } = fillDragState;
+    const sourceRow = rows[sourceCell.rowIndex];
+    
+    if (sourceRow && columnId) {
+      const sourceValue = sourceRow.original[columnId];
+      
+      // Fill cells between source and target (only the specific column)
+      const startRow = Math.min(sourceCell.rowIndex, targetEndRow);
+      const endRow = Math.max(sourceCell.rowIndex, targetEndRow);
+      
+      for (let r = startRow; r <= endRow; r++) {
+        if (r !== sourceCell.rowIndex) {
+          const targetRow = rows[r];
+          if (targetRow) {
+            onCellUpdate(targetRow.id, columnId, sourceValue);
+          }
+        }
+      }
+    }
+    
+    endFillDrag();
+  }, [fillDragState, rows, onCellUpdate, endFillDrag]);
+
+  // Attach/detach fill drag listeners
+  useEffect(() => {
+    if (fillDragState) {
+      document.addEventListener('mousemove', handleFillDragMove);
+      document.addEventListener('mouseup', handleFillDragEnd);
+      return () => {
+        document.removeEventListener('mousemove', handleFillDragMove);
+        document.removeEventListener('mouseup', handleFillDragEnd);
+      };
+    }
+  }, [fillDragState, handleFillDragMove, handleFillDragEnd]);
+
   return (
     <div 
       ref={tableContainerRef}
@@ -876,6 +939,16 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
                       const cellIsSelected = isCellSelected(rowIndex, colIndex);
                       const isDataCell = columnId !== 'select';
                       
+                      // Check if cell is in fill drag range (only this specific column)
+                      const isInFillRange = fillDragState && 
+                        columnId === fillDragState.columnId &&
+                        ((fillDragState.targetEndRow >= fillDragState.sourceCell.rowIndex && 
+                          rowIndex > fillDragState.sourceCell.rowIndex && 
+                          rowIndex <= fillDragState.targetEndRow) ||
+                         (fillDragState.targetEndRow < fillDragState.sourceCell.rowIndex && 
+                          rowIndex < fillDragState.sourceCell.rowIndex && 
+                          rowIndex >= fillDragState.targetEndRow));
+                      
                       // Determine background color for pinned cells
                       const getBgColor = () => {
                         if (!isPinned) return undefined;
@@ -910,7 +983,9 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
                           // Selection styling (Shift+select or Ctrl+click)
                           cellIsSelected && isDataCell && 'cell-selected',
                           // Focus styling - primary border ring
-                          cellIsFocused && isDataCell && 'cell-focused-ring'
+                          cellIsFocused && isDataCell && 'cell-focused-ring',
+                          // Fill drag target highlight
+                          isInFillRange && isDataCell && 'fill-target'
                         )}
                         style={{ 
                           width: `${cell.column.getSize()}px`, 
@@ -922,6 +997,17 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
                         }}
                       >
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                        {/* Fill handle - appears on focused cell */}
+                        {cellIsFocused && isDataCell && !editingCell && (
+                          <div
+                            className="fill-handle"
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              startFillDrag({ rowIndex, colIndex }, columnId);
+                            }}
+                          />
+                        )}
                       </td>
                       );
                     })}

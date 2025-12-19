@@ -343,3 +343,27 @@ td.cell-selected,
 td.cell-focused-ring {
   will-change: background-color, box-shadow;
 }
+
+/* Excel-like fill handle */
+.fill-handle {
+  position: absolute;
+  bottom: -3px;
+  right: -3px;
+  width: 8px;
+  height: 8px;
+  background-color: rgb(99, 102, 241);
+  border: 1px solid white;
+  cursor: crosshair;
+  z-index: 40;
+  border-radius: 1px;
+}
+
+.fill-handle:hover {
+  transform: scale(1.2);
+}
+
+/* Fill target cells during drag */
+td.fill-target {
+  background-color: rgba(99, 102, 241, 0.15) !important;
+  border: 1px dashed rgb(99, 102, 241) !important;
+}

@@ -82,6 +82,12 @@ interface SheetStore {
   setGridDimensions: (dimensions: { rows: number; cols: number }) => void;
   clearCellSelection: () => void;
   moveFocus: (direction: NavigationDirection, extend: boolean) => void;
+
+  // Fill drag state (Excel-like drag to fill)
+  fillDragState: { sourceCell: CellPosition; columnId: string; targetEndRow: number } | null;
+  startFillDrag: (sourceCell: CellPosition, columnId: string) => void;
+  updateFillDrag: (targetEndRow: number) => void;
+  endFillDrag: () => void;
 }
 
 const defaultViewState: ViewState = {
@@ -324,4 +330,24 @@ export const useSheetStore = create<SheetStore>((set, get) => ({
       });
     }
   },
+
+  // Fill drag state (Excel-like drag to fill)
+  fillDragState: null,
+  
+  startFillDrag: (sourceCell, columnId) => set({
+    fillDragState: { 
+      sourceCell, 
+      columnId,
+      targetEndRow: sourceCell.rowIndex 
+    }
+  }),
+  
+  updateFillDrag: (targetEndRow) => set((state) => {
+    if (!state.fillDragState) return state;
+    return {
+      fillDragState: { ...state.fillDragState, targetEndRow }
+    };
+  }),
+  
+  endFillDrag: () => set({ fillDragState: null }),
 }));

@@ -85,7 +85,7 @@ export const escalationSheetConfig: SheetConfig = {
     {
       id: 'notes',
       label: 'Notes',
-      type: 'longtext',
+      type: 'text',
       width: 200,
       required: false,
       editable: true,

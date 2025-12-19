@@ -1,13 +1,14 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { ColumnConfig, StatusOption } from '@/types';
 import { RowHeight } from '@/lib/store/sheet-store';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
 import { getCellTextSize, getCellPadding, highlightText } from './cell-utils';
+import { Check, ChevronDown } from 'lucide-react';
 
 interface StatusCellProps {
   value: any;
@@ -32,8 +33,13 @@ export function StatusCell({
   onSave,
   onCancel,
 }: StatusCellProps) {
-  const [editValue, setEditValue] = useState(value || '');
-  const [open, setOpen] = useState(false);
+  const [searchText, setSearchText] = useState('');
+  const [highlightedIndex, setHighlightedIndex] = useState(0);
+  const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0, width: 0 });
+  const inputRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  
   const options = (columnConfig.options || []) as StatusOption[];
   const textSizeClass = getCellTextSize(rowHeight);
   const paddingClass = getCellPadding(rowHeight);
@@ -45,15 +51,61 @@ export function StatusCell({
   const avatarSize = rowHeight === 'compact' ? 'h-4 w-4' : rowHeight === 'spacious' ? 'h-7 w-7' : 'h-5 w-5';
   const avatarTextSize = rowHeight === 'compact' ? 'text-[8px]' : 'text-[10px]';
 
-  // Reset edit value when editing starts
+  // Filter options based on search text
+  const filteredOptions = useMemo(() => {
+    if (!searchText.trim()) return options;
+    const search = searchText.toLowerCase();
+    return options.filter(opt => 
+      opt.label.toLowerCase().includes(search) ||
+      opt.value.toLowerCase().includes(search)
+    );
+  }, [options, searchText]);
+
+  // Find exact match (case-insensitive)
+  const findExactMatch = (text: string) => {
+    const search = text.toLowerCase().trim();
+    if (!search) return null;
+    return options.find(opt => 
+      opt.label.toLowerCase() === search ||
+      opt.value.toLowerCase() === search
+    );
+  };
+
+  // Calculate dropdown position
+  useEffect(() => {
+    if (isEditing && containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      setDropdownPos({
+        top: rect.bottom,
+        left: rect.left,
+        width: rect.width
+      });
+    }
+  }, [isEditing]);
+
+  // Reset state when editing starts
   useEffect(() => {
     if (isEditing) {
-      setEditValue(value || '');
-      setOpen(true);
-    } else {
-      setOpen(false);
+      setSearchText('');
+      setHighlightedIndex(0);
+      setTimeout(() => inputRef.current?.focus(), 10);
     }
-  }, [isEditing, value]);
+  }, [isEditing]);
+
+  // Reset highlighted index when filtered options change
+  useEffect(() => {
+    setHighlightedIndex(0);
+  }, [filteredOptions.length]);
+
+  // Scroll highlighted item into view
+  useEffect(() => {
+    if (isEditing && listRef.current) {
+      const highlightedItem = listRef.current.querySelector(`[data-index="${highlightedIndex}"]`);
+      if (highlightedItem) {
+        highlightedItem.scrollIntoView({ block: 'nearest' });
+      }
+    }
+  }, [highlightedIndex, isEditing]);
 
   const getOption = (val: string): StatusOption | undefined => {
     return options.find((opt) => opt.value === val);
@@ -67,68 +119,157 @@ export function StatusCell({
   // Get fun emoji avatar for user
   const getFunkyAvatar = (optionValue: string, name: string) => {
     const funkyChars: { [key: string]: string } = {
-      'kamal': '👻',      // Ghost
-      'rahul': '🐉',      // Dragon
-      'priya': '🐱',      // Cat
-      'amit': '🐕',       // Dog
-      'sneha': '👽',      // Alien
-      'vikram': '🐋',     // Whale
+      'kamal': '👻',
+      'rahul': '🐉',
+      'priya': '🐱',
+      'amit': '🐕',
+      'sneha': '👽',
+      'vikram': '🐋',
     };
     
-    // Fallback fun characters if not mapped
     const fallbackChars = ['🦊', '🦁', '🐼', '🐸', '🦉', '🐧', '🦈', '🦇', '🦩', '🦘', '🦝', '🦦', '🐨', '🐯'];
     const charIndex = optionValue.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) % fallbackChars.length;
     
     return funkyChars[optionValue.toLowerCase()] || fallbackChars[charIndex];
   };
 
+  const handleSelect = (selectedValue: string) => {
+    onSave(selectedValue);
+  };
+
+  const handleBlurWithAutoMatch = () => {
+    const match = findExactMatch(searchText);
+    if (match) {
+      onSave(match.value);
+    } else if (filteredOptions.length === 1) {
+      onSave(filteredOptions[0].value);
+    } else {
+      onCancel();
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    e.stopPropagation();
+    
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault();
+        setHighlightedIndex(prev => 
+          prev < filteredOptions.length - 1 ? prev + 1 : prev
+        );
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        setHighlightedIndex(prev => prev > 0 ? prev - 1 : 0);
+        break;
+      case 'Enter':
+        e.preventDefault();
+        if (filteredOptions[highlightedIndex]) {
+          handleSelect(filteredOptions[highlightedIndex].value);
+        } else {
+          handleBlurWithAutoMatch();
+        }
+        break;
+      case 'Escape':
+        e.preventDefault();
+        onCancel();
+        break;
+      case 'Tab':
+        handleBlurWithAutoMatch();
+        break;
+    }
+  };
+
   if (isEditing) {
     return (
-      <div className="p-1">
-        <Select
-          open={open}
-          onOpenChange={(isOpen) => {
-            setOpen(isOpen);
-            if (!isOpen) {
-              // Close without selection - cancel edit
-              onCancel();
-            }
-          }}
-          value={editValue}
-          onValueChange={(val) => {
-            setEditValue(val);
-            setOpen(false);
-            onSave(val);
-          }}
-        >
-          <SelectTrigger className="h-8 w-full">
-            <SelectValue placeholder="Select status..." />
-          </SelectTrigger>
-          <SelectContent>
-            {options.map((option) => (
-              <SelectItem key={option.value} value={option.value}>
-                <div className="flex items-center gap-2">
-                  {isUserField ? (
-                    <Avatar className={avatarSize}>
-                      <AvatarFallback 
-                        className={cn(avatarTextSize, 'font-medium text-white')}
+      <div ref={containerRef} className="relative w-full h-full">
+        {/* Compact input */}
+        <div className="flex items-center h-full gap-0.5 px-1 bg-white">
+          <input
+            ref={inputRef}
+            type="text"
+            value={searchText}
+            onChange={(e) => setSearchText(e.target.value)}
+            onKeyDown={handleKeyDown}
+            onClick={(e) => {
+              e.stopPropagation();
+              inputRef.current?.focus();
+            }}
+            onFocus={(e) => e.stopPropagation()}
+            onBlur={(e) => {
+              const relatedTarget = e.relatedTarget as HTMLElement;
+              if (!relatedTarget?.closest('.status-dropdown-portal')) {
+                setTimeout(handleBlurWithAutoMatch, 150);
+              }
+            }}
+            placeholder={currentOption?.label || 'Type...'}
+            className="flex-1 min-w-[40px] h-full px-0.5 text-xs text-gray-900 bg-transparent outline-none border-none"
+            style={{ color: '#111827' }}
+            autoComplete="off"
+            autoFocus
+          />
+          <ChevronDown className="w-2.5 h-2.5 text-muted-foreground shrink-0" />
+        </div>
+        
+        {/* Portal dropdown - renders outside the table cell */}
+        {typeof document !== 'undefined' && createPortal(
+          <div 
+            ref={listRef}
+            className="status-dropdown-portal fixed bg-white border border-gray-200 rounded shadow-lg max-h-32 overflow-auto"
+            style={{
+              top: dropdownPos.top,
+              left: dropdownPos.left,
+              width: Math.max(dropdownPos.width, 120),
+              zIndex: 9999,
+            }}
+          >
+            {filteredOptions.length === 0 ? (
+              <div className="px-2 py-1.5 text-xs text-gray-500">
+                No matches
+              </div>
+            ) : (
+              filteredOptions.map((option, index) => {
+                const isSelected = option.value === value;
+                
+                return (
+                  <div
+                    key={option.value}
+                    data-index={index}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      handleSelect(option.value);
+                    }}
+                    onMouseEnter={() => setHighlightedIndex(index)}
+                    className={cn(
+                      'flex items-center gap-1.5 px-2 py-1 text-xs font-medium cursor-pointer',
+                      index === highlightedIndex && 'bg-blue-50',
+                      isSelected && 'font-semibold'
+                    )}
+                  >
+                    {isUserField ? (
+                      <span className="text-xs">{getFunkyAvatar(option.value, option.label)}</span>
+                    ) : (
+                      <div
+                        className="w-2.5 h-2.5 rounded-full shrink-0"
                         style={{ backgroundColor: option.color }}
-                      >
-                        {getFunkyAvatar(option.value, option.label)}
-                      </AvatarFallback>
-                    </Avatar>
-                  ) : (
-                    <div
-                      className="h-2 w-2 rounded-full"
-                      style={{ backgroundColor: option.color }}
-                    />
-                  )}
-                  {option.label}
-                </div>
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+                      />
+                    )}
+                    <span className="truncate" style={{ color: option.color }}>
+                      {searchText.trim() 
+                        ? highlightText(option.label, searchText.trim())
+                        : option.label
+                      }
+                    </span>
+                    {isSelected && (
+                      <Check className="w-3 h-3 ml-auto shrink-0 text-blue-600" />
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </div>,
+          document.body
+        )}
       </div>
     );
   }
