@@ -15,6 +15,15 @@ import {
 
 export type RowHeight = 'compact' | 'comfortable' | 'spacious';
 
+// History entry for undo/redo
+export interface HistoryEntry {
+  rowId: string;
+  columnId: string;
+  oldValue: any;
+  newValue: any;
+  timestamp: number;
+}
+
 // Cell position for navigation and selection
 export interface CellPosition {
   rowIndex: number;
@@ -88,6 +97,16 @@ interface SheetStore {
   startFillDrag: (sourceCell: CellPosition, columnId: string) => void;
   updateFillDrag: (targetEndRow: number) => void;
   endFillDrag: () => void;
+
+  // Undo/Redo history
+  undoStack: HistoryEntry[];
+  redoStack: HistoryEntry[];
+  pushToHistory: (entry: Omit<HistoryEntry, 'timestamp'>) => void;
+  undo: () => HistoryEntry | null;
+  redo: () => HistoryEntry | null;
+  canUndo: () => boolean;
+  canRedo: () => boolean;
+  clearHistory: () => void;
 }
 
 const defaultViewState: ViewState = {
@@ -350,4 +369,50 @@ export const useSheetStore = create<SheetStore>((set, get) => ({
   }),
   
   endFillDrag: () => set({ fillDragState: null }),
+
+  // Undo/Redo history (max 50 entries)
+  undoStack: [],
+  redoStack: [],
+  
+  pushToHistory: (entry) => set((state) => {
+    const newEntry: HistoryEntry = {
+      ...entry,
+      timestamp: Date.now(),
+    };
+    // Limit stack size to 50 entries
+    const newUndoStack = [...state.undoStack, newEntry].slice(-50);
+    return {
+      undoStack: newUndoStack,
+      redoStack: [], // Clear redo stack when new action is performed
+    };
+  }),
+  
+  undo: () => {
+    const { undoStack, redoStack } = get();
+    if (undoStack.length === 0) return null;
+    
+    const entry = undoStack[undoStack.length - 1];
+    set({
+      undoStack: undoStack.slice(0, -1),
+      redoStack: [...redoStack, entry].slice(-50),
+    });
+    return entry;
+  },
+  
+  redo: () => {
+    const { undoStack, redoStack } = get();
+    if (redoStack.length === 0) return null;
+    
+    const entry = redoStack[redoStack.length - 1];
+    set({
+      redoStack: redoStack.slice(0, -1),
+      undoStack: [...undoStack, entry].slice(-50),
+    });
+    return entry;
+  },
+  
+  canUndo: () => get().undoStack.length > 0,
+  canRedo: () => get().redoStack.length > 0,
+  
+  clearHistory: () => set({ undoStack: [], redoStack: [] }),
 }));

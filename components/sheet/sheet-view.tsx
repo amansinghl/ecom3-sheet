@@ -38,7 +38,10 @@ export function SheetView({ config, userRole }: SheetViewProps) {
     setColumnFilter,
     loadViewStateForSheet,
     loadColumnWidthsForSheet,
-    setActiveSheetId
+    setActiveSheetId,
+    pushToHistory,
+    undo: undoFromStore,
+    redo: redoFromStore,
   } = useSheetStore();
   const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [showBulkUploadModal, setShowBulkUploadModal] = useState(false);
@@ -357,6 +360,20 @@ export function SheetView({ config, userRole }: SheetViewProps) {
 
     // Convert rowId to string to handle cases where it might be a number from API
     const rowIdString = String(rowId);
+    
+    // Get the old value for undo/redo history
+    const currentRow = data.find((row) => String(row.id) === rowIdString);
+    const oldValue = currentRow?.[columnId];
+    
+    // Only push to history if value actually changed
+    if (oldValue !== value && currentRow) {
+      pushToHistory({
+        rowId: rowIdString,
+        columnId,
+        oldValue,
+        newValue: value,
+      });
+    }
 
     // Prevent shipment_no updates for existing rows (rows with numeric IDs)
     if (isShipmentNoUpdate) {
@@ -1002,6 +1019,58 @@ export function SheetView({ config, userRole }: SheetViewProps) {
     });
   };
 
+  // Undo handler - restore previous value
+  const handleUndo = () => {
+    const entry = undoFromStore();
+    if (!entry) {
+      toast.info('Nothing to undo');
+      return;
+    }
+    
+    // Update the cell with the old value (without pushing to history)
+    setData((prev) =>
+      prev.map((row) => {
+        if (String(row.id) === String(entry.rowId)) {
+          return {
+            ...row,
+            [entry.columnId]: entry.oldValue,
+            updatedAt: new Date(),
+          };
+        }
+        return row;
+      })
+    );
+    
+    const columnLabel = config.columns.find((col) => col.id === entry.columnId)?.label || entry.columnId;
+    toast.success(`Undo: Restored ${columnLabel}`, { duration: 2000 });
+  };
+
+  // Redo handler - reapply the change
+  const handleRedo = () => {
+    const entry = redoFromStore();
+    if (!entry) {
+      toast.info('Nothing to redo');
+      return;
+    }
+    
+    // Update the cell with the new value (without pushing to history)
+    setData((prev) =>
+      prev.map((row) => {
+        if (String(row.id) === String(entry.rowId)) {
+          return {
+            ...row,
+            [entry.columnId]: entry.newValue,
+            updatedAt: new Date(),
+          };
+        }
+        return row;
+      })
+    );
+    
+    const columnLabel = config.columns.find((col) => col.id === entry.columnId)?.label || entry.columnId;
+    toast.success(`Redo: Restored ${columnLabel}`, { duration: 2000 });
+  };
+
   const processBulkUploadFile = async (file: File) => {
     try {
       toast.loading('Reading Excel file...', { id: 'bulk-upload' });
@@ -1252,6 +1321,8 @@ export function SheetView({ config, userRole }: SheetViewProps) {
                 hasActiveFilters={Object.keys(viewState.columnFilters).length > 0}
                 scrollContainerRef={scrollContainerRef}
                 globalSearch={globalSearch}
+                onUndo={handleUndo}
+                onRedo={handleRedo}
               />
             )}
           </div>

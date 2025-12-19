@@ -38,9 +38,11 @@ interface DataGridProps {
   hasActiveFilters?: boolean;
   scrollContainerRef?: React.RefObject<HTMLDivElement | null>;
   globalSearch?: string;
+  onUndo?: () => void;
+  onRedo?: () => void;
 }
 
-export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibility: externalColumnVisibility, onColumnVisibilityChange, onDuplicateRow, onCopyRow, onDeleteRow, onAddRow, onClearFilters, hasActiveFilters, scrollContainerRef, globalSearch = '' }: DataGridProps) {
+export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibility: externalColumnVisibility, onColumnVisibilityChange, onDuplicateRow, onCopyRow, onDeleteRow, onAddRow, onClearFilters, hasActiveFilters, scrollContainerRef, globalSearch = '', onUndo, onRedo }: DataGridProps) {
   const { 
     selectedRows, 
     toggleRowSelection, 
@@ -671,6 +673,22 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
     
     const isArrowKey = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key);
     const isCopy = (e.ctrlKey || e.metaKey) && e.key === 'c';
+    const isUndo = (e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey;
+    const isRedo = (e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey));
+    
+    // Handle undo (Ctrl+Z / Cmd+Z)
+    if (isUndo) {
+      e.preventDefault();
+      onUndo?.();
+      return;
+    }
+    
+    // Handle redo (Ctrl+Y / Cmd+Y or Ctrl+Shift+Z / Cmd+Shift+Z)
+    if (isRedo) {
+      e.preventDefault();
+      onRedo?.();
+      return;
+    }
     
     // Handle copy (Ctrl+C / Cmd+C)
     if (isCopy) {
@@ -717,7 +735,7 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
     if (e.key === 'Escape') {
       clearCellSelection();
     }
-  }, [editingCell, focusedCell, setFocusedCell, moveFocus, rows, orderedColumns, setEditingCell, clearCellSelection, handleCopy, finishRapidNav]);
+  }, [editingCell, focusedCell, setFocusedCell, moveFocus, rows, orderedColumns, setEditingCell, clearCellSelection, handleCopy, finishRapidNav, onUndo, onRedo]);
 
   // Track if we have multi-selected cells (avoid recalculating on every render)
   const hasSelectedCells = selectedCells.size > 0;
