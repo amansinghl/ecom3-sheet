@@ -323,25 +323,33 @@ button:active {
   position: relative;
 }
 
-/* Optimize table scrolling performance */
+/* Optimize table scrolling performance - Safari compatible */
 table {
-  contain: layout style;
+  table-layout: fixed;
+  border-collapse: collapse;
 }
 
 tbody {
-  contain: layout;
+  display: table-row-group;
+}
+
+tr {
+  display: table-row;
 }
 
 /* Data cells - optimized for fast rendering */
 td, th {
-  contain: layout style;
-  will-change: auto;
+  display: table-cell;
+  /* Avoid contain and will-change for Safari compatibility */
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
 }
 
-/* Only apply will-change when actually selected/focused */
-td.cell-selected,
-td.cell-focused-ring {
-  will-change: background-color, box-shadow;
+/* Safari-specific scroll fixes */
+@supports (-webkit-touch-callout: none) {
+  .overflow-auto {
+    -webkit-overflow-scrolling: touch;
+  }
 }
 
 /* Excel-like fill handle */

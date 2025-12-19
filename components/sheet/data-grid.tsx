@@ -812,7 +812,6 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
       tabIndex={0}
       onKeyDown={handleKeyDown}
       className="relative h-full w-full overflow-auto rounded-md border border-border bg-white focus:outline-none scroll-auto select-none"
-      style={{ contain: 'strict' }}
     >
       <table className="border-collapse" style={{ width: table.getCenterTotalSize(), tableLayout: 'fixed' }}>
         <thead className="sticky top-0 z-30 bg-gray-100 border-b-2 border-gray-300">
@@ -878,12 +877,10 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
         <tbody>
           {rowVirtualizer.getVirtualItems().length > 0 ? (
             <>
-              {/* Spacer for rows before viewport */}
-              {rowVirtualizer.getVirtualItems()[0].index > 0 && (
-                <tr>
-                  <td style={{ height: `${rowVirtualizer.getVirtualItems()[0].start}px` }} />
-                </tr>
-              )}
+              {/* Top spacer - Safari compatible */}
+              <tr aria-hidden="true" style={{ height: rowVirtualizer.getVirtualItems()[0]?.start || 0 }}>
+                <td colSpan={orderedColumns.length + 1} style={{ padding: 0, border: 'none' }} />
+              </tr>
               
               {/* Render only visible rows */}
               {rowVirtualizer.getVirtualItems().map((virtualRow) => {
@@ -1015,16 +1012,12 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
                 );
               })}
               
-              {/* Spacer for rows after viewport */}
-              {rowVirtualizer.getVirtualItems().length > 0 && 
-                rowVirtualizer.getVirtualItems()[rowVirtualizer.getVirtualItems().length - 1].index < rows.length - 1 && (
-                <tr>
-                  <td style={{ 
-                    height: `${rowVirtualizer.getTotalSize() - 
-                      rowVirtualizer.getVirtualItems()[rowVirtualizer.getVirtualItems().length - 1].end}px` 
-                  }} />
-                </tr>
-              )}
+              {/* Bottom spacer - Safari compatible */}
+              <tr aria-hidden="true" style={{ 
+                height: rowVirtualizer.getTotalSize() - (rowVirtualizer.getVirtualItems()[rowVirtualizer.getVirtualItems().length - 1]?.end || 0) 
+              }}>
+                <td colSpan={orderedColumns.length + 1} style={{ padding: 0, border: 'none' }} />
+              </tr>
             </>
           ) : null}
         </tbody>
