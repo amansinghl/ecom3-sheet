@@ -31,6 +31,7 @@ export function useEscalationSheetData(
     retry: options.retry ?? 3,
     staleTime: options.staleTime ?? 5 * 60 * 1000, // 5 minutes
     gcTime: options.cacheTime ?? 10 * 60 * 1000, // 10 minutes
+    refetchOnWindowFocus: false,
   });
 }
 
@@ -50,6 +51,7 @@ export function useTechSheetData(
     retry: options.retry ?? 3,
     staleTime: options.staleTime ?? 5 * 60 * 1000,
     gcTime: options.cacheTime ?? 10 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 }
 
@@ -79,6 +81,8 @@ export function useSheetData(
     retry: options.retry ?? 3,
     staleTime: options.staleTime ?? 5 * 60 * 1000,
     gcTime: options.cacheTime ?? 10 * 60 * 1000,
+    // Disable auto-refetch on window focus to prevent overwriting local edits
+    refetchOnWindowFocus: false,
   });
 }
 

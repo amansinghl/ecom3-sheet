@@ -331,6 +331,8 @@ table {
 
 tbody {
   display: table-row-group;
+  /* Match row background to reduce flash on fast scroll */
+  background-color: #f9fafb;
 }
 
 tr {
@@ -343,6 +345,13 @@ td, th {
   /* Avoid contain and will-change for Safari compatibility */
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
+}
+
+/* Smooth scroll container optimization */
+.overflow-auto {
+  /* GPU acceleration for smooth scrolling */
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
 }
 
 /* Safari-specific scroll fixes */

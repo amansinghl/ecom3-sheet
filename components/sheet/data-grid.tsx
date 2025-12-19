@@ -446,7 +446,7 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
         default: return 24;
       }
     },
-    overscan: 25, // Render extra rows for smooth scrolling during rapid navigation
+    overscan: 100, // Increased for smoother fast scrolling (render 50 extra rows above/below viewport)
   });
 
   // Scroll to editing cell when it changes (only if not visible)
@@ -874,12 +874,12 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
             </tr>
           ))}
         </thead>
-        <tbody>
+        <tbody className="bg-gray-50">
           {rowVirtualizer.getVirtualItems().length > 0 ? (
             <>
               {/* Top spacer - Safari compatible */}
               <tr aria-hidden="true" style={{ height: rowVirtualizer.getVirtualItems()[0]?.start || 0 }}>
-                <td colSpan={orderedColumns.length + 1} style={{ padding: 0, border: 'none' }} />
+                <td colSpan={orderedColumns.length + 1} style={{ padding: 0, border: 'none', backgroundColor: '#f9fafb' }} />
               </tr>
               
               {/* Render only visible rows */}
@@ -1016,7 +1016,7 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
               <tr aria-hidden="true" style={{ 
                 height: rowVirtualizer.getTotalSize() - (rowVirtualizer.getVirtualItems()[rowVirtualizer.getVirtualItems().length - 1]?.end || 0) 
               }}>
-                <td colSpan={orderedColumns.length + 1} style={{ padding: 0, border: 'none' }} />
+                <td colSpan={orderedColumns.length + 1} style={{ padding: 0, border: 'none', backgroundColor: '#f9fafb' }} />
               </tr>
             </>
           ) : null}
