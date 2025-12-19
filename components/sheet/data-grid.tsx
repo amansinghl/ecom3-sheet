@@ -668,27 +668,28 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
 
   // Keyboard navigation handler
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    // Don't handle navigation when editing a cell
-    if (editingCell) return;
-    
-    const isArrowKey = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key);
-    const isCopy = (e.ctrlKey || e.metaKey) && e.key === 'c';
     const isUndo = (e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey;
     const isRedo = (e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey));
     
-    // Handle undo (Ctrl+Z / Cmd+Z)
+    // Handle undo (Ctrl+Z / Cmd+Z) - works even when editing
     if (isUndo) {
       e.preventDefault();
       onUndo?.();
       return;
     }
     
-    // Handle redo (Ctrl+Y / Cmd+Y or Ctrl+Shift+Z / Cmd+Shift+Z)
+    // Handle redo (Ctrl+Y / Cmd+Y or Ctrl+Shift+Z / Cmd+Shift+Z) - works even when editing
     if (isRedo) {
       e.preventDefault();
       onRedo?.();
       return;
     }
+    
+    // Don't handle navigation/copy when editing a cell
+    if (editingCell) return;
+    
+    const isArrowKey = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key);
+    const isCopy = (e.ctrlKey || e.metaKey) && e.key === 'c';
     
     // Handle copy (Ctrl+C / Cmd+C)
     if (isCopy) {
