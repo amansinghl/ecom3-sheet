@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Copy, Trash2, Files } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -36,11 +37,16 @@ export function RowContextMenu({
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
+    // Small delay to avoid immediate close from the same right-click event
+    const timer = setTimeout(() => {
+      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('contextmenu', handleClickOutside);
+    }, 10);
+    
     document.addEventListener('keydown', handleEscape);
-    document.addEventListener('contextmenu', handleClickOutside);
 
     return () => {
+      clearTimeout(timer);
       document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('keydown', handleEscape);
       document.removeEventListener('contextmenu', handleClickOutside);
@@ -91,11 +97,11 @@ export function RowContextMenu({
     },
   ];
 
-  return (
+  const menuContent = (
     <div
       ref={menuRef}
-      className="fixed z-50 min-w-[180px] rounded-md border bg-popover p-1 shadow-md animate-in fade-in-0 zoom-in-95"
-      style={{ left: x, top: y }}
+      className="fixed min-w-[180px] rounded-md border bg-popover p-1 shadow-lg animate-in fade-in-0 zoom-in-95 select-text"
+      style={{ left: x, top: y, zIndex: 9999 }}
     >
       {menuItems.map((item, index) => {
         const Icon = item.icon;
@@ -104,7 +110,7 @@ export function RowContextMenu({
             key={index}
             onClick={item.onClick}
             className={cn(
-              'relative flex w-full cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground',
+              'relative flex w-full cursor-pointer items-center rounded-sm px-2 py-1.5 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground',
               item.className
             )}
           >
@@ -115,4 +121,11 @@ export function RowContextMenu({
       })}
     </div>
   );
+
+  // Render using portal to escape the select-none container
+  if (typeof document !== 'undefined') {
+    return createPortal(menuContent, document.body);
+  }
+
+  return menuContent;
 }

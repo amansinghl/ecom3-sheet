@@ -118,7 +118,7 @@ export function NumberCell({
         onBlur={handleBlur}
         placeholder={isShipmentNoColumn ? "e.g., 123456, 789012" : undefined}
         className={cn(
-          'h-full w-full rounded-none border-0 text-right focus-visible:ring-2 focus-visible:ring-primary',
+          'h-full w-full rounded-none border-0 text-right focus-visible:ring-2 focus-visible:ring-primary select-text',
           inputType === 'number' && '[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none',
           textSizeClass
         )}

@@ -55,7 +55,7 @@ export function PhoneCell({
         onChange={(e) => setEditValue(e.target.value)}
         onKeyDown={handleKeyDown}
         onBlur={() => onSave(editValue)}
-        className="h-full w-full rounded-none border-0 focus-visible:ring-2 focus-visible:ring-primary"
+        className="h-full w-full rounded-none border-0 focus-visible:ring-2 focus-visible:ring-primary select-text"
       />
     );
   }

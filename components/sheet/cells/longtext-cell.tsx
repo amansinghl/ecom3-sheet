@@ -99,7 +99,7 @@ export function LongTextCell({
         onKeyDown={handleKeyDown}
         onBlur={handleBlur}
         className={cn(
-          'h-full w-full rounded-none border-0 focus-visible:ring-2 focus-visible:ring-primary resize-none',
+          'h-full w-full rounded-none border-0 focus-visible:ring-2 focus-visible:ring-primary resize-none select-text',
           textSizeClass,
           'min-h-[60px]'
         )}

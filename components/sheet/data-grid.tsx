@@ -811,7 +811,7 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
       ref={tableContainerRef}
       tabIndex={0}
       onKeyDown={handleKeyDown}
-      className="relative h-full w-full overflow-auto rounded-md border border-border bg-white focus:outline-none scroll-auto"
+      className="relative h-full w-full overflow-auto rounded-md border border-border bg-white focus:outline-none scroll-auto select-none"
       style={{ contain: 'strict' }}
     >
       <table className="border-collapse" style={{ width: table.getCenterTotalSize(), tableLayout: 'fixed' }}>

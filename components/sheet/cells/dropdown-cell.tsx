@@ -250,7 +250,7 @@ export function DropdownCell({
               }
             }}
             placeholder={isMultiselect && selectedValues.length > 0 ? '' : 'Type...'}
-            className="flex-1 min-w-[40px] h-full px-0.5 text-xs text-gray-900 bg-transparent outline-none border-none"
+            className="flex-1 min-w-[40px] h-full px-0.5 text-xs text-gray-900 bg-transparent outline-none border-none select-text"
             style={{ color: '#111827' }}
             autoComplete="off"
             autoFocus

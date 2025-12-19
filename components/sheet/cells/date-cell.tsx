@@ -72,7 +72,7 @@ export function DateCell({
         onKeyDown={handleKeyDown}
         onBlur={() => onSave(editValue ? new Date(editValue) : null)}
         className={cn(
-          'h-full w-full rounded-none border-0 focus-visible:ring-2 focus-visible:ring-primary',
+          'h-full w-full rounded-none border-0 focus-visible:ring-2 focus-visible:ring-primary select-text',
           textSizeClass
         )}
       />
