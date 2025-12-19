@@ -526,6 +526,8 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
   // Track rapid navigation state
   const isRapidNavRef = useRef(false);
   const pendingScrollRef = useRef<{ rowIndex: number; colIndex: number } | null>(null);
+  // Track if focus came from a click (skip scroll effect for clicks)
+  const focusFromClickRef = useRef(false);
 
   // Fast scroll using virtualizer - optimized for speed
   const scrollToCell = useCallback((rowIndex: number, colIndex: number, immediate: boolean) => {
@@ -533,22 +535,43 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
     
     const container = tableContainerRef.current;
     
-    // Always use virtualizer for vertical - it's optimized
-    rowVirtualizer.scrollToIndex(rowIndex, { 
-      align: 'auto',
-      behavior: 'auto'
-    });
+    // Check if row is already visible in the virtualizer
+    const virtualItems = rowVirtualizer.getVirtualItems();
+    const isRowVisible = virtualItems.some(item => item.index === rowIndex);
+    
+    // Only scroll if the row is not visible
+    if (!isRowVisible) {
+      rowVirtualizer.scrollToIndex(rowIndex, { 
+        align: 'auto',
+        behavior: 'auto'
+      });
+    }
 
     if (immediate) {
-      // For immediate scroll, find cell and use scrollIntoView (fast native method)
+      // For immediate scroll, find cell and check if it needs scrolling
       requestAnimationFrame(() => {
         const cellElement = container.querySelector(`td[data-cell="${rowIndex}-${colIndex}"]`);
         if (cellElement) {
-          cellElement.scrollIntoView({ 
-            block: 'nearest', 
-            inline: 'nearest',
-            behavior: 'auto' 
-          });
+          const containerRect = container.getBoundingClientRect();
+          const cellRect = cellElement.getBoundingClientRect();
+          
+          // Only scroll horizontally if the cell is outside the visible horizontal area
+          // Never trigger vertical scroll from here - let virtualizer handle it
+          const isHorizontallyVisible = 
+            cellRect.left >= containerRect.left && 
+            cellRect.right <= containerRect.right;
+          
+          if (!isHorizontallyVisible) {
+            // Use scrollLeft directly instead of scrollIntoView to avoid vertical scroll
+            const scrollLeft = container.scrollLeft;
+            if (cellRect.left < containerRect.left) {
+              // Cell is to the left, scroll left
+              container.scrollLeft = scrollLeft - (containerRect.left - cellRect.left) - 10;
+            } else if (cellRect.right > containerRect.right) {
+              // Cell is to the right, scroll right
+              container.scrollLeft = scrollLeft + (cellRect.right - containerRect.right) + 10;
+            }
+          }
         }
       });
     }
@@ -557,6 +580,12 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
   // Scroll effect - minimal during rapid nav, precise otherwise
   useEffect(() => {
     if (!focusedCell) return;
+    
+    // Skip scroll if focus came from a click (user already sees the cell)
+    if (focusFromClickRef.current) {
+      focusFromClickRef.current = false;
+      return;
+    }
     
     const { rowIndex, colIndex } = focusedCell;
 
@@ -745,6 +774,9 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
   const handleCellClick = useCallback((rowIndex: number, colIndex: number, e: React.MouseEvent) => {
     // Don't interfere with editing mode
     if (editingCell) return;
+    
+    // Mark that focus is coming from a click (skip scroll effect)
+    focusFromClickRef.current = true;
     
     if (e.shiftKey && focusedCell) {
       // Extend selection from focused cell to clicked cell
