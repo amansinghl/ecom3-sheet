@@ -80,7 +80,7 @@ export const escalationSheetConfig: SheetConfig = {
       type: 'text',
       width: 120,
       required: false,
-      editable: true,
+      editable: false,
     },
     {
       id: 'notes',
@@ -96,7 +96,7 @@ export const escalationSheetConfig: SheetConfig = {
       type: 'highlights',
       width: 350,
       required: false,
-      editable: true,
+      editable: false,
     },
     {
       id: 'partner_name',
@@ -104,7 +104,7 @@ export const escalationSheetConfig: SheetConfig = {
       type: 'text',
       width: 150,
       required: false,
-      editable: true,
+      editable: false,
     },
     {
       id: 'manual_case',
@@ -121,7 +121,7 @@ export const escalationSheetConfig: SheetConfig = {
       type: 'longtext',
       width: 200,
       required: false,
-      editable: true,
+      editable: false,
     },
     {
       id: 'followup_remarks',
@@ -137,7 +137,7 @@ export const escalationSheetConfig: SheetConfig = {
       type: 'datetime',
       width: 150,
       required: false,
-      editable: true,
+      editable: false,
     },
     {
       id: 'vamashipper',
@@ -145,7 +145,7 @@ export const escalationSheetConfig: SheetConfig = {
       type: 'text',
       width: 120,
       required: false,
-      editable: true,
+      editable: false,
     },
     {
       id: 'source_of_complaint',
@@ -161,7 +161,7 @@ export const escalationSheetConfig: SheetConfig = {
       type: 'text',
       width: 150,
       required: false,
-      editable: true,
+      editable: false,
     },
     {
       id: 'manual_ticket_status',
@@ -178,7 +178,7 @@ export const escalationSheetConfig: SheetConfig = {
       type: 'datetime',
       width: 150,
       required: false,
-      editable: true,
+      editable: false,
     },
     {
       id: 'latest_tracking_status',
@@ -186,7 +186,7 @@ export const escalationSheetConfig: SheetConfig = {
       type: 'text',
       width: 180,
       required: false,
-      editable: true,
+      editable: false,
     },
     {
       id: 'consignee_name',
@@ -194,7 +194,7 @@ export const escalationSheetConfig: SheetConfig = {
       type: 'text',
       width: 150,
       required: false,
-      editable: true,
+      editable: false,
     },
     {
       id: 'consignee_no',
@@ -202,7 +202,7 @@ export const escalationSheetConfig: SheetConfig = {
       type: 'phone',
       width: 120,
       required: false,
-      editable: true,
+      editable: false,
     },
     {
       id: 'duplicate_awb',
@@ -210,7 +210,7 @@ export const escalationSheetConfig: SheetConfig = {
       type: 'text',
       width: 120,
       required: false,
-      editable: true,
+      editable: false,
     },
     {
       id: 'email_subject',
@@ -226,7 +226,7 @@ export const escalationSheetConfig: SheetConfig = {
       type: 'text',
       width: 150,
       required: false,
-      editable: true,
+      editable: false,
     },
     {
       id: 'shipment_booking_date',
@@ -234,7 +234,7 @@ export const escalationSheetConfig: SheetConfig = {
       type: 'date',
       width: 150,
       required: false,
-      editable: true,
+      editable: false,
     },
     {
       id: 'seller_name',
@@ -242,7 +242,7 @@ export const escalationSheetConfig: SheetConfig = {
       type: 'text',
       width: 150,
       required: false,
-      editable: true,
+      editable: false,
     },
     {
       id: 'seller_mobile',
@@ -250,7 +250,7 @@ export const escalationSheetConfig: SheetConfig = {
       type: 'phone',
       width: 120,
       required: false,
-      editable: true,
+      editable: false,
     },
     {
       id: 'entity_id',
@@ -258,7 +258,7 @@ export const escalationSheetConfig: SheetConfig = {
       type: 'number',
       width: 100,
       required: false,
-      editable: true,
+      editable: false,
     },
     {
       id: 'ticket_delay',
@@ -266,7 +266,7 @@ export const escalationSheetConfig: SheetConfig = {
       type: 'number',
       width: 120,
       required: false,
-      editable: true,
+      editable: false,
     },
     {
       id: 'lr_number',
@@ -290,7 +290,7 @@ export const escalationSheetConfig: SheetConfig = {
       type: 'text',
       width: 180,
       required: false,
-      editable: true,
+      editable: false,
     },
     {
       id: 'edd_partner',
@@ -298,7 +298,7 @@ export const escalationSheetConfig: SheetConfig = {
       type: 'text',
       width: 120,
       required: false,
-      editable: true,
+      editable: false,
     },
     {
       id: 'reattempt_count',
@@ -306,7 +306,7 @@ export const escalationSheetConfig: SheetConfig = {
       type: 'number',
       width: 140,
       required: false,
-      editable: true,
+      editable: false,
     },
   ],
   defaultSort: {
