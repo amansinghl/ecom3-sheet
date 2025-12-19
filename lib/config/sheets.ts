@@ -126,7 +126,7 @@ export const escalationSheetConfig: SheetConfig = {
     {
       id: 'followup_remarks',
       label: 'Followup Remarks',
-      type: 'longtext',
+      type: 'text',
       width: 200,
       required: false,
       editable: true,
