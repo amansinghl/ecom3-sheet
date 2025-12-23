@@ -36,6 +36,7 @@ export function SheetView({ config, userRole }: SheetViewProps) {
     setColumnFilter,
     loadViewStateForSheet,
     loadColumnWidthsForSheet,
+    loadColumnOrderForSheet,
     setActiveSheetId,
     pushToHistory,
     undo: undoFromStore,
@@ -72,9 +73,10 @@ export function SheetView({ config, userRole }: SheetViewProps) {
     setActiveSheetId(config.id);
     loadViewStateForSheet(config.id);
     loadColumnWidthsForSheet(config.id);
+    loadColumnOrderForSheet(config.id);
     // Reset the flag when sheet changes
     hasAppliedDefaultFilters.current = false;
-  }, [config.id, setActiveSheetId, loadViewStateForSheet, loadColumnWidthsForSheet]);
+  }, [config.id, setActiveSheetId, loadViewStateForSheet, loadColumnWidthsForSheet, loadColumnOrderForSheet]);
 
   // Apply default view filters if no filters are already set (after state loads)
   useEffect(() => {

@@ -10,7 +10,9 @@ import {
   saveHiddenColumns,
   loadHiddenColumns,
   savePinnedColumns,
-  loadPinnedColumns
+  loadPinnedColumns,
+  saveColumnOrder,
+  loadColumnOrder
 } from '@/lib/utils/storage';
 
 export type RowHeight = 'compact' | 'comfortable' | 'spacious';
@@ -65,6 +67,12 @@ interface SheetStore {
   toggleColumnPin: (columnId: string) => void;
   resetViewState: () => void;
   loadViewStateForSheet: (sheetId: string) => void;
+
+  // Column order (for user customization)
+  columnOrder: string[];
+  setColumnOrder: (order: string[]) => void;
+  moveColumn: (columnId: string, direction: 'up' | 'down') => void;
+  loadColumnOrderForSheet: (sheetId: string) => void;
 
   // Selected rows
   selectedRows: Set<string>;
@@ -124,6 +132,7 @@ export const useSheetStore = create<SheetStore>((set, get) => ({
     // Load persisted state for the new sheet
     get().loadViewStateForSheet(id);
     get().loadColumnWidthsForSheet(id);
+    get().loadColumnOrderForSheet(id);
     const savedRowHeight = loadRowHeight(id);
     if (savedRowHeight) {
       set({ rowHeight: savedRowHeight });
@@ -251,6 +260,37 @@ export const useSheetStore = create<SheetStore>((set, get) => ({
         pinnedColumns,
       },
     }));
+  },
+
+  // Column order (for user customization)
+  columnOrder: [],
+  setColumnOrder: (order) => {
+    set({ columnOrder: order });
+    const { activeSheetId } = get();
+    saveColumnOrder(activeSheetId, order);
+  },
+  moveColumn: (columnId, direction) => {
+    const { columnOrder } = get();
+    const currentIndex = columnOrder.indexOf(columnId);
+    if (currentIndex === -1) return;
+    
+    const newIndex = direction === 'up' 
+      ? Math.max(0, currentIndex - 1)
+      : Math.min(columnOrder.length - 1, currentIndex + 1);
+    
+    if (newIndex === currentIndex) return;
+    
+    const newOrder = [...columnOrder];
+    newOrder.splice(currentIndex, 1);
+    newOrder.splice(newIndex, 0, columnId);
+    
+    set({ columnOrder: newOrder });
+    const { activeSheetId } = get();
+    saveColumnOrder(activeSheetId, newOrder);
+  },
+  loadColumnOrderForSheet: (sheetId) => {
+    const order = loadColumnOrder(sheetId);
+    set({ columnOrder: order });
   },
 
   selectedRows: new Set(),

@@ -72,6 +72,9 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
     startFillDrag,
     updateFillDrag,
     endFillDrag,
+    // Column order
+    columnOrder,
+    setColumnOrder,
   } = useSheetStore();
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnResizeMode] = useState<ColumnResizeMode>('onChange');
@@ -172,13 +175,41 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
     spacious: 'py-3',
   };
 
-  // Reorder columns so pinned ones come first
+  // Initialize column order if not set
+  useEffect(() => {
+    if (columnOrder.length === 0 && config.columns.length > 0) {
+      setColumnOrder(config.columns.map(col => col.id));
+    }
+  }, [config.columns, columnOrder.length, setColumnOrder]);
+
+  // Reorder columns: use custom order, filter visible, then put pinned first
   const orderedColumns = useMemo(() => {
     const pinnedIds = viewState.pinnedColumns;
-    const pinned = config.columns.filter(col => pinnedIds.includes(col.id));
-    const unpinned = config.columns.filter(col => !pinnedIds.includes(col.id));
+    
+    // Get columns in custom order (or config order if no custom order)
+    const orderedIds = columnOrder.length > 0 ? columnOrder : config.columns.map(c => c.id);
+    
+    // Filter to only visible columns
+    const visibleColumns = orderedIds
+      .map(id => config.columns.find(c => c.id === id))
+      .filter((col): col is typeof config.columns[0] => 
+        col !== undefined && columnVisibility[col.id] !== false
+      );
+    
+    // Add any new columns that aren't in the order yet
+    const orderedSet = new Set(orderedIds);
+    const newColumns = config.columns.filter(
+      col => !orderedSet.has(col.id) && columnVisibility[col.id] !== false
+    );
+    
+    const allVisibleColumns = [...visibleColumns, ...newColumns];
+    
+    // Separate into pinned and unpinned while maintaining relative order
+    const pinned = allVisibleColumns.filter(col => pinnedIds.includes(col.id));
+    const unpinned = allVisibleColumns.filter(col => !pinnedIds.includes(col.id));
+    
     return [...pinned, ...unpinned];
-  }, [config.columns, viewState.pinnedColumns]);
+  }, [config.columns, viewState.pinnedColumns, columnOrder, columnVisibility]);
 
   // Create columns from config
   const columns = useMemo<ColumnDef<RowData>[]>(() => {
@@ -418,23 +449,29 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
     columnResizeMode,
   });
 
-  // Calculate sticky positions for pinned columns
+  // Calculate sticky positions for pinned columns (only visible ones)
   const stickyPositions = useMemo(() => {
     const positions: Record<string, number> = {};
     let currentLeft = 60; // Start after select column
     
-    viewState.pinnedColumns.forEach(columnId => {
-      positions[columnId] = currentLeft;
-      const width = columnWidths[columnId] || 150;
-      currentLeft += width;
-    });
+    // Only calculate positions for visible pinned columns in order
+    orderedColumns
+      .filter(col => viewState.pinnedColumns.includes(col.id))
+      .forEach(col => {
+        positions[col.id] = currentLeft;
+        const width = columnWidths[col.id] || col.width || 150;
+        currentLeft += width;
+      });
     
     return positions;
-  }, [viewState.pinnedColumns, columnWidths]);
+  }, [orderedColumns, viewState.pinnedColumns, columnWidths]);
 
-  // Get the last pinned column ID for shadow effect
-  const lastPinnedColumn = viewState.pinnedColumns.length > 0 
-    ? viewState.pinnedColumns[viewState.pinnedColumns.length - 1] 
+  // Get the last visible pinned column ID for shadow effect
+  const visiblePinnedColumns = orderedColumns.filter(col => 
+    viewState.pinnedColumns.includes(col.id)
+  );
+  const lastPinnedColumn = visiblePinnedColumns.length > 0 
+    ? visiblePinnedColumns[visiblePinnedColumns.length - 1].id 
     : 'select';
 
   // Virtual scrolling setup

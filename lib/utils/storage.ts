@@ -13,6 +13,7 @@ const STORAGE_KEYS = {
   columnVisibility: (sheetId: string) => `column-visibility-${sheetId}`,
   hiddenColumns: (sheetId: string) => `sheet-hidden-columns-${sheetId}`,
   pinnedColumns: (sheetId: string) => `sheet-pinned-columns-${sheetId}`,
+  columnOrder: (sheetId: string) => `sheet-column-order-${sheetId}`,
 };
 
 /**
@@ -175,6 +176,32 @@ export function loadPinnedColumns(sheetId: string): string[] {
 }
 
 /**
+ * Save column order to localStorage
+ */
+export function saveColumnOrder(sheetId: string, order: string[]): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(STORAGE_KEYS.columnOrder(sheetId), JSON.stringify(order));
+  } catch (error) {
+    console.error('Failed to save column order to localStorage:', error);
+  }
+}
+
+/**
+ * Load column order from localStorage
+ */
+export function loadColumnOrder(sheetId: string): string[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const stored = localStorage.getItem(STORAGE_KEYS.columnOrder(sheetId));
+    return stored ? JSON.parse(stored) : [];
+  } catch (error) {
+    console.error('Failed to load column order from localStorage:', error);
+    return [];
+  }
+}
+
+/**
  * Clear all stored data for a specific sheet
  */
 export function clearSheetStorage(sheetId: string): void {
@@ -186,6 +213,7 @@ export function clearSheetStorage(sheetId: string): void {
     localStorage.removeItem(STORAGE_KEYS.columnVisibility(sheetId));
     localStorage.removeItem(STORAGE_KEYS.hiddenColumns(sheetId));
     localStorage.removeItem(STORAGE_KEYS.pinnedColumns(sheetId));
+    localStorage.removeItem(STORAGE_KEYS.columnOrder(sheetId));
   } catch (error) {
     console.error('Failed to clear sheet storage:', error);
   }

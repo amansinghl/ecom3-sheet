@@ -17,13 +17,100 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Search, FileDown, Plus, Info, SplitSquareVertical, Eye, EyeOff, Download, FileSpreadsheet, RefreshCw, Sliders, ArrowUpNarrowWide, ArrowDownWideNarrow, Rows3, Upload, Pin, PinOff, X } from 'lucide-react';
+import { Search, FileDown, Plus, Info, SplitSquareVertical, Eye, EyeOff, Download, FileSpreadsheet, RefreshCw, Sliders, ArrowUpNarrowWide, ArrowDownWideNarrow, Rows3, Upload, Pin, PinOff, X, GripVertical } from 'lucide-react';
 import { useSheetStore, RowHeight } from '@/lib/store/sheet-store';
-import { SheetConfig, RowData, UserRole } from '@/types';
+import { SheetConfig, RowData, UserRole, ColumnConfig } from '@/types';
 import { exportToCSV, exportToExcel } from '@/lib/utils/export';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+
+// Sortable column item component
+interface SortableColumnItemProps {
+  column: ColumnConfig;
+  isVisible: boolean;
+  isPinned: boolean;
+  onToggleVisibility: () => void;
+  onTogglePin: () => void;
+}
+
+function SortableColumnItem({ column, isVisible, isPinned, onToggleVisibility, onTogglePin }: SortableColumnItemProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: column.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="flex items-center gap-1.5 py-1.5 px-2 hover:bg-muted rounded-sm cursor-default"
+    >
+      {/* Drag handle */}
+      <button
+        {...attributes}
+        {...listeners}
+        className="p-0.5 rounded hover:bg-accent cursor-grab active:cursor-grabbing touch-none"
+        title="Drag to reorder"
+      >
+        <GripVertical className="h-4 w-4 text-muted-foreground" />
+      </button>
+      
+      {/* Toggle visibility */}
+      <button
+        onClick={onToggleVisibility}
+        className="flex items-center gap-2 flex-1 hover:bg-transparent text-left"
+      >
+        {isVisible ? (
+          <Eye className="h-4 w-4 text-primary shrink-0" />
+        ) : (
+          <EyeOff className="h-4 w-4 text-muted-foreground shrink-0" />
+        )}
+        <span className="flex-1 text-sm truncate">{column.label}</span>
+      </button>
+      
+      {/* Pin toggle */}
+      <button
+        onClick={onTogglePin}
+        className="p-1 rounded hover:bg-accent transition-colors shrink-0"
+        title={isPinned ? 'Unpin column' : 'Pin column'}
+      >
+        {isPinned ? (
+          <PinOff className="h-3.5 w-3.5 text-primary" />
+        ) : (
+          <Pin className="h-3.5 w-3.5 text-muted-foreground" />
+        )}
+      </button>
+    </div>
+  );
+}
 
 export interface ToolbarProps {
   config: SheetConfig;
@@ -65,7 +152,49 @@ export const Toolbar = forwardRef<ToolbarRef, ToolbarProps>(({ config, data, use
     rowHeight,
     setRowHeight,
     toggleColumnPin,
+    columnOrder,
+    setColumnOrder,
   } = useSheetStore();
+
+  // DnD sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 5, // 5px movement before drag starts
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  // Get ordered columns for the dropdown
+  const getOrderedColumns = () => {
+    const orderedCols = columnOrder.length > 0 
+      ? columnOrder
+          .map(id => config.columns.find(c => c.id === id))
+          .filter((col): col is ColumnConfig => col !== undefined)
+      : config.columns;
+    
+    // Add any new columns not in the order
+    const orderedIds = new Set(columnOrder);
+    const newCols = config.columns.filter(c => !orderedIds.has(c.id));
+    
+    return [...orderedCols, ...newCols];
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    
+    if (over && active.id !== over.id) {
+      const orderedCols = getOrderedColumns();
+      const oldIndex = orderedCols.findIndex(col => col.id === active.id);
+      const newIndex = orderedCols.findIndex(col => col.id === over.id);
+      
+      const newOrder = arrayMove(orderedCols.map(c => c.id), oldIndex, newIndex);
+      setColumnOrder(newOrder);
+    }
+  };
 
   const canEdit = config.permissions?.[userRole]?.canEdit ?? false;
   const canExport = config.permissions?.[userRole]?.canExport ?? false;
@@ -194,57 +323,42 @@ export const Toolbar = forwardRef<ToolbarRef, ToolbarProps>(({ config, data, use
           <DropdownMenuTrigger asChild>
             <Button variant="outline" size="sm" className="h-7 shrink-0 text-xs px-2">
               <Eye className="h-3.5 w-3.5 sm:mr-1.5" />
-              {/* <span className="hidden sm:inline">Columns</span> */}
               <Badge variant="secondary" className="ml-1 sm:ml-1.5 h-4 px-1 text-[9px]">
                 {visibleColumnsCount}
               </Badge>
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-56 max-h-[400px] overflow-y-auto">
-            <div className="px-2 py-1.5 text-sm font-semibold">Toggle columns</div>
+          <DropdownMenuContent align="start" className="w-64 max-h-[400px] overflow-hidden">
+            <div className="px-2 py-1.5 text-sm font-semibold flex items-center gap-2">
+              <GripVertical className="h-3.5 w-3.5 text-muted-foreground" />
+              Drag to reorder columns
+            </div>
             <DropdownMenuSeparator />
-            {config.columns.map((col) => {
-              const isVisible = columnVisibility[col.id] !== false;
-              const isPinned = viewState.pinnedColumns.includes(col.id);
-              return (
-                <DropdownMenuItem
-                  key={col.id}
-                  className="flex items-center gap-2 cursor-pointer"
-                  onSelect={(e) => {
-                    e.preventDefault();
-                  }}
+            <ScrollArea className="h-[320px]">
+              <div className="p-1">
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={closestCenter}
+                  onDragEnd={handleDragEnd}
                 >
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      toggleColumnVisibility(col.id);
-                    }}
-                    className="flex items-center gap-2 flex-1 hover:bg-transparent"
+                  <SortableContext
+                    items={getOrderedColumns().map(c => c.id)}
+                    strategy={verticalListSortingStrategy}
                   >
-                    {isVisible ? (
-                      <Eye className="h-4 w-4 text-primary" />
-                    ) : (
-                      <EyeOff className="h-4 w-4 text-muted-foreground" />
-                    )}
-                    <span className="flex-1 text-left">{col.label}</span>
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      toggleColumnPin(col.id);
-                    }}
-                    className="p-1 rounded hover:bg-muted transition-colors"
-                    title={isPinned ? 'Unpin column' : 'Pin column'}
-                  >
-                    {isPinned ? (
-                      <PinOff className="h-3.5 w-3.5 text-primary" />
-                    ) : (
-                      <Pin className="h-3.5 w-3.5 text-muted-foreground" />
-                    )}
-                  </button>
-                </DropdownMenuItem>
-              );
-            })}
+                    {getOrderedColumns().map((col) => (
+                      <SortableColumnItem
+                        key={col.id}
+                        column={col}
+                        isVisible={columnVisibility[col.id] !== false}
+                        isPinned={viewState.pinnedColumns.includes(col.id)}
+                        onToggleVisibility={() => toggleColumnVisibility(col.id)}
+                        onTogglePin={() => toggleColumnPin(col.id)}
+                      />
+                    ))}
+                  </SortableContext>
+                </DndContext>
+              </div>
+            </ScrollArea>
           </DropdownMenuContent>
         </DropdownMenu>
 
