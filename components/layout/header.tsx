@@ -60,7 +60,7 @@ export function Header() {
 
   // Calculate days since December 19, 2024
   const getDaysSinceLaunch = () => {
-    const launchDate = new Date('2024-12-19');
+    const launchDate = new Date('2025-12-19');
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     launchDate.setHours(0, 0, 0, 0);
