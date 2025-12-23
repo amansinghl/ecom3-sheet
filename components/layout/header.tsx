@@ -83,7 +83,7 @@ export function Header() {
             </span>
             <span className="text-muted-foreground">•</span>
             <span className="text-xs text-muted-foreground">
-              It's been {daysSinceLaunch} {daysSinceLaunch === 1 ? 'day' : 'days'} since launch (Dec 19, 2024)
+              It's been {daysSinceLaunch} {daysSinceLaunch === 1 ? 'day' : 'days'} since launch (Dec 19, 2025)
             </span>
           </div>
         </Marquee>
