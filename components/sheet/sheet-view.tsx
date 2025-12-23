@@ -105,10 +105,20 @@ export function SheetView({ config, userRole }: SheetViewProps) {
   // Update data when API data changes
   useEffect(() => {
     if (apiData) {
-      setData(apiData);
+      // Map the API response id to escalation_id for escalations sheet
+      const processedData = apiData.map((row: RowData) => {
+        if (config.id === 'escalations' && row.id !== undefined) {
+          return {
+            ...row,
+            escalation_id: row.id, // Map id to escalation_id for display
+          };
+        }
+        return row;
+      });
+      setData(processedData);
       setLocalError(null);
     }
-  }, [apiData]);
+  }, [apiData, config.id]);
 
   // Handle API errors
   useEffect(() => {
@@ -214,8 +224,79 @@ export function SheetView({ config, userRole }: SheetViewProps) {
       return emptyRow;
     }).filter(Boolean); // Remove null entries
 
+    // Identify and mark duplicate rows based on shipment_no + manual_case combination
+    // Only for escalations sheet and only in "Open Escalations" view
+    if (config.id === 'escalations') {
+      // Check if we're in the "Open Escalations" view (is_closed === 0)
+      const isOpenEscalationsView = activeViewId === 'open' || 
+        (viewState.columnFilters['is_closed']?.condition?.operator === 'equals' && 
+         viewState.columnFilters['is_closed']?.condition?.value === 0);
+      
+      // Only process duplicates if in Open Escalations view
+      if (isOpenEscalationsView) {
+        // Group rows by shipment_no + manual_case combination
+        const duplicateMap = new Map<string, RowData[]>();
+        
+        result.forEach((row) => {
+          const idString = String(row.id);
+          // Skip temporary and empty rows
+          if (idString.startsWith('row-') || idString.startsWith('empty-')) return;
+          
+          const shipmentNo = row.shipment_no;
+          const manualCase = row.manual_case;
+          
+          // Skip rows with empty/null/undefined manual_case - duplicates only apply when manual_case has a value
+          if (!manualCase || manualCase === '' || manualCase === null || manualCase === undefined) {
+            return;
+          }
+          
+          // Create a key from shipment_no and manual_case
+          const key = `${shipmentNo || ''}_${manualCase}`;
+          
+          if (!duplicateMap.has(key)) {
+            duplicateMap.set(key, []);
+          }
+          duplicateMap.get(key)!.push(row);
+        });
+        
+        // Process duplicates: keep lowest id, mark others
+        duplicateMap.forEach((rows) => {
+          if (rows.length > 1) {
+            // Sort by id (convert to number if possible, otherwise string comparison)
+            rows.sort((a, b) => {
+              const idA = typeof a.id === 'number' ? a.id : parseInt(String(a.id), 10);
+              const idB = typeof b.id === 'number' ? b.id : parseInt(String(b.id), 10);
+              
+              // If both are valid numbers, compare numerically
+              if (!isNaN(idA) && !isNaN(idB)) {
+                return idA - idB;
+              }
+              // Otherwise compare as strings
+              return String(a.id).localeCompare(String(b.id));
+            });
+            
+            // Keep the first one (lowest id) normal, mark others as duplicates
+            for (let i = 1; i < rows.length; i++) {
+              rows[i].duplicate_awb = 'Duplicate Entry, will be deleted in 15 minutes';
+              rows[i]._isDuplicate = true; // Flag for styling
+            }
+          }
+        });
+      } else {
+        // Clear duplicate flags when not in Open Escalations view
+        result.forEach((row) => {
+          if (row._isDuplicate) {
+            delete row._isDuplicate;
+            if (row.duplicate_awb === 'Duplicate Entry, will be deleted in 15 minutes') {
+              row.duplicate_awb = null;
+            }
+          }
+        });
+      }
+    }
+
     return [...result, ...emptyRows];
-  }, [data, viewState.columnFilters, config.columns, config.id, globalSearch]);
+  }, [data, viewState.columnFilters, config.columns, config.id, globalSearch, activeViewId]);
 
   const visibleRowCount = useMemo(() => {
     return filteredData.filter((row) => !String(row.id).startsWith('empty-')).length;
@@ -1199,9 +1280,12 @@ export function SheetView({ config, userRole }: SheetViewProps) {
       const manualCaseIndex = headers.findIndex((h: string) => 
         h === 'manual_case' || h === 'manual case' || h === 'manualcase'
       );
-      const followupRemarksIndex = headers.findIndex((h: string) => 
-        h === 'followup_remarks' || h === 'followup remarks' || h === 'followupremarks'
+      const notesIndex = headers.findIndex((h: string) => 
+        h === 'notes' || h === 'Notes'
       );
+      const sourceOfComplaintIndex = headers.findIndex((h: string) => 
+        h === 'source_of_complaint' || h === 'source of complaint' || h === 'Source of Complaint'
+      )
 
       if (shipmentNoIndex === -1) {
         toast.error('Excel file must have a "shipment_no" column', { id: 'bulk-upload' });
@@ -1212,7 +1296,8 @@ export function SheetView({ config, userRole }: SheetViewProps) {
       const uploadData: Array<{
         shipment_no: string | number;
         manual_case?: string | null;
-        followup_remarks?: string | null;
+        notes?: string | null;
+        source_of_complaint?: string | null;
       }> = [];
 
       // Process data rows (skip header row)
@@ -1231,8 +1316,12 @@ export function SheetView({ config, userRole }: SheetViewProps) {
           record.manual_case = String(row[manualCaseIndex]).trim() || null;
         }
 
-        if (followupRemarksIndex !== -1 && row[followupRemarksIndex]) {
-          record.followup_remarks = String(row[followupRemarksIndex]).trim() || null;
+        if (notesIndex !== -1 && row[notesIndex]) {
+          record.notes = String(row[notesIndex]).trim() || null;
+        }
+
+        if (sourceOfComplaintIndex !== -1 && row[sourceOfComplaintIndex]) {
+          record.source_of_complaint = String(row[sourceOfComplaintIndex]).trim() || null;
         }
 
         uploadData.push(record);

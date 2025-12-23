@@ -941,6 +941,7 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
                 const row = rows[virtualRow.index];
                 const idx = virtualRow.index;
                 const isEmptyRow = row.original._isEmpty === true;
+                const isDuplicate = row.original._isDuplicate === true;
                 
                 return (
                   <tr
@@ -961,15 +962,17 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
                     }}
                     className={cn(
                       'border-b border-border group/row',
-                      // Base zebra striping - pure white for even, light gray for odd
-                      idx % 2 === 0 ? 'bg-white' : 'bg-gray-50',
-                      // Hover states with zebra striping maintained
-                      !isEmptyRow && !selectedRows.has(row.id) && idx % 2 === 0 && 'hover:bg-gray-100',
-                      !isEmptyRow && !selectedRows.has(row.id) && idx % 2 !== 0 && 'hover:bg-gray-100',
+                      // Duplicate row styling - red background (highest priority)
+                      isDuplicate && !isEmptyRow && 'bg-red-200 hover:bg-red-300',
+                      // Base zebra striping - pure white for even, light gray for odd (only if not duplicate)
+                      !isDuplicate && idx % 2 === 0 ? 'bg-white' : !isDuplicate ? 'bg-gray-50' : '',
+                      // Hover states with zebra striping maintained (only if not duplicate)
+                      !isEmptyRow && !selectedRows.has(row.id) && !isDuplicate && idx % 2 === 0 && 'hover:bg-gray-100',
+                      !isEmptyRow && !selectedRows.has(row.id) && !isDuplicate && idx % 2 !== 0 && 'hover:bg-gray-100',
                       // Empty row styling
                       isEmptyRow && 'bg-gray-50',
-                      // Selected row styling
-                      selectedRows.has(row.id) && !isEmptyRow && 'bg-blue-50 hover:bg-blue-100',
+                      // Selected row styling (only if not duplicate)
+                      selectedRows.has(row.id) && !isEmptyRow && !isDuplicate && 'bg-blue-50 hover:bg-blue-100',
                       rowHeightClasses[rowHeight]
                     )}
                   >
@@ -1003,6 +1006,13 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
                       // Determine background color for pinned cells
                       const getBgColor = () => {
                         if (!isPinned) return undefined;
+                        
+                        const isDuplicate = row.original._isDuplicate === true;
+                        
+                        // Duplicate row styling takes highest precedence
+                        if (isDuplicate && !isEmptyRow) {
+                          return '#fecaca'; // red-200
+                        }
                         
                         // Cell selection takes precedence
                         if (cellIsSelected && isDataCell) {
@@ -1044,6 +1054,10 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
                           ...(isPinned ? { 
                             left: `${stickyLeft}px`,
                             backgroundColor: getBgColor()
+                          } : {}),
+                          // Apply red background for duplicate rows (non-pinned cells)
+                          ...(!isPinned && row.original._isDuplicate === true && !isEmptyRow ? {
+                            backgroundColor: '#fecaca' // red-200
                           } : {})
                         }}
                       >

@@ -94,8 +94,8 @@ export function BulkUploadModal({ isOpen, onClose, onUpload }: BulkUploadModalPr
   const handleDownloadSample = useCallback(() => {
     // Download sample file from public folder
     const link = document.createElement('a');
-    link.href = '/sample-escalation-upload.xlsx';
-    link.download = 'sample-escalation-upload.xlsx';
+    link.href = '/Kalesh-Upload-22_Dec.xlsx';
+    link.download = 'Kalesh-Upload-22_Dec.xlsx';
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
