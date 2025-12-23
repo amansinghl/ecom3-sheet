@@ -1,5 +1,6 @@
 'use client';
 
+import { memo } from 'react';
 import { ColumnConfig } from '@/types';
 import { RowHeight } from '@/lib/store/sheet-store';
 import { TextCell } from './text-cell';
@@ -28,7 +29,34 @@ interface CellRendererProps {
   onCancel: () => void;
 }
 
-export function CellRenderer({
+// Custom comparison function to prevent unnecessary re-renders
+function arePropsEqual(prev: CellRendererProps, next: CellRendererProps): boolean {
+  // Always re-render if editing state changes
+  if (prev.isEditing !== next.isEditing) return false;
+  
+  // Re-render if value changes
+  if (prev.value !== next.value) return false;
+  
+  // Re-render if edit permission changes
+  if (prev.canEdit !== next.canEdit) return false;
+  
+  // Re-render if row height changes
+  if (prev.rowHeight !== next.rowHeight) return false;
+  
+  // Re-render if global search changes (only when not editing)
+  if (!next.isEditing && prev.globalSearch !== next.globalSearch) return false;
+  
+  // Column config changes rarely, check by id
+  if (prev.columnConfig.id !== next.columnConfig.id) return false;
+  
+  // For highlights cell, check rowData
+  if (next.columnConfig.type === 'highlights' && prev.rowData !== next.rowData) return false;
+  
+  // Don't check callback references - they're stable from parent
+  return true;
+}
+
+export const CellRenderer = memo(function CellRenderer({
   value,
   columnConfig,
   isEditing,
@@ -82,4 +110,4 @@ export function CellRenderer({
     default:
       return <TextCell {...cellProps} />;
   }
-}
+}, arePropsEqual);

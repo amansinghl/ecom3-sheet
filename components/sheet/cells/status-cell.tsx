@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, memo } from 'react';
 import { createPortal } from 'react-dom';
 import { ColumnConfig, StatusOption } from '@/types';
 import { RowHeight } from '@/lib/store/sheet-store';
@@ -22,7 +22,7 @@ interface StatusCellProps {
   onCancel: () => void;
 }
 
-export function StatusCell({
+export const StatusCell = memo(function StatusCell({
   value,
   columnConfig,
   isEditing,
@@ -324,4 +324,4 @@ export function StatusCell({
       )}
     </div>
   );
-}
+});

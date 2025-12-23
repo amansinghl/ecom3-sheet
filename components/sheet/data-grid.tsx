@@ -142,6 +142,18 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
   const tableContainerRef = scrollContainerRef || internalTableContainerRef;
   const prevEditingCellRef = useRef(editingCell);
   
+  // PERFORMANCE: Store frequently changing values in refs to avoid column recreation
+  const editingCellRef = useRef(editingCell);
+  const setEditingCellRef = useRef(setEditingCell);
+  const onCellUpdateRef = useRef(onCellUpdate);
+  const globalSearchRef = useRef(globalSearch);
+  
+  // Keep refs up to date
+  editingCellRef.current = editingCell;
+  setEditingCellRef.current = setEditingCell;
+  onCellUpdateRef.current = onCellUpdate;
+  globalSearchRef.current = globalSearch;
+  
   // Initialize column visibility (empty on server to avoid hydration mismatch)
   const [internalColumnVisibility, setInternalColumnVisibility] = useState<Record<string, boolean>>({});
   
@@ -352,8 +364,10 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
           );
         },
         cell: ({ row, column }) => {
+          // PERFORMANCE: Read from refs to avoid recreating columns on state change
+          const currentEditingCell = editingCellRef.current;
           const isEditing =
-            editingCell?.rowId === row.id && editingCell?.columnId === column.id;
+            currentEditingCell?.rowId === row.id && currentEditingCell?.columnId === column.id;
           const value = row.getValue(column.id);
           
           // Check if this is shipment_no column and if row is existing (numeric ID)
@@ -375,13 +389,13 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
               canEdit={canEditThisCell}
               rowHeight={rowHeight}
               rowData={row.original}
-              globalSearch={globalSearch}
-              onEdit={() => setEditingCell({ rowId: row.id, columnId: column.id })}
+              globalSearch={globalSearchRef.current}
+              onEdit={() => setEditingCellRef.current({ rowId: row.id, columnId: column.id })}
               onSave={(newValue) => {
-                onCellUpdate(row.id, column.id, newValue);
-                setEditingCell(null);
+                onCellUpdateRef.current(row.id, column.id, newValue);
+                setEditingCellRef.current(null);
               }}
-              onCancel={() => setEditingCell(null)}
+              onCancel={() => setEditingCellRef.current(null)}
             />
           );
         },
@@ -394,7 +408,9 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
     });
 
     return cols;
-  }, [orderedColumns, canEdit, editingCell, setEditingCell, onCellUpdate, columnWidths, viewState.columnFilters, viewState.pinnedColumns, setColumnFilter, toggleColumnPin, rowHeight, openFilterPopover, globalSearch]);
+  // PERFORMANCE: Removed editingCell, setEditingCell, onCellUpdate, globalSearch from deps
+  // They're now read from refs to prevent column recreation on every state change
+  }, [orderedColumns, canEdit, columnWidths, viewState.columnFilters, viewState.pinnedColumns, setColumnFilter, toggleColumnPin, rowHeight, openFilterPopover, data, config.id]);
 
   const table = useReactTable({
     data,
@@ -488,7 +504,7 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
         default: return 24;
       }
     },
-    overscan: 100, // Increased for smoother fast scrolling (render 50 extra rows above/below viewport)
+    overscan: 5, // Keep low for performance - render only 5 extra rows above/below viewport
   });
 
   // Scroll to editing cell when it changes (only if not visible)

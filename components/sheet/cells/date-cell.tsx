@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, memo } from 'react';
 import { format } from 'date-fns';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
@@ -20,7 +20,7 @@ interface DateCellProps {
   onCancel: () => void;
 }
 
-export function DateCell({
+export const DateCell = memo(function DateCell({
   value,
   columnConfig,
   isEditing,
@@ -103,4 +103,4 @@ export function DateCell({
       {highlightedValue}
     </div>
   );
-}
+});

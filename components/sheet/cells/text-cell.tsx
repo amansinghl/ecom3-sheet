@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, memo } from 'react';
 import { ColumnConfig } from '@/types';
 import { RowHeight } from '@/lib/store/sheet-store';
 import { Input } from '@/components/ui/input';
@@ -19,7 +19,7 @@ interface TextCellProps {
   onCancel: () => void;
 }
 
-export function TextCell({
+export const TextCell = memo(function TextCell({
   value,
   isEditing,
   canEdit,
@@ -108,4 +108,4 @@ export function TextCell({
       {highlightedValue}
     </div>
   );
-}
+});

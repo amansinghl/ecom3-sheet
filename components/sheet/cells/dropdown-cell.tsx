@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, memo } from 'react';
 import { createPortal } from 'react-dom';
 import { ColumnConfig } from '@/types';
 import { RowHeight } from '@/lib/store/sheet-store';
@@ -20,7 +20,7 @@ interface DropdownCellProps {
   onCancel: () => void;
 }
 
-export function DropdownCell({
+export const DropdownCell = memo(function DropdownCell({
   value,
   columnConfig,
   isEditing,
@@ -381,4 +381,4 @@ export function DropdownCell({
       {highlightedLabel}
     </div>
   );
-}
+});
