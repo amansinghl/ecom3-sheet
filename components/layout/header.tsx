@@ -58,6 +58,19 @@ export function Header() {
   const RoleIcon = roleConfig?.icon;
   const avatarPath = user ? getRandomAvatar(user.email || user.name) : null;
 
+  // Calculate days since December 19, 2024
+  const getDaysSinceLaunch = () => {
+    const launchDate = new Date('2024-12-19');
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    launchDate.setHours(0, 0, 0, 0);
+    const diffTime = today.getTime() - launchDate.getTime();
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays;
+  };
+
+  const daysSinceLaunch = getDaysSinceLaunch();
+
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/80 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60">
       {/* Marquee Announcement */}
@@ -67,6 +80,10 @@ export function Header() {
             <PartyPopper className="h-4 w-4 text-primary flex-shrink-0" />
             <span>
               🎉 Celebrating Launch!🚀 Rahul ji is treating everyone to a Pizza Party! 🍕 -- Requested by Tech Team. 
+            </span>
+            <span className="text-muted-foreground">•</span>
+            <span className="text-xs text-muted-foreground">
+              It's been {daysSinceLaunch} {daysSinceLaunch === 1 ? 'day' : 'days'} since launch (Dec 19, 2024)
             </span>
           </div>
         </Marquee>
