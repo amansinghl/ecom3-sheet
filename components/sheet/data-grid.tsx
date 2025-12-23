@@ -720,6 +720,78 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
     }
   }, [focusedCell, selectionRange, selectedCells, rows, orderedColumns]);
 
+  // Paste from clipboard to focused/selected cells
+  const handlePaste = useCallback(async () => {
+    if (!focusedCell) return;
+    
+    try {
+      const clipboardText = await navigator.clipboard.readText();
+      if (!clipboardText) return;
+      
+      // Parse clipboard data (tab-separated columns, newline-separated rows)
+      const clipboardRows = clipboardText.split('\n').map(row => row.split('\t'));
+      
+      if (selectionRange) {
+        // Paste into selection range
+        const minRow = Math.min(selectionRange.start.rowIndex, selectionRange.end.rowIndex);
+        const maxRow = Math.max(selectionRange.start.rowIndex, selectionRange.end.rowIndex);
+        const minCol = Math.min(selectionRange.start.colIndex, selectionRange.end.colIndex);
+        const maxCol = Math.max(selectionRange.start.colIndex, selectionRange.end.colIndex);
+        
+        for (let r = minRow; r <= maxRow; r++) {
+          const row = rows[r];
+          if (!row) continue;
+          
+          const clipboardRowIndex = (r - minRow) % clipboardRows.length;
+          const clipboardRow = clipboardRows[clipboardRowIndex];
+          
+          for (let c = minCol; c <= maxCol; c++) {
+            const columnId = orderedColumns[c]?.id;
+            const colConfig = config.columns.find(col => col.id === columnId);
+            
+            // Skip if column is not editable
+            if (!columnId || !colConfig || !(colConfig.editable ?? true)) continue;
+            
+            const clipboardColIndex = (c - minCol) % clipboardRow.length;
+            const value = clipboardRow[clipboardColIndex];
+            
+            if (value !== undefined) {
+              onCellUpdate(row.id, columnId, value);
+            }
+          }
+        }
+      } else {
+        // Paste starting from focused cell
+        const startRow = focusedCell.rowIndex;
+        const startCol = focusedCell.colIndex;
+        
+        for (let r = 0; r < clipboardRows.length; r++) {
+          const rowIndex = startRow + r;
+          const row = rows[rowIndex];
+          if (!row) continue;
+          
+          const clipboardRow = clipboardRows[r];
+          
+          for (let c = 0; c < clipboardRow.length; c++) {
+            const colIndex = startCol + c;
+            const columnId = orderedColumns[colIndex]?.id;
+            const colConfig = config.columns.find(col => col.id === columnId);
+            
+            // Skip if column is not editable
+            if (!columnId || !colConfig || !(colConfig.editable ?? true)) continue;
+            
+            const value = clipboardRow[c];
+            if (value !== undefined) {
+              onCellUpdate(row.id, columnId, value);
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Failed to paste from clipboard:', err);
+    }
+  }, [focusedCell, selectionRange, rows, orderedColumns, config.columns, onCellUpdate]);
+
   // Track when rapid navigation ends
   const rapidNavTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -754,16 +826,24 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
       return;
     }
     
-    // Don't handle navigation/copy when editing a cell
+    // Don't handle navigation/copy/paste when editing a cell
     if (editingCell) return;
     
     const isArrowKey = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key);
     const isCopy = (e.ctrlKey || e.metaKey) && e.key === 'c';
+    const isPaste = (e.ctrlKey || e.metaKey) && e.key === 'v';
     
     // Handle copy (Ctrl+C / Cmd+C)
     if (isCopy) {
       e.preventDefault();
       handleCopy();
+      return;
+    }
+    
+    // Handle paste (Ctrl+V / Cmd+V)
+    if (isPaste) {
+      e.preventDefault();
+      handlePaste();
       return;
     }
     
@@ -805,7 +885,7 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
     if (e.key === 'Escape') {
       clearCellSelection();
     }
-  }, [editingCell, focusedCell, setFocusedCell, moveFocus, rows, orderedColumns, setEditingCell, clearCellSelection, handleCopy, finishRapidNav, onUndo, onRedo]);
+  }, [editingCell, focusedCell, setFocusedCell, moveFocus, rows, orderedColumns, setEditingCell, clearCellSelection, handleCopy, handlePaste, finishRapidNav, onUndo, onRedo]);
 
   // Track if we have multi-selected cells (avoid recalculating on every render)
   const hasSelectedCells = selectedCells.size > 0;
