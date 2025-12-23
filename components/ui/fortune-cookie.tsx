@@ -21,6 +21,11 @@ const fortunes = [
   "Data filter karo, life easy ho jayegi!",
   "Aaj ka target complete? Shabaash!",
   "Agar data organize nahi hai, toh tension mat lo - Arbaz ji fix kar denge!",
+
+  // hindi fortunes
+  "काम उतना ही करो कि पगार ज्यादा लगे",
+  "बाहुबलि रामाधीर सिंह: 'जब तक इस देश में सिनेमा है,,,,, '",
+  "रक्तचाप बढ़ाना है तो अनस से बात कर लो",
 ];
 
 const getRandomFortune = () => {
