@@ -587,6 +587,19 @@ export const Toolbar = forwardRef<ToolbarRef, ToolbarProps>(({ config, data, use
                     </p>
                   </div>
                 </div>
+
+                {/* Rule 20 */}
+                <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-2">
+                  <h4 className="font-medium text-foreground">21. Revoke RTO</h4>
+                  <div className="space-y-1 pl-4">
+                    <p className="text-muted-foreground">
+                      <span className="font-medium text-green-600 dark:text-green-400">Positive Closure:</span> Tracking = <code className="px-1.5 py-0.5 rounded bg-background border text-xs">1900</code>
+                    </p>
+                    <p className="text-muted-foreground">
+                      <span className="font-medium text-orange-600 dark:text-orange-400">Negative Closure:</span> Tracking = <code className="px-1.5 py-0.5 rounded bg-background border text-xs">2030</code>
+                    </p>
+                  </div>
+                </div>
               </div>
 
               {/* Automation Details */}

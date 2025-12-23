@@ -23,6 +23,7 @@ const manualCaseOptions: StatusOption[] = [
   { label: 'COD to Prepaid Change', value: 'COD to Prepaid Change', color: '#8b5cf6' },
   { label: 'Wrong RTO', value: 'Wrong RTO', color: '#f43f5e' },
   { label: 'Misrouted Shipment', value: 'Misrouted Shipment', color: '#fbbf24' },
+  { label: 'Revoke RTO', value: 'Revoke RTO', color: '#f97167' },
 ];
 
 // Manual Ticket Status Options
@@ -136,6 +137,14 @@ export const escalationSheetConfig: SheetConfig = {
       label: 'Created At',
       type: 'datetime',
       width: 150,
+      required: false,
+      editable: false,
+    },
+    {
+      id: 'escalation_id',
+      label: 'Escalation ID',
+      type: 'number',
+      width: 120,
       required: false,
       editable: false,
     },
