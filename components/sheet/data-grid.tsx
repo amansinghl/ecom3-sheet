@@ -66,6 +66,7 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
     setGridDimensions,
     clearCellSelection,
     moveFocus,
+    moveToExtreme,
     fillDragState,
     startFillDrag,
     updateFillDrag,
@@ -630,6 +631,8 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
   const pendingScrollRef = useRef<{ rowIndex: number; colIndex: number } | null>(null);
   // Track if focus came from a click (skip scroll effect for clicks)
   const focusFromClickRef = useRef(false);
+  // Track if we already handled scroll (for CTRL+Arrow jumps)
+  const scrollHandledRef = useRef(false);
 
   // Fast scroll using virtualizer - optimized for speed
   const scrollToCell = useCallback((rowIndex: number, colIndex: number, immediate: boolean) => {
@@ -686,6 +689,12 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
     // Skip scroll if focus came from a click (user already sees the cell)
     if (focusFromClickRef.current) {
       focusFromClickRef.current = false;
+      return;
+    }
+    
+    // Skip scroll if we already handled it (CTRL+Arrow jumps)
+    if (scrollHandledRef.current) {
+      scrollHandledRef.current = false;
       return;
     }
     
@@ -930,7 +939,58 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
       }
       
       const direction = e.key.replace('Arrow', '').toLowerCase() as 'up' | 'down' | 'left' | 'right';
-      moveFocus(direction, e.shiftKey);
+      
+      // CTRL+Arrow: Jump to extreme cell (like Google Sheets)
+      if (e.ctrlKey || e.metaKey) {
+        if (direction === 'up' || direction === 'down') {
+          // For up/down, find the last row with data (not empty)
+          const lastFilledRowIndex = rows.findLastIndex(row => row.original._isEmpty !== true);
+          const firstFilledRowIndex = rows.findIndex(row => row.original._isEmpty !== true);
+          
+          if (lastFilledRowIndex === -1) {
+            // All rows are empty, just go to edge
+            moveToExtreme(direction, e.shiftKey);
+          } else {
+            // Jump to first or last filled row
+            const targetRow = direction === 'up' ? firstFilledRowIndex : lastFilledRowIndex;
+            const newFocusedCell = { rowIndex: targetRow, colIndex: focusedCell.colIndex };
+            
+            if (e.shiftKey) {
+              // Extend selection
+              setSelectionRange({
+                start: selectionRange?.start || focusedCell,
+                end: newFocusedCell,
+              });
+            } else {
+              setSelectionRange(null);
+            }
+            // Mark that we're handling scroll ourselves
+            scrollHandledRef.current = true;
+            setFocusedCell(newFocusedCell);
+            
+            // Scroll with proper alignment to ensure cell is fully visible
+            rowVirtualizer.scrollToIndex(targetRow, { 
+              align: direction === 'up' ? 'start' : 'end',
+              behavior: 'auto'
+            });
+            
+            // Add extra scroll padding for the last row to be fully visible
+            if (direction === 'down' && tableContainerRef.current) {
+              requestAnimationFrame(() => {
+                if (tableContainerRef.current) {
+                  // Scroll down a bit more to ensure last row is fully visible
+                  tableContainerRef.current.scrollTop += 80;
+                }
+              });
+            }
+          }
+        } else {
+          // Left/right: jump to extreme column
+          moveToExtreme(direction, e.shiftKey);
+        }
+      } else {
+        moveFocus(direction, e.shiftKey);
+      }
     }
     
     // Enter key to start editing
@@ -947,7 +1007,7 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
     if (e.key === 'Escape') {
       clearCellSelection();
     }
-  }, [editingCell, focusedCell, setFocusedCell, moveFocus, rows, orderedColumns, setEditingCell, clearCellSelection, handleCopy, handlePaste, finishRapidNav, onUndo, onRedo]);
+  }, [editingCell, focusedCell, selectionRange, setFocusedCell, setSelectionRange, moveFocus, moveToExtreme, rows, rowVirtualizer, orderedColumns, setEditingCell, clearCellSelection, handleCopy, handlePaste, finishRapidNav, onUndo, onRedo]);
 
   // Track if we have multi-selected cells (avoid recalculating on every render)
   const hasSelectedCells = selectedCells.size > 0;

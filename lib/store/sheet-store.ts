@@ -103,6 +103,7 @@ interface SheetStore {
   setGridDimensions: (dimensions: { rows: number; cols: number }) => void;
   clearCellSelection: () => void;
   moveFocus: (direction: NavigationDirection, extend: boolean) => void;
+  moveToExtreme: (direction: NavigationDirection, extend: boolean) => void;
 
   // Fill drag state (Excel-like drag to fill)
   fillDragState: { sourceCell: CellPosition; columnId: string; targetEndRow: number } | null;
@@ -386,6 +387,54 @@ export const useSheetStore = create<SheetStore>((set, get) => ({
     
     if (extend) {
       // Extend selection from the anchor point (start of selection or original focused cell)
+      const anchor = selectionRange?.start || focusedCell;
+      set({
+        focusedCell: newFocusedCell,
+        selectionRange: {
+          start: anchor,
+          end: newFocusedCell,
+        },
+      });
+    } else {
+      // Move focus without selection
+      set({
+        focusedCell: newFocusedCell,
+        selectionRange: null,
+      });
+    }
+  },
+
+  // CTRL+Arrow: Jump to extreme cell in direction (like Google Sheets)
+  moveToExtreme: (direction, extend) => {
+    const { focusedCell, selectionRange, gridDimensions } = get();
+    
+    if (!focusedCell) return;
+    
+    const { colIndex } = focusedCell;
+    const { rows, cols } = gridDimensions;
+    
+    let newRowIndex = focusedCell.rowIndex;
+    let newColIndex = colIndex;
+    
+    switch (direction) {
+      case 'up':
+        newRowIndex = 0; // Jump to first row
+        break;
+      case 'down':
+        newRowIndex = rows - 1; // Jump to last row
+        break;
+      case 'left':
+        newColIndex = 0; // Jump to first column
+        break;
+      case 'right':
+        newColIndex = cols - 1; // Jump to last column
+        break;
+    }
+    
+    const newFocusedCell = { rowIndex: newRowIndex, colIndex: newColIndex };
+    
+    if (extend) {
+      // Extend selection from the anchor point (CTRL+SHIFT+Arrow)
       const anchor = selectionRange?.start || focusedCell;
       set({
         focusedCell: newFocusedCell,
