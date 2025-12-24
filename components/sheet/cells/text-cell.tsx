@@ -14,6 +14,7 @@ interface TextCellProps {
   canEdit: boolean;
   rowHeight: RowHeight;
   globalSearch?: string;
+  initialValue?: string; // For direct typing - replaces value when entering edit mode
   onEdit: () => void;
   onSave: (value: any) => void;
   onCancel: () => void;
@@ -25,6 +26,7 @@ export const TextCell = memo(function TextCell({
   canEdit,
   rowHeight,
   globalSearch = '',
+  initialValue,
   onEdit,
   onSave,
   onCancel,
@@ -42,16 +44,23 @@ export const TextCell = memo(function TextCell({
   useEffect(() => {
     // Only sync when transitioning from not editing to editing
     if (isEditing && !prevIsEditingRef.current) {
-      const initialValue = value || '';
-      setEditValue(initialValue);
-      currentValueRef.current = initialValue;
+      // If initialValue is provided (user typed directly), use it instead of current value
+      const startValue = initialValue !== undefined ? initialValue : (value || '');
+      setEditValue(startValue);
+      currentValueRef.current = startValue;
       if (inputRef.current) {
         inputRef.current.focus();
-        inputRef.current.select();
+        // If starting with initialValue, put cursor at the end instead of selecting all
+        if (initialValue !== undefined) {
+          const len = startValue.length;
+          inputRef.current.setSelectionRange(len, len);
+        } else {
+          inputRef.current.select();
+        }
       }
     }
     prevIsEditingRef.current = isEditing;
-  }, [isEditing, value]);
+  }, [isEditing, value, initialValue]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {

@@ -85,8 +85,8 @@ interface SheetStore {
   clearSelection: () => void;
 
   // Editing state
-  editingCell: { rowId: string; columnId: string } | null;
-  setEditingCell: (cell: { rowId: string; columnId: string } | null) => void;
+  editingCell: { rowId: string; columnId: string; initialValue?: string } | null;
+  setEditingCell: (cell: { rowId: string; columnId: string; initialValue?: string } | null) => void;
 
   // Filter panel visibility
   showFilterPanel: boolean;

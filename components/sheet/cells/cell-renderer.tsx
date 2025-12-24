@@ -24,6 +24,7 @@ interface CellRendererProps {
   rowHeight: RowHeight;
   rowData?: any; // Full row data for highlights cell
   globalSearch?: string;
+  initialValue?: string; // For direct typing - replaces value when entering edit mode
   onEdit: () => void;
   onSave: (value: any) => void;
   onCancel: () => void;
@@ -46,6 +47,9 @@ function arePropsEqual(prev: CellRendererProps, next: CellRendererProps): boolea
   // Re-render if global search changes (only when not editing)
   if (!next.isEditing && prev.globalSearch !== next.globalSearch) return false;
   
+  // Re-render if initialValue changes (for direct typing feature)
+  if (prev.initialValue !== next.initialValue) return false;
+  
   // Column config changes rarely, check by id
   if (prev.columnConfig.id !== next.columnConfig.id) return false;
   
@@ -64,6 +68,7 @@ export const CellRenderer = memo(function CellRenderer({
   rowHeight,
   rowData,
   globalSearch = '',
+  initialValue,
   onEdit,
   onSave,
   onCancel,
@@ -75,6 +80,7 @@ export const CellRenderer = memo(function CellRenderer({
     canEdit,
     rowHeight,
     globalSearch,
+    initialValue,
     onEdit,
     onSave,
     onCancel,

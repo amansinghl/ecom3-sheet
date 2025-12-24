@@ -13,6 +13,7 @@ interface UrlCellProps {
   canEdit: boolean;
   rowHeight: RowHeight;
   globalSearch?: string;
+  initialValue?: string; // For direct typing - replaces value when entering edit mode
   onEdit: () => void;
   onSave: (value: any) => void;
   onCancel: () => void;
@@ -24,19 +25,34 @@ export function UrlCell({
   canEdit,
   rowHeight,
   globalSearch = '',
+  initialValue,
   onEdit,
   onSave,
   onCancel,
 }: UrlCellProps) {
   const [editValue, setEditValue] = useState(value || '');
   const inputRef = useRef<HTMLInputElement>(null);
+  const prevIsEditingRef = useRef(false);
 
   useEffect(() => {
-    if (isEditing && inputRef.current) {
-      inputRef.current.focus();
-      inputRef.current.select();
+    // Only sync when transitioning from not editing to editing
+    if (isEditing && !prevIsEditingRef.current) {
+      // If initialValue is provided (user typed directly), use it instead of current value
+      const startValue = initialValue !== undefined ? initialValue : (value || '');
+      setEditValue(startValue);
+      if (inputRef.current) {
+        inputRef.current.focus();
+        // If starting with initialValue, put cursor at the end instead of selecting all
+        if (initialValue !== undefined) {
+          const len = startValue.length;
+          inputRef.current.setSelectionRange(len, len);
+        } else {
+          inputRef.current.select();
+        }
+      }
     }
-  }, [isEditing]);
+    prevIsEditingRef.current = isEditing;
+  }, [isEditing, value, initialValue]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {

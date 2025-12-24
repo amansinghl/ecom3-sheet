@@ -435,6 +435,7 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
               rowHeight={rowHeight}
               rowData={row.original}
               globalSearch={globalSearchRef.current}
+              initialValue={isEditing ? currentEditingCell?.initialValue : undefined}
               onEdit={() => setEditingCellRef.current({ rowId: row.id, columnId: column.id })}
               onSave={(newValue) => {
                 onCellUpdateRef.current(row.id, column.id, newValue);
@@ -1021,7 +1022,26 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
     if (e.key === 'Escape') {
       clearCellSelection();
     }
-  }, [editingCell, focusedCell, selectionRange, setFocusedCell, setSelectionRange, moveFocus, moveToExtreme, rows, rowVirtualizer, orderedColumns, setEditingCell, clearCellSelection, handleCopy, handlePaste, finishRapidNav, onUndo, onRedo]);
+    
+    // Direct typing on focused cell - start editing with the typed character
+    // Detect printable characters (single character, not a control key)
+    if (focusedCell && e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      const row = rows[focusedCell.rowIndex];
+      const columnId = orderedColumns[focusedCell.colIndex]?.id;
+      const colConfig = config.columns.find(c => c.id === columnId);
+      
+      // Check if the cell is editable
+      if (row && columnId && colConfig && canEdit && (colConfig.editable ?? true)) {
+        // Don't start typing on checkbox, user, date, dropdown cells - they have special input modes
+        const nonTypableTypes = ['checkbox', 'user', 'date', 'datetime', 'dropdown', 'multiselect', 'status'];
+        if (!nonTypableTypes.includes(colConfig.type)) {
+          e.preventDefault();
+          // Start editing with the typed character as initial value
+          setEditingCell({ rowId: row.id, columnId, initialValue: e.key });
+        }
+      }
+    }
+  }, [editingCell, focusedCell, selectionRange, setFocusedCell, setSelectionRange, moveFocus, moveToExtreme, rows, rowVirtualizer, orderedColumns, setEditingCell, clearCellSelection, handleCopy, handlePaste, finishRapidNav, onUndo, onRedo, config.columns, canEdit]);
 
   // Track if we have multi-selected cells (avoid recalculating on every render)
   const hasSelectedCells = selectedCells.size > 0;

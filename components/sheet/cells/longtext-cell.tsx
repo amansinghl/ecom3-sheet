@@ -16,6 +16,7 @@ interface LongTextCellProps {
   canEdit: boolean;
   rowHeight: RowHeight;
   globalSearch?: string;
+  initialValue?: string; // For direct typing - replaces value when entering edit mode
   onEdit: () => void;
   onSave: (value: any) => void;
   onCancel: () => void;
@@ -28,6 +29,7 @@ export function LongTextCell({
   canEdit,
   rowHeight,
   globalSearch = '',
+  initialValue,
   onEdit,
   onSave,
   onCancel,
@@ -47,16 +49,23 @@ export function LongTextCell({
   useEffect(() => {
     // Only sync when transitioning from not editing to editing
     if (isEditing && !prevIsEditingRef.current) {
-      const initialValue = value || '';
-      setEditValue(initialValue);
-      currentValueRef.current = initialValue;
+      // If initialValue is provided (user typed directly), use it instead of current value
+      const startValue = initialValue !== undefined ? initialValue : (value || '');
+      setEditValue(startValue);
+      currentValueRef.current = startValue;
       if (textareaRef.current) {
         textareaRef.current.focus();
-        textareaRef.current.select();
+        // If starting with initialValue, put cursor at the end instead of selecting all
+        if (initialValue !== undefined) {
+          const len = startValue.length;
+          textareaRef.current.setSelectionRange(len, len);
+        } else {
+          textareaRef.current.select();
+        }
       }
     }
     prevIsEditingRef.current = isEditing;
-  }, [isEditing, value]);
+  }, [isEditing, value, initialValue]);
 
   const handleSave = () => {
     onSave(editValue);
