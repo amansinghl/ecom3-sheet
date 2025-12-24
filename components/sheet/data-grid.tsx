@@ -570,6 +570,12 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
         }
       }
     }
+    
+    // Refocus table container when editing ends (so arrow keys work again)
+    if (prevEditingCellRef.current && !editingCell) {
+      tableContainerRef.current?.focus();
+    }
+    
     prevEditingCellRef.current = editingCell;
   }, [editingCell, groupedData, rowVirtualizer]);
 
