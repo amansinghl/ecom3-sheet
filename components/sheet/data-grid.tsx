@@ -981,12 +981,20 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
             });
             
             // Add extra scroll padding for the last row to be fully visible
+            // Use multiple frames to ensure virtualizer has finished scrolling
             if (direction === 'down' && tableContainerRef.current) {
-              requestAnimationFrame(() => {
+              const addExtraScroll = () => {
                 if (tableContainerRef.current) {
-                  // Scroll down a bit more to ensure last row is fully visible
-                  tableContainerRef.current.scrollTop += 80;
+                  const container = tableContainerRef.current;
+                  const maxScrollTop = container.scrollHeight - container.clientHeight;
+                  // Scroll to near the bottom with extra padding (3 row heights worth)
+                  const extraPadding = 120; // ~3 rows of padding
+                  container.scrollTop = Math.min(container.scrollTop + extraPadding, maxScrollTop);
                 }
+              };
+              // Double RAF to ensure virtualizer has finished its scroll
+              requestAnimationFrame(() => {
+                requestAnimationFrame(addExtraScroll);
               });
             }
           }
