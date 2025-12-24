@@ -384,3 +384,13 @@ td.fill-target {
   background-color: rgba(99, 102, 241, 0.15) !important;
   border: 1px dashed rgb(99, 102, 241) !important;
 }
+
+/* Group header row styling */
+tr[data-group-header] {
+  position: sticky;
+  z-index: 15;
+}
+
+tr[data-group-header] td {
+  background-color: inherit;
+}

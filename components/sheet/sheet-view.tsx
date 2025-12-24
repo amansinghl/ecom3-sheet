@@ -37,6 +37,7 @@ export function SheetView({ config, userRole }: SheetViewProps) {
     loadViewStateForSheet,
     loadColumnWidthsForSheet,
     loadColumnOrderForSheet,
+    loadGroupingForSheet,
     setActiveSheetId,
     pushToHistory,
     undo: undoFromStore,
@@ -68,15 +69,14 @@ export function SheetView({ config, userRole }: SheetViewProps) {
   const [activeViewId, setActiveViewId] = useState<string | undefined>(defaultView?.id);
   const activeView = config.views?.find((v) => v.id === activeViewId);
 
-  // Load persisted state when component mounts or config changes
   useEffect(() => {
     setActiveSheetId(config.id);
     loadViewStateForSheet(config.id);
     loadColumnWidthsForSheet(config.id);
     loadColumnOrderForSheet(config.id);
-    // Reset the flag when sheet changes
+    loadGroupingForSheet(config.id);
     hasAppliedDefaultFilters.current = false;
-  }, [config.id, setActiveSheetId, loadViewStateForSheet, loadColumnWidthsForSheet, loadColumnOrderForSheet]);
+  }, [config.id, setActiveSheetId, loadViewStateForSheet, loadColumnWidthsForSheet, loadColumnOrderForSheet, loadGroupingForSheet]);
 
   // Apply default view filters if no filters are already set (after state loads)
   useEffect(() => {

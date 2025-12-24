@@ -14,6 +14,8 @@ const STORAGE_KEYS = {
   hiddenColumns: (sheetId: string) => `sheet-hidden-columns-${sheetId}`,
   pinnedColumns: (sheetId: string) => `sheet-pinned-columns-${sheetId}`,
   columnOrder: (sheetId: string) => `sheet-column-order-${sheetId}`,
+  groupByColumn: (sheetId: string) => `sheet-group-by-${sheetId}`,
+  collapsedGroups: (sheetId: string) => `sheet-collapsed-groups-${sheetId}`,
 };
 
 /**
@@ -201,9 +203,49 @@ export function loadColumnOrder(sheetId: string): string[] {
   }
 }
 
-/**
- * Clear all stored data for a specific sheet
- */
+export function saveGroupByColumn(sheetId: string, columnId: string | null): void {
+  if (typeof window === 'undefined') return;
+  try {
+    if (columnId === null) {
+      localStorage.removeItem(STORAGE_KEYS.groupByColumn(sheetId));
+    } else {
+      localStorage.setItem(STORAGE_KEYS.groupByColumn(sheetId), columnId);
+    }
+  } catch (error) {
+    console.error('Failed to save group by column:', error);
+  }
+}
+
+export function loadGroupByColumn(sheetId: string): string | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    return localStorage.getItem(STORAGE_KEYS.groupByColumn(sheetId));
+  } catch (error) {
+    console.error('Failed to load group by column:', error);
+    return null;
+  }
+}
+
+export function saveCollapsedGroups(sheetId: string, groups: string[]): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(STORAGE_KEYS.collapsedGroups(sheetId), JSON.stringify(groups));
+  } catch (error) {
+    console.error('Failed to save collapsed groups:', error);
+  }
+}
+
+export function loadCollapsedGroups(sheetId: string): string[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const stored = localStorage.getItem(STORAGE_KEYS.collapsedGroups(sheetId));
+    return stored ? JSON.parse(stored) : [];
+  } catch (error) {
+    console.error('Failed to load collapsed groups:', error);
+    return [];
+  }
+}
+
 export function clearSheetStorage(sheetId: string): void {
   if (typeof window === 'undefined') return;
   try {
@@ -214,6 +256,8 @@ export function clearSheetStorage(sheetId: string): void {
     localStorage.removeItem(STORAGE_KEYS.hiddenColumns(sheetId));
     localStorage.removeItem(STORAGE_KEYS.pinnedColumns(sheetId));
     localStorage.removeItem(STORAGE_KEYS.columnOrder(sheetId));
+    localStorage.removeItem(STORAGE_KEYS.groupByColumn(sheetId));
+    localStorage.removeItem(STORAGE_KEYS.collapsedGroups(sheetId));
   } catch (error) {
     console.error('Failed to clear sheet storage:', error);
   }

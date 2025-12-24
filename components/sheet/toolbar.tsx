@@ -17,7 +17,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Search, FileDown, Plus, Info, SplitSquareVertical, Eye, EyeOff, Download, FileSpreadsheet, RefreshCw, Sliders, ArrowUpNarrowWide, ArrowDownWideNarrow, Rows3, Upload, Pin, PinOff, X, GripVertical } from 'lucide-react';
+import { Search, FileDown, Plus, Info, SplitSquareVertical, Eye, EyeOff, Download, FileSpreadsheet, RefreshCw, Sliders, ArrowUpNarrowWide, ArrowDownWideNarrow, Rows3, Upload, Pin, PinOff, X, GripVertical, Layers, Check, ChevronDown, ChevronUp, Minimize2, Maximize2 } from 'lucide-react';
 import { useSheetStore, RowHeight } from '@/lib/store/sheet-store';
 import { SheetConfig, RowData, UserRole, ColumnConfig } from '@/types';
 import { exportToCSV, exportToExcel } from '@/lib/utils/export';
@@ -154,6 +154,11 @@ export const Toolbar = forwardRef<ToolbarRef, ToolbarProps>(({ config, data, use
     toggleColumnPin,
     columnOrder,
     setColumnOrder,
+    groupByColumn,
+    setGroupByColumn,
+    collapsedGroups,
+    collapseAllGroups,
+    expandAllGroups,
   } = useSheetStore();
 
   // DnD sensors
@@ -366,7 +371,6 @@ export const Toolbar = forwardRef<ToolbarRef, ToolbarProps>(({ config, data, use
           <DropdownMenuTrigger asChild>
             <Button variant="outline" size="sm" className="hidden sm:flex h-7 shrink-0 text-xs px-2">
               <SplitSquareVertical className="mr-1.5 h-3.5 w-3.5" />
-              {/* Row Height */}
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start">
@@ -384,6 +388,71 @@ export const Toolbar = forwardRef<ToolbarRef, ToolbarProps>(({ config, data, use
                 Spacious
               </DropdownMenuRadioItem>
             </DropdownMenuRadioGroup>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button 
+              variant={groupByColumn ? "default" : "outline"} 
+              size="sm" 
+              className="hidden sm:flex h-7 shrink-0 text-xs px-2"
+            >
+              <Layers className="h-3.5 w-3.5 sm:mr-1.5" />
+              <span className="hidden lg:inline">
+                {groupByColumn ? config.columns.find(c => c.id === groupByColumn)?.label || 'Group' : 'Group'}
+              </span>
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-56">
+            <DropdownMenuItem 
+              onClick={() => setGroupByColumn(null)}
+              className={!groupByColumn ? 'bg-accent' : ''}
+            >
+              <X className="mr-2 h-4 w-4" />
+              No Grouping
+              {!groupByColumn && <Check className="ml-auto h-4 w-4" />}
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">
+              Group by column
+            </div>
+            {config.columns
+              .filter(col => ['dropdown', 'status', 'text', 'user'].includes(col.type))
+              .map(col => (
+                <DropdownMenuItem 
+                  key={col.id}
+                  onClick={() => setGroupByColumn(col.id)}
+                  className={groupByColumn === col.id ? 'bg-accent' : ''}
+                >
+                  {col.label}
+                  {groupByColumn === col.id && <Check className="ml-auto h-4 w-4" />}
+                </DropdownMenuItem>
+              ))
+            }
+            {groupByColumn && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => {
+                  const uniqueValues = [...new Set(
+                    data
+                      .filter(row => !(row as any)._isEmpty)
+                      .map(row => {
+                        const val = row[groupByColumn];
+                        return val != null && val !== '' ? String(val) : '(No Value)';
+                      })
+                  )];
+                  collapseAllGroups(uniqueValues);
+                }}>
+                  <Minimize2 className="mr-2 h-4 w-4" />
+                  Collapse All
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => expandAllGroups()}>
+                  <Maximize2 className="mr-2 h-4 w-4" />
+                  Expand All
+                </DropdownMenuItem>
+              </>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
 

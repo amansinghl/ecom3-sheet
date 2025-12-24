@@ -12,7 +12,7 @@ import {
   ColumnResizeMode,
 } from '@tanstack/react-table';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { SheetConfig, RowData, UserRole, ColumnFilter } from '@/types';
+import { SheetConfig, RowData, UserRole, ColumnFilter, GroupHeader } from '@/types';
 import { useSheetStore, CellPosition, SelectionRange } from '@/lib/store/sheet-store';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -21,7 +21,7 @@ import { RowContextMenu } from './row-context-menu';
 import { EmptyState } from './empty-state';
 import { ColumnFilterDropdown } from './column-filter-dropdown';
 import { cn } from '@/lib/utils';
-import { ChevronDown, ChevronUp, Filter, Pin, PinOff } from 'lucide-react';
+import { ChevronDown, ChevronUp, ChevronRight, Filter, Pin, PinOff } from 'lucide-react';
 
 interface DataGridProps {
   config: SheetConfig;
@@ -57,7 +57,6 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
     setColumnWidth, 
     setColumnFilter, 
     toggleColumnPin,
-    // Cell navigation
     focusedCell,
     selectionRange,
     selectedCells,
@@ -67,14 +66,15 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
     setGridDimensions,
     clearCellSelection,
     moveFocus,
-    // Fill drag
     fillDragState,
     startFillDrag,
     updateFillDrag,
     endFillDrag,
-    // Column order
     columnOrder,
     setColumnOrder,
+    groupByColumn,
+    collapsedGroups,
+    toggleGroupCollapse,
   } = useSheetStore();
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnResizeMode] = useState<ColumnResizeMode>('onChange');
@@ -222,6 +222,50 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
     
     return [...pinned, ...unpinned];
   }, [config.columns, viewState.pinnedColumns, columnOrder, columnVisibility]);
+
+  const isGroupHeader = (item: RowData | GroupHeader): item is GroupHeader => {
+    return (item as GroupHeader)._isGroupHeader === true;
+  };
+
+  const groupedData = useMemo((): (RowData | GroupHeader)[] => {
+    if (!groupByColumn) return data;
+
+    const groups = new Map<string, RowData[]>();
+    
+    data.forEach(row => {
+      if (row._isEmpty) return;
+      const rawValue = row[groupByColumn];
+      const groupValue = rawValue != null && rawValue !== '' ? String(rawValue) : '(No Value)';
+      if (!groups.has(groupValue)) {
+        groups.set(groupValue, []);
+      }
+      groups.get(groupValue)!.push(row);
+    });
+
+    const result: (RowData | GroupHeader)[] = [];
+    const sortedGroups = Array.from(groups.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+
+    sortedGroups.forEach(([groupValue, rows]) => {
+      const isCollapsed = collapsedGroups.has(groupValue);
+      result.push({
+        _isGroupHeader: true,
+        _groupId: `group-${groupValue}`,
+        groupValue,
+        count: rows.length,
+        isCollapsed,
+      });
+      if (!isCollapsed) {
+        result.push(...rows);
+      }
+    });
+
+    const emptyRows = data.filter(row => row._isEmpty);
+    if (!collapsedGroups.has('__empty__')) {
+      result.push(...emptyRows);
+    }
+
+    return result;
+  }, [data, groupByColumn, collapsedGroups]);
 
   // Create columns from config
   const columns = useMemo<ColumnDef<RowData>[]>(() => {
@@ -412,10 +456,14 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
   // They're now read from refs to prevent column recreation on every state change
   }, [orderedColumns, canEdit, columnWidths, viewState.columnFilters, viewState.pinnedColumns, setColumnFilter, toggleColumnPin, rowHeight, openFilterPopover, data, config.id]);
 
+  const tableData = useMemo(() => {
+    return groupedData.filter((item): item is RowData => !isGroupHeader(item));
+  }, [groupedData]);
+
   const table = useReactTable({
-    data,
+    data: tableData,
     columns,
-    getRowId: (row) => row.id, // Use our row ID instead of index
+    getRowId: (row) => row.id,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
@@ -490,13 +538,14 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
     ? visiblePinnedColumns[visiblePinnedColumns.length - 1].id 
     : 'select';
 
-  // Virtual scrolling setup
   const { rows } = table.getRowModel();
   
   const rowVirtualizer = useVirtualizer({
-    count: rows.length,
+    count: groupedData.length,
     getScrollElement: () => tableContainerRef.current,
-    estimateSize: () => {
+    estimateSize: (index) => {
+      const item = groupedData[index];
+      if (isGroupHeader(item)) return 36;
       switch (rowHeight) {
         case 'compact': return 24;
         case 'comfortable': return 40;
@@ -504,26 +553,24 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
         default: return 24;
       }
     },
-    overscan: 5, // Keep low for performance - render only 5 extra rows above/below viewport
+    overscan: 5,
   });
 
-  // Scroll to editing cell when it changes (only if not visible)
   useEffect(() => {
     if (editingCell && editingCell !== prevEditingCellRef.current) {
-      const rowIndex = rows.findIndex(row => row.id === editingCell.rowId);
+      const rowIndex = groupedData.findIndex(item => 
+        !isGroupHeader(item) && item.id === editingCell.rowId
+      );
       if (rowIndex !== -1) {
-        // Check if the row is already visible in the viewport
         const virtualItems = rowVirtualizer.getVirtualItems();
         const isVisible = virtualItems.some(item => item.index === rowIndex);
-        
-        // Only scroll if the row is not visible, and use 'start' alignment to keep position
         if (!isVisible) {
           rowVirtualizer.scrollToIndex(rowIndex, { align: 'start', behavior: 'smooth' });
         }
       }
     }
     prevEditingCellRef.current = editingCell;
-  }, [editingCell, rows, rowVirtualizer]);
+  }, [editingCell, groupedData, rowVirtualizer]);
 
   // Save scroll position to localStorage (throttled to avoid lag during rapid scroll)
   const scrollSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -572,12 +619,11 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
     }
   }, [config.id]);
 
-  // Update grid dimensions when data or columns change
   useEffect(() => {
     const numCols = orderedColumns.length;
-    const numRows = rows.length;
+    const numRows = groupedData.filter(item => !isGroupHeader(item)).length;
     setGridDimensions({ rows: numRows, cols: numCols });
-  }, [orderedColumns.length, rows.length, setGridDimensions]);
+  }, [orderedColumns.length, groupedData, setGridDimensions]);
 
   // Track rapid navigation state
   const isRapidNavRef = useRef(false);
@@ -1069,9 +1115,42 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
                 <td colSpan={orderedColumns.length + 1} style={{ padding: 0, border: 'none', backgroundColor: '#f9fafb' }} />
               </tr>
               
-              {/* Render only visible rows */}
               {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-                const row = rows[virtualRow.index];
+                const item = groupedData[virtualRow.index];
+                
+                if (isGroupHeader(item)) {
+                  return (
+                    <tr
+                      key={item._groupId}
+                      data-index={virtualRow.index}
+                      onClick={() => toggleGroupCollapse(item.groupValue)}
+                      className="bg-muted/60 hover:bg-muted cursor-pointer border-b border-border"
+                      style={{ height: 36 }}
+                    >
+                      <td 
+                        colSpan={orderedColumns.length + 1}
+                        className="px-4 py-2 sticky left-0 bg-muted/60"
+                      >
+                        <div className="flex items-center gap-2">
+                          {item.isCollapsed ? (
+                            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                          ) : (
+                            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                          )}
+                          <span className="font-semibold text-sm">{item.groupValue}</span>
+                          <span className="text-xs text-muted-foreground bg-background px-2 py-0.5 rounded-full">
+                            {item.count} {item.count === 1 ? 'row' : 'rows'}
+                          </span>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                }
+
+                const tableRow = rows.find(r => r.id === item.id);
+                if (!tableRow) return null;
+                
+                const row = tableRow;
                 const idx = virtualRow.index;
                 const isEmptyRow = row.original._isEmpty === true;
                 const isDuplicate = row.original._isDuplicate === true;
@@ -1083,7 +1162,6 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
                     onMouseEnter={() => setHoveredRow(row.id)}
                     onMouseLeave={() => setHoveredRow(null)}
                     onContextMenu={(e) => {
-                      // Don't show context menu for empty rows
                       if (!isEmptyRow) {
                         e.preventDefault();
                         setContextMenu({
@@ -1095,16 +1173,11 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
                     }}
                     className={cn(
                       'border-b border-border group/row',
-                      // Duplicate row styling - red background (highest priority)
                       isDuplicate && !isEmptyRow && 'bg-red-200 hover:bg-red-300',
-                      // Base zebra striping - pure white for even, light gray for odd (only if not duplicate)
                       !isDuplicate && idx % 2 === 0 ? 'bg-white' : !isDuplicate ? 'bg-gray-50' : '',
-                      // Hover states with zebra striping maintained (only if not duplicate)
                       !isEmptyRow && !selectedRows.has(row.id) && !isDuplicate && idx % 2 === 0 && 'hover:bg-gray-100',
                       !isEmptyRow && !selectedRows.has(row.id) && !isDuplicate && idx % 2 !== 0 && 'hover:bg-gray-100',
-                      // Empty row styling
                       isEmptyRow && 'bg-gray-50',
-                      // Selected row styling (only if not duplicate)
                       selectedRows.has(row.id) && !isEmptyRow && !isDuplicate && 'bg-blue-50 hover:bg-blue-100',
                       rowHeightClasses[rowHeight]
                     )}
@@ -1224,7 +1297,7 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
         </tbody>
       </table>
 
-      {data.length === 0 && (
+      {tableData.length === 0 && (
         <EmptyState
           type={hasActiveFilters ? 'no-filtered' : 'no-data'}
           onAddRow={onAddRow}

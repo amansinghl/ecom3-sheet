@@ -79,11 +79,20 @@ export interface SheetConfig {
 // Row Data
 export interface RowData {
   id: string;
-  [key: string]: any; // Dynamic columns
+  [key: string]: any;
   createdAt: Date;
   updatedAt: Date;
   createdBy: string;
   updatedBy: string;
+}
+
+// Group Header for row grouping
+export interface GroupHeader {
+  _isGroupHeader: true;
+  _groupId: string;
+  groupValue: string;
+  count: number;
+  isCollapsed: boolean;
 }
 
 // Filter Types

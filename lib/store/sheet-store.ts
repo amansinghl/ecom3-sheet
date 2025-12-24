@@ -12,7 +12,11 @@ import {
   savePinnedColumns,
   loadPinnedColumns,
   saveColumnOrder,
-  loadColumnOrder
+  loadColumnOrder,
+  saveGroupByColumn,
+  loadGroupByColumn,
+  saveCollapsedGroups,
+  loadCollapsedGroups
 } from '@/lib/utils/storage';
 
 export type RowHeight = 'compact' | 'comfortable' | 'spacious';
@@ -115,6 +119,15 @@ interface SheetStore {
   canUndo: () => boolean;
   canRedo: () => boolean;
   clearHistory: () => void;
+
+  // Row grouping
+  groupByColumn: string | null;
+  collapsedGroups: Set<string>;
+  setGroupByColumn: (columnId: string | null) => void;
+  toggleGroupCollapse: (groupValue: string) => void;
+  collapseAllGroups: (groupValues: string[]) => void;
+  expandAllGroups: () => void;
+  loadGroupingForSheet: (sheetId: string) => void;
 }
 
 const defaultViewState: ViewState = {
@@ -129,10 +142,10 @@ export const useSheetStore = create<SheetStore>((set, get) => ({
   activeSheetId: 'escalations',
   setActiveSheetId: (id) => {
     set({ activeSheetId: id });
-    // Load persisted state for the new sheet
     get().loadViewStateForSheet(id);
     get().loadColumnWidthsForSheet(id);
     get().loadColumnOrderForSheet(id);
+    get().loadGroupingForSheet(id);
     const savedRowHeight = loadRowHeight(id);
     if (savedRowHeight) {
       set({ rowHeight: savedRowHeight });
@@ -455,4 +468,51 @@ export const useSheetStore = create<SheetStore>((set, get) => ({
   canRedo: () => get().redoStack.length > 0,
   
   clearHistory: () => set({ undoStack: [], redoStack: [] }),
+
+  // Row grouping
+  groupByColumn: null,
+  collapsedGroups: new Set(),
+
+  setGroupByColumn: (columnId) => {
+    set({ groupByColumn: columnId, collapsedGroups: new Set() });
+    const { activeSheetId } = get();
+    saveGroupByColumn(activeSheetId, columnId);
+    saveCollapsedGroups(activeSheetId, []);
+  },
+
+  toggleGroupCollapse: (groupValue) => {
+    set((state) => {
+      const newCollapsed = new Set(state.collapsedGroups);
+      if (newCollapsed.has(groupValue)) {
+        newCollapsed.delete(groupValue);
+      } else {
+        newCollapsed.add(groupValue);
+      }
+      const { activeSheetId } = get();
+      saveCollapsedGroups(activeSheetId, Array.from(newCollapsed));
+      return { collapsedGroups: newCollapsed };
+    });
+  },
+
+  collapseAllGroups: (groupValues) => {
+    const newCollapsed = new Set(groupValues);
+    set({ collapsedGroups: newCollapsed });
+    const { activeSheetId } = get();
+    saveCollapsedGroups(activeSheetId, groupValues);
+  },
+
+  expandAllGroups: () => {
+    set({ collapsedGroups: new Set() });
+    const { activeSheetId } = get();
+    saveCollapsedGroups(activeSheetId, []);
+  },
+
+  loadGroupingForSheet: (sheetId) => {
+    const groupByColumn = loadGroupByColumn(sheetId);
+    const collapsedGroups = loadCollapsedGroups(sheetId);
+    set({ 
+      groupByColumn, 
+      collapsedGroups: new Set(collapsedGroups) 
+    });
+  },
 }));
