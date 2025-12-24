@@ -9,6 +9,7 @@ import { Toaster, toast } from 'sonner';
 import { signOut } from 'next-auth/react';
 import { apiClient } from '@/lib/api/client';
 import { LoadingState } from '@/components/ui/loading-state';
+import { TooltipProvider } from '@/components/ui/tooltip';
 
 // Create context for session status
 interface SessionContextType {
@@ -100,9 +101,11 @@ export function Providers({ children }: { children: React.ReactNode }) {
           enableSystem
           disableTransitionOnChange
         >
-          <ApiTokenInitializer>
-            {children}
-          </ApiTokenInitializer>
+          <TooltipProvider delayDuration={300}>
+            <ApiTokenInitializer>
+              {children}
+            </ApiTokenInitializer>
+          </TooltipProvider>
           <Toaster
             position="bottom-right"
             toastOptions={{

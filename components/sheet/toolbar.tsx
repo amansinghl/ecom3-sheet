@@ -24,6 +24,7 @@ import { exportToCSV, exportToExcel } from '@/lib/utils/export';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   DndContext,
   closestCenter,
@@ -302,37 +303,52 @@ export const Toolbar = forwardRef<ToolbarRef, ToolbarProps>(({ config, data, use
             Total: {visibleRowCount}
           </span>
           {onRefresh && config.id === 'escalations' && (
-            <Button 
-              size="sm" 
-              variant="outline" 
-              onClick={onRefresh} 
-              className="h-7 shrink-0 text-xs px-2"
-            >
-              <RefreshCw className="h-3.5 w-3.5 sm:mr-1.5" />
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button 
+                  size="sm" 
+                  variant="outline" 
+                  onClick={onRefresh} 
+                  className="h-7 shrink-0 text-xs px-2"
+                >
+                  <RefreshCw className="h-3.5 w-3.5 sm:mr-1.5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Refresh data</TooltipContent>
+            </Tooltip>
           )}
         </div>
 
         {canEdit && onAddRow && (
-          <Button 
-            size="sm" 
-            onClick={onAddRow} 
-            className="h-7 shrink-0 text-xs px-2"
-            disabled={config.id === 'escalations' && activeViewId === 'closed'}
-          >
-            <Plus className="h-3.5 w-3.5 sm:mr-1.5" />
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button 
+                size="sm" 
+                onClick={onAddRow} 
+                className="h-7 shrink-0 text-xs px-2"
+                disabled={config.id === 'escalations' && activeViewId === 'closed'}
+              >
+                <Plus className="h-3.5 w-3.5 sm:mr-1.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Add new row</TooltipContent>
+          </Tooltip>
         )}
 
         <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" className="h-7 shrink-0 text-xs px-2">
-              <Eye className="h-3.5 w-3.5 sm:mr-1.5" />
-              <Badge variant="secondary" className="ml-1 sm:ml-1.5 h-4 px-1 text-[9px]">
-                {visibleColumnsCount}
-              </Badge>
-            </Button>
-          </DropdownMenuTrigger>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="h-7 shrink-0 text-xs px-2">
+                  <Eye className="h-3.5 w-3.5 sm:mr-1.5" />
+                  <Badge variant="secondary" className="ml-1 sm:ml-1.5 h-4 px-1 text-[9px]">
+                    {visibleColumnsCount}
+                  </Badge>
+                </Button>
+              </DropdownMenuTrigger>
+            </TooltipTrigger>
+            <TooltipContent>Column visibility</TooltipContent>
+          </Tooltip>
           <DropdownMenuContent align="start" className="w-64 max-h-[400px] overflow-hidden">
             <div className="px-2 py-1.5 text-sm font-semibold flex items-center gap-2">
               <GripVertical className="h-3.5 w-3.5 text-muted-foreground" />
@@ -368,11 +384,16 @@ export const Toolbar = forwardRef<ToolbarRef, ToolbarProps>(({ config, data, use
         </DropdownMenu>
 
         <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" className="hidden sm:flex h-7 shrink-0 text-xs px-2">
-              <SplitSquareVertical className="mr-1.5 h-3.5 w-3.5" />
-            </Button>
-          </DropdownMenuTrigger>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="hidden sm:flex h-7 shrink-0 text-xs px-2">
+                  <SplitSquareVertical className="mr-1.5 h-3.5 w-3.5" />
+                </Button>
+              </DropdownMenuTrigger>
+            </TooltipTrigger>
+            <TooltipContent>Row height</TooltipContent>
+          </Tooltip>
           <DropdownMenuContent align="start">
             <DropdownMenuRadioGroup value={rowHeight} onValueChange={(val) => setRowHeight(val as RowHeight)}>
               <DropdownMenuRadioItem value="compact">
@@ -392,18 +413,23 @@ export const Toolbar = forwardRef<ToolbarRef, ToolbarProps>(({ config, data, use
         </DropdownMenu>
 
         <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button 
-              variant={groupByColumn ? "default" : "outline"} 
-              size="sm" 
-              className="hidden sm:flex h-7 shrink-0 text-xs px-2"
-            >
-              <Layers className="h-3.5 w-3.5 sm:mr-1.5" />
-              <span className="hidden lg:inline">
-                {groupByColumn ? config.columns.find(c => c.id === groupByColumn)?.label || 'Group' : 'Group'}
-              </span>
-            </Button>
-          </DropdownMenuTrigger>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <DropdownMenuTrigger asChild>
+                <Button 
+                  variant={groupByColumn ? "default" : "outline"} 
+                  size="sm" 
+                  className="hidden sm:flex h-7 shrink-0 text-xs px-2"
+                >
+                  <Layers className="h-3.5 w-3.5 sm:mr-1.5" />
+                  <span className="hidden lg:inline">
+                    {groupByColumn ? config.columns.find(c => c.id === groupByColumn)?.label || 'Group' : 'Group'}
+                  </span>
+                </Button>
+              </DropdownMenuTrigger>
+            </TooltipTrigger>
+            <TooltipContent>Group by column</TooltipContent>
+          </Tooltip>
           <DropdownMenuContent align="start" className="w-56">
             <DropdownMenuItem 
               onClick={() => setGroupByColumn(null)}
@@ -457,24 +483,34 @@ export const Toolbar = forwardRef<ToolbarRef, ToolbarProps>(({ config, data, use
         </DropdownMenu>
 
         {canEdit && onBulkUpload && config.id === 'escalations' && (
-          <Button 
-            size="sm" 
-            variant="outline" 
-            onClick={onBulkUpload} 
-            className="h-7 shrink-0 text-xs px-2"
-          >
-            <Upload className="h-3.5 w-3.5 sm:mr-1.5" />
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button 
+                size="sm" 
+                variant="outline" 
+                onClick={onBulkUpload} 
+                className="h-7 shrink-0 text-xs px-2"
+              >
+                <Upload className="h-3.5 w-3.5 sm:mr-1.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Bulk upload</TooltipContent>
+          </Tooltip>
         )}
 
         {canExport && (
           <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="h-7 shrink-0 text-xs px-2">
-                <Download className="h-3.5 w-3.5 sm:mr-1.5" />
-                {/* <span className="hidden sm:inline">Export</span> */}
-              </Button>
-            </DropdownMenuTrigger>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="h-7 shrink-0 text-xs px-2">
+                    <Download className="h-3.5 w-3.5 sm:mr-1.5" />
+                    {/* <span className="hidden sm:inline">Export</span> */}
+                  </Button>
+                </DropdownMenuTrigger>
+              </TooltipTrigger>
+              <TooltipContent>Export data</TooltipContent>
+            </Tooltip>
             <DropdownMenuContent align="end">
               <DropdownMenuItem onClick={handleExportCSV}>
                 <FileDown className="mr-2 h-4 w-4" />
@@ -489,15 +525,19 @@ export const Toolbar = forwardRef<ToolbarRef, ToolbarProps>(({ config, data, use
         )}
 
         {config.id === 'escalations' && (
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            className="h-7 w-7 shrink-0 px-0"
-            onClick={() => setShowInfoDialog(true)}
-            title="Auto-Closure Logic Info"
-          >
-            <Info className="h-3.5 w-3.5" />
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="h-7 w-7 shrink-0 px-0"
+                onClick={() => setShowInfoDialog(true)}
+              >
+                <Info className="h-3.5 w-3.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Auto-closure logic info</TooltipContent>
+          </Tooltip>
         )}
       </div>
 
