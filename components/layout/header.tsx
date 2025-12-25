@@ -73,21 +73,7 @@ export function Header() {
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/80 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60">
-      {/* Marquee Announcement */}
-      <div className="h-8 bg-primary/10 dark:bg-primary/20 border-b border-border/60 overflow-hidden">
-        <Marquee pauseOnHover className="h-full">
-          <div className="flex items-center gap-3 px-6 text-sm font-semibold text-foreground whitespace-nowrap">
-            <PartyPopper className="h-4 w-4 text-primary flex-shrink-0" />
-            <span>
-              🎉 Celebrating Launch!🚀 Rahul ji is treating everyone to a Pizza Party! 🍕 -- Requested by Tech Team. 
-            </span>
-            <span className="text-muted-foreground">•</span>
-            <span className="text-xs text-muted-foreground">
-              It's been {daysSinceLaunch} {daysSinceLaunch === 1 ? 'day' : 'days'} since launch (Dec 19, 2025)
-            </span>
-          </div>
-        </Marquee>
-      </div>
+      
       <div className="flex h-12 items-center justify-between px-4">
         {/* Logo Section */}
         <div className="flex items-center gap-2">
