@@ -344,80 +344,8 @@ export const escalationSheetConfig: SheetConfig = {
   },
 };
 
-// Portfolio Sheet Configuration
-export const portfolioSheetConfig: SheetConfig = {
-  id: 'portfolio',
-  name: 'Portfolio',
-  icon: 'Star',
-  description: 'Excellence in action - A showcase of talent and innovation',
-  views: [],
-  columns: [
-    {
-      id: 'title',
-      label: 'Title',
-      type: 'text',
-      width: 200,
-      required: false,
-      editable: true,
-    },
-    {
-      id: 'description',
-      label: 'Description',
-      type: 'longtext',
-      width: 300,
-      required: false,
-      editable: true,
-    },
-    {
-      id: 'status',
-      label: 'Status',
-      type: 'status',
-      width: 150,
-      required: false,
-      editable: true,
-      options: [
-        { label: 'Active', value: 'Active', color: '#10b981' },
-        { label: 'In Progress', value: 'In Progress', color: '#f59e0b' },
-        { label: 'Completed', value: 'Completed', color: '#8b5cf6' },
-      ],
-    },
-    {
-      id: 'created_date',
-      label: 'Created Date',
-      type: 'date',
-      width: 150,
-      required: false,
-      editable: true,
-    },
-  ],
-  defaultSort: {
-    columnId: 'created_date',
-    direction: 'desc',
-  },
-  permissions: {
-    admin: {
-      canView: true,
-      canEdit: true,
-      canDelete: true,
-      canExport: true,
-    },
-    editor: {
-      canView: true,
-      canEdit: true,
-      canDelete: false,
-      canExport: true,
-    },
-    viewer: {
-      canView: true,
-      canEdit: false,
-      canDelete: false,
-      canExport: false,
-    },
-  },
-};
-
 // All available sheets
-export const sheets: SheetConfig[] = [escalationSheetConfig, portfolioSheetConfig];
+export const sheets: SheetConfig[] = [escalationSheetConfig];
 
 // Helper to get sheet by ID
 export const getSheetById = (id: string): SheetConfig | undefined => {
