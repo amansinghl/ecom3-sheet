@@ -135,13 +135,41 @@ export interface Sort {
   direction: 'asc' | 'desc';
 }
 
-// View Definition
+// View Definition (for system/config views)
 export interface ViewConfig {
   id: string;
   name: string;
   description?: string;
   filters: Filter[];
   isDefault?: boolean;
+}
+
+// User View (extended view with all saved state)
+export interface UserView {
+  id: string;
+  name: string;
+  description?: string;
+  filters: Filter[];
+  isDefault?: boolean;
+  isSystem?: boolean; // true for system views (Open/Closed) - cannot be deleted
+  icon?: string; // lucide icon name
+  color?: string; // hex color for visual distinction
+  // Saved view state
+  hiddenColumns: string[];
+  pinnedColumns: string[];
+  columnOrder: string[];
+  sorts: Sort[];
+  groupByColumn: string | null;
+  // Metadata
+  createdAt: string; // ISO string for localStorage
+  updatedAt: string;
+}
+
+// Views state for localStorage
+export interface ViewsStorageState {
+  views: UserView[];
+  activeViewId: string | null;
+  defaultViewId: string | null;
 }
 
 // View State

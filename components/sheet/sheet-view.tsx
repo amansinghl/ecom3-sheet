@@ -1,12 +1,14 @@
 'use client';
 
 import { useState, useMemo, useEffect, useRef } from 'react';
-import { SheetConfig, RowData, UserRole, ColumnFilter } from '@/types';
+import { useSession } from 'next-auth/react';
+import { SheetConfig, RowData, UserRole, ColumnFilter, UserView } from '@/types';
 import { DataGrid } from './data-grid';
 import { Toolbar, ToolbarRef } from './toolbar';
 import { CommandPalette } from './command-palette';
 import { TableSkeleton } from './table-skeleton';
 import { ViewsSidebar } from './views-sidebar';
+import { ViewCreateDialog } from './view-create-dialog';
 import { HeroSection } from './hero-section';
 import { BulkUploadModal } from './bulk-upload-modal';
 import { useSheetStore } from '@/lib/store/sheet-store';
@@ -24,6 +26,10 @@ interface SheetViewProps {
 }
 
 export function SheetView({ config, userRole }: SheetViewProps) {
+  // Get user session for personalized views
+  const { data: session } = useSession();
+  const userName = session?.user?.name || 'User';
+  
   const [data, setData] = useState<RowData[]>([]);
   const [globalSearch, setGlobalSearch] = useState('');
   const [localError, setLocalError] = useState<string | null>(null);
@@ -42,9 +48,25 @@ export function SheetView({ config, userRole }: SheetViewProps) {
     pushToHistory,
     undo: undoFromStore,
     redo: redoFromStore,
+    // Views management from store
+    views,
+    activeViewId: storeActiveViewId,
+    defaultViewId,
+    loadViewsForSheet,
+    addView,
+    updateView,
+    deleteView: storeDeleteView,
+    duplicateView: storeDuplicateView,
+    setActiveViewId: storeSetActiveViewId,
+    setDefaultViewId,
+    applyView,
+    getCurrentViewState,
   } = useSheetStore();
   const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [showBulkUploadModal, setShowBulkUploadModal] = useState(false);
+  const [showViewDialog, setShowViewDialog] = useState(false);
+  const [editingView, setEditingView] = useState<UserView | null>(null);
+  const [viewDialogMode, setViewDialogMode] = useState<'create' | 'edit'>('create');
   const toolbarRef = useRef<ToolbarRef>(null);
   const hasAppliedDefaultFilters = useRef(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -64,10 +86,9 @@ export function SheetView({ config, userRole }: SheetViewProps) {
     }
   );
 
-  // View management
-  const defaultView = config.views?.find((v) => v.isDefault) || config.views?.[0];
-  const [activeViewId, setActiveViewId] = useState<string | undefined>(defaultView?.id);
-  const activeView = config.views?.find((v) => v.id === activeViewId);
+  // View management - use store values
+  const activeViewId = storeActiveViewId;
+  const activeView = views.find((v) => v.id === activeViewId);
 
   useEffect(() => {
     setActiveSheetId(config.id);
@@ -75,8 +96,11 @@ export function SheetView({ config, userRole }: SheetViewProps) {
     loadColumnWidthsForSheet(config.id);
     loadColumnOrderForSheet(config.id);
     loadGroupingForSheet(config.id);
+    // Load views from localStorage and merge with system views from config
+    // Pass userName to create a default personal view if none exists
+    loadViewsForSheet(config.id, config.views, userName);
     hasAppliedDefaultFilters.current = false;
-  }, [config.id, setActiveSheetId, loadViewStateForSheet, loadColumnWidthsForSheet, loadColumnOrderForSheet, loadGroupingForSheet]);
+  }, [config.id, setActiveSheetId, loadViewStateForSheet, loadColumnWidthsForSheet, loadColumnOrderForSheet, loadGroupingForSheet, loadViewsForSheet, config.views, userName]);
 
   // Apply default view filters if no filters are already set (after state loads)
   useEffect(() => {
@@ -1377,31 +1401,89 @@ export function SheetView({ config, userRole }: SheetViewProps) {
   };
 
   const handleViewChange = (viewId: string) => {
-    setActiveViewId(viewId);
-    
-    // Apply view filters when switching views
-    const selectedView = config.views?.find((v) => v.id === viewId);
-    if (selectedView?.filters) {
-      // Convert view filters to column filters format
-      const columnFilters: Record<string, ColumnFilter> = {};
-      selectedView.filters.forEach((filter) => {
-        columnFilters[filter.columnId] = {
-          type: 'condition',
-          condition: {
-            operator: filter.operator,
-            value: filter.value,
-          },
-        };
+    const selectedView = views.find((v) => v.id === viewId);
+    if (selectedView) {
+      applyView(selectedView);
+    }
+  };
+
+  // View management handlers
+  const handleCreateView = () => {
+    setEditingView(null);
+    setViewDialogMode('create');
+    setShowViewDialog(true);
+  };
+
+  const handleEditView = (view: UserView) => {
+    setEditingView(view);
+    setViewDialogMode('edit');
+    setShowViewDialog(true);
+  };
+
+  const handleDuplicateView = (viewId: string) => {
+    const duplicated = storeDuplicateView(viewId);
+    if (duplicated) {
+      toast.success(`View "${duplicated.name}" created`);
+    }
+  };
+
+  const handleDeleteView = (viewId: string) => {
+    const viewToDelete = views.find(v => v.id === viewId);
+    if (viewToDelete?.isSystem) {
+      toast.error('Cannot delete system views');
+      return;
+    }
+    storeDeleteView(viewId);
+    toast.success('View deleted');
+  };
+
+  const handleSetDefaultView = (viewId: string) => {
+    setDefaultViewId(viewId);
+    const view = views.find(v => v.id === viewId);
+    toast.success(`"${view?.name}" set as default view`);
+  };
+
+  const handleSaveView = (data: { 
+    name: string; 
+    description?: string;
+    saveFilters: boolean;
+    saveColumnLayout: boolean;
+    saveSorting: boolean;
+  }) => {
+    if (viewDialogMode === 'edit' && editingView) {
+      // Update existing view
+      updateView(editingView.id, {
+        name: data.name,
+        description: data.description,
+      });
+      toast.success(`View "${data.name}" updated`);
+    } else {
+      // Create new view
+      const currentState = getCurrentViewState();
+      
+      const newView = addView({
+        name: data.name,
+        description: data.description,
+        isSystem: false,
+        isDefault: false,
+        icon: 'LayoutGrid',
+        color: '#6366f1',
+        filters: data.saveFilters ? currentState.filters : [],
+        hiddenColumns: data.saveColumnLayout ? currentState.hiddenColumns : [],
+        pinnedColumns: data.saveColumnLayout ? currentState.pinnedColumns : [],
+        columnOrder: data.saveColumnLayout ? currentState.columnOrder : [],
+        sorts: data.saveSorting ? currentState.sorts : [],
+        groupByColumn: data.saveSorting ? currentState.groupByColumn : null,
       });
       
-      // Apply the filters
-      Object.entries(columnFilters).forEach(([columnId, filter]) => {
-        setColumnFilter(columnId, filter);
-      });
-    } else {
-      // Clear filters if view has no filters
-      clearAllFilters();
+      toast.success(`View "${data.name}" created`);
+      
+      // Switch to the new view
+      applyView(newView);
     }
+    
+    setShowViewDialog(false);
+    setEditingView(null);
   };
 
   // Keyboard shortcuts
@@ -1423,14 +1505,32 @@ export function SheetView({ config, userRole }: SheetViewProps) {
 
   return (
     <div className="flex h-full">
-      {/* Sidebar - only show if views are defined */}
-      {config.views && config.views.length > 0 && (
+      {/* Sidebar - only show if views exist */}
+      {views.length > 0 && (
         <ViewsSidebar
-          views={config.views}
+          views={views}
           activeViewId={activeViewId || ''}
+          defaultViewId={defaultViewId}
           onViewChange={handleViewChange}
+          onCreateView={handleCreateView}
+          onEditView={handleEditView}
+          onDuplicateView={handleDuplicateView}
+          onDeleteView={handleDeleteView}
+          onSetDefaultView={handleSetDefaultView}
         />
       )}
+
+      {/* View Create/Edit Dialog */}
+      <ViewCreateDialog
+        isOpen={showViewDialog}
+        onClose={() => {
+          setShowViewDialog(false);
+          setEditingView(null);
+        }}
+        onSave={handleSaveView}
+        editingView={editingView}
+        mode={viewDialogMode}
+      />
 
       {/* Main Content Area */}
       <div className="flex h-full flex-1 flex-col overflow-hidden">

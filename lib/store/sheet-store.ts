@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { ViewState, RowData, ColumnFilter } from '@/types';
+import { ViewState, RowData, ColumnFilter, UserView, ViewConfig, Filter, Sort } from '@/types';
 import { 
   saveFilters, 
   loadFilters, 
@@ -16,7 +16,14 @@ import {
   saveGroupByColumn,
   loadGroupByColumn,
   saveCollapsedGroups,
-  loadCollapsedGroups
+  loadCollapsedGroups,
+  // Views storage
+  saveViews,
+  loadViews,
+  saveActiveView,
+  loadActiveView,
+  saveDefaultView,
+  loadDefaultView,
 } from '@/lib/utils/storage';
 
 export type RowHeight = 'compact' | 'comfortable' | 'spacious';
@@ -129,6 +136,22 @@ interface SheetStore {
   collapseAllGroups: (groupValues: string[]) => void;
   expandAllGroups: () => void;
   loadGroupingForSheet: (sheetId: string) => void;
+
+  // Views management
+  views: UserView[];
+  activeViewId: string | null;
+  defaultViewId: string | null;
+  setViews: (views: UserView[]) => void;
+  addView: (view: Omit<UserView, 'id' | 'createdAt' | 'updatedAt'>) => UserView;
+  updateView: (viewId: string, updates: Partial<UserView>) => void;
+  deleteView: (viewId: string) => void;
+  duplicateView: (viewId: string) => UserView | null;
+  setActiveViewId: (viewId: string | null) => void;
+  setDefaultViewId: (viewId: string | null) => void;
+  loadViewsForSheet: (sheetId: string, systemViews?: ViewConfig[], userName?: string) => void;
+  saveCurrentStateAsView: (name: string, description?: string) => UserView;
+  applyView: (view: UserView) => void;
+  getCurrentViewState: () => Omit<UserView, 'id' | 'name' | 'createdAt' | 'updatedAt' | 'isSystem'>;
 }
 
 const defaultViewState: ViewState = {
@@ -563,5 +586,272 @@ export const useSheetStore = create<SheetStore>((set, get) => ({
       groupByColumn, 
       collapsedGroups: new Set(collapsedGroups) 
     });
+  },
+
+  // Views management
+  views: [],
+  activeViewId: null,
+  defaultViewId: null,
+
+  setViews: (views) => {
+    set({ views });
+    const { activeSheetId } = get();
+    saveViews(activeSheetId, views);
+  },
+
+  addView: (viewData) => {
+    const now = new Date().toISOString();
+    const newView: UserView = {
+      ...viewData,
+      id: `view-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      createdAt: now,
+      updatedAt: now,
+    };
+    
+    set((state) => ({
+      views: [...state.views, newView],
+    }));
+    
+    const { activeSheetId, views } = get();
+    saveViews(activeSheetId, views);
+    
+    return newView;
+  },
+
+  updateView: (viewId, updates) => {
+    set((state) => ({
+      views: state.views.map((view) =>
+        view.id === viewId
+          ? { ...view, ...updates, updatedAt: new Date().toISOString() }
+          : view
+      ),
+    }));
+    
+    const { activeSheetId, views } = get();
+    saveViews(activeSheetId, views);
+  },
+
+  deleteView: (viewId) => {
+    const { views, activeViewId, defaultViewId } = get();
+    const viewToDelete = views.find(v => v.id === viewId);
+    
+    // Don't delete system views
+    if (viewToDelete?.isSystem) {
+      console.warn('Cannot delete system views');
+      return;
+    }
+    
+    set((state) => ({
+      views: state.views.filter((view) => view.id !== viewId),
+      // Clear active view if it was deleted
+      activeViewId: state.activeViewId === viewId ? null : state.activeViewId,
+      // Clear default view if it was deleted
+      defaultViewId: state.defaultViewId === viewId ? null : state.defaultViewId,
+    }));
+    
+    const { activeSheetId } = get();
+    saveViews(activeSheetId, get().views);
+    
+    if (activeViewId === viewId) {
+      saveActiveView(activeSheetId, null);
+    }
+    if (defaultViewId === viewId) {
+      saveDefaultView(activeSheetId, null);
+    }
+  },
+
+  duplicateView: (viewId) => {
+    const { views } = get();
+    const viewToDuplicate = views.find((v) => v.id === viewId);
+    
+    if (!viewToDuplicate) return null;
+    
+    const now = new Date().toISOString();
+    const newView: UserView = {
+      ...viewToDuplicate,
+      id: `view-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      name: `${viewToDuplicate.name} (Copy)`,
+      isSystem: false, // Duplicated views are never system views
+      isDefault: false,
+      createdAt: now,
+      updatedAt: now,
+    };
+    
+    set((state) => ({
+      views: [...state.views, newView],
+    }));
+    
+    const { activeSheetId } = get();
+    saveViews(activeSheetId, get().views);
+    
+    return newView;
+  },
+
+  setActiveViewId: (viewId) => {
+    set({ activeViewId: viewId });
+    const { activeSheetId } = get();
+    saveActiveView(activeSheetId, viewId);
+  },
+
+  setDefaultViewId: (viewId) => {
+    set((state) => ({
+      defaultViewId: viewId,
+      views: state.views.map((view) => ({
+        ...view,
+        isDefault: view.id === viewId,
+      })),
+    }));
+    
+    const { activeSheetId, views } = get();
+    saveDefaultView(activeSheetId, viewId);
+    saveViews(activeSheetId, views);
+  },
+
+  loadViewsForSheet: (sheetId, systemViews = [], userName) => {
+    // Load user views from localStorage
+    let userViews = loadViews(sheetId);
+    const activeViewId = loadActiveView(sheetId);
+    const defaultViewId = loadDefaultView(sheetId);
+    
+    // Convert system views (from config) to UserView format
+    const now = new Date().toISOString();
+    const systemUserViews: UserView[] = systemViews.map((sv) => ({
+      id: sv.id,
+      name: sv.name,
+      description: sv.description,
+      filters: sv.filters,
+      isDefault: sv.isDefault,
+      isSystem: true,
+      icon: sv.id === 'open' ? 'Inbox' : 'Archive',
+      color: sv.id === 'open' ? '#22c55e' : '#6b7280',
+      hiddenColumns: [],
+      pinnedColumns: [],
+      columnOrder: [],
+      sorts: [],
+      groupByColumn: null,
+      createdAt: now,
+      updatedAt: now,
+    }));
+    
+    // Create default personal view if user has no views and we have a username
+    if (userViews.length === 0 && userName) {
+      const defaultPersonalView: UserView = {
+        id: `view-personal-${Date.now()}`,
+        name: `${userName}'s View`,
+        description: 'Your personal default view',
+        filters: [],
+        isDefault: false,
+        isSystem: false,
+        icon: 'User',
+        color: '#8b5cf6', // Purple
+        hiddenColumns: [],
+        pinnedColumns: [],
+        columnOrder: [],
+        sorts: [],
+        groupByColumn: null,
+        createdAt: now,
+        updatedAt: now,
+      };
+      userViews = [defaultPersonalView];
+      // Save the new default personal view
+      saveViews(sheetId, userViews);
+    }
+    
+    // Merge system views with user views
+    const allViews = [...systemUserViews, ...userViews];
+    
+    // Determine active view (saved or default from config or first system view)
+    let effectiveActiveViewId = activeViewId;
+    if (!effectiveActiveViewId || !allViews.find(v => v.id === effectiveActiveViewId)) {
+      // Use default view if set
+      if (defaultViewId && allViews.find(v => v.id === defaultViewId)) {
+        effectiveActiveViewId = defaultViewId;
+      } else {
+        // Fall back to first system default or first view
+        const defaultView = allViews.find(v => v.isDefault) || allViews[0];
+        effectiveActiveViewId = defaultView?.id || null;
+      }
+    }
+    
+    set({
+      views: allViews,
+      activeViewId: effectiveActiveViewId,
+      defaultViewId: defaultViewId,
+    });
+  },
+
+  saveCurrentStateAsView: (name, description) => {
+    const currentState = get().getCurrentViewState();
+    
+    const newView = get().addView({
+      name,
+      description,
+      isSystem: false,
+      isDefault: false,
+      ...currentState,
+    });
+    
+    return newView;
+  },
+
+  applyView: (view) => {
+    const { activeSheetId } = get();
+    
+    // Apply filters from view
+    const columnFilters: Record<string, ColumnFilter> = {};
+    view.filters.forEach((filter) => {
+      columnFilters[filter.columnId] = {
+        type: 'condition',
+        condition: {
+          operator: filter.operator,
+          value: filter.value,
+        },
+      };
+    });
+    
+    set((state) => ({
+      viewState: {
+        ...state.viewState,
+        columnFilters,
+        hiddenColumns: view.hiddenColumns,
+        pinnedColumns: view.pinnedColumns,
+        sorts: view.sorts,
+      },
+      columnOrder: view.columnOrder.length > 0 ? view.columnOrder : state.columnOrder,
+      groupByColumn: view.groupByColumn,
+      activeViewId: view.id,
+    }));
+    
+    // Persist the changes
+    saveFilters(activeSheetId, columnFilters);
+    saveHiddenColumns(activeSheetId, view.hiddenColumns);
+    savePinnedColumns(activeSheetId, view.pinnedColumns);
+    if (view.columnOrder.length > 0) {
+      saveColumnOrder(activeSheetId, view.columnOrder);
+    }
+    saveGroupByColumn(activeSheetId, view.groupByColumn);
+    saveActiveView(activeSheetId, view.id);
+  },
+
+  getCurrentViewState: () => {
+    const { viewState, columnOrder, groupByColumn } = get();
+    
+    // Convert column filters to Filter[] format
+    const filters: Filter[] = Object.entries(viewState.columnFilters)
+      .filter(([_, filter]) => filter.condition)
+      .map(([columnId, filter]) => ({
+        columnId,
+        operator: filter.condition!.operator,
+        value: filter.condition!.value,
+      }));
+    
+    return {
+      filters,
+      hiddenColumns: viewState.hiddenColumns,
+      pinnedColumns: viewState.pinnedColumns,
+      columnOrder,
+      sorts: viewState.sorts,
+      groupByColumn,
+    };
   },
 }));

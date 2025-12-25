@@ -2,7 +2,7 @@
  * Utility functions for managing persistent state in localStorage
  */
 
-import { ColumnFilter } from '@/types';
+import { ColumnFilter, UserView } from '@/types';
 import { RowHeight } from '@/lib/store/sheet-store';
 
 // Storage keys
@@ -16,6 +16,10 @@ const STORAGE_KEYS = {
   columnOrder: (sheetId: string) => `sheet-column-order-${sheetId}`,
   groupByColumn: (sheetId: string) => `sheet-group-by-${sheetId}`,
   collapsedGroups: (sheetId: string) => `sheet-collapsed-groups-${sheetId}`,
+  // Views storage
+  views: (sheetId: string) => `sheet-views-${sheetId}`,
+  activeView: (sheetId: string) => `sheet-active-view-${sheetId}`,
+  defaultView: (sheetId: string) => `sheet-default-view-${sheetId}`,
 };
 
 /**
@@ -246,6 +250,133 @@ export function loadCollapsedGroups(sheetId: string): string[] {
   }
 }
 
+// ============================================
+// Views Storage Functions
+// ============================================
+
+/**
+ * Save user views to localStorage
+ */
+export function saveViews(sheetId: string, views: UserView[]): void {
+  if (typeof window === 'undefined') return;
+  try {
+    // Only save non-system views (system views are defined in config)
+    const userViews = views.filter(v => !v.isSystem);
+    localStorage.setItem(STORAGE_KEYS.views(sheetId), JSON.stringify(userViews));
+  } catch (error) {
+    console.error('Failed to save views to localStorage:', error);
+  }
+}
+
+/**
+ * Load user views from localStorage
+ */
+export function loadViews(sheetId: string): UserView[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const stored = localStorage.getItem(STORAGE_KEYS.views(sheetId));
+    return stored ? JSON.parse(stored) : [];
+  } catch (error) {
+    console.error('Failed to load views from localStorage:', error);
+    return [];
+  }
+}
+
+/**
+ * Save active view ID to localStorage
+ */
+export function saveActiveView(sheetId: string, viewId: string | null): void {
+  if (typeof window === 'undefined') return;
+  try {
+    if (viewId === null) {
+      localStorage.removeItem(STORAGE_KEYS.activeView(sheetId));
+    } else {
+      localStorage.setItem(STORAGE_KEYS.activeView(sheetId), viewId);
+    }
+  } catch (error) {
+    console.error('Failed to save active view:', error);
+  }
+}
+
+/**
+ * Load active view ID from localStorage
+ */
+export function loadActiveView(sheetId: string): string | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    return localStorage.getItem(STORAGE_KEYS.activeView(sheetId));
+  } catch (error) {
+    console.error('Failed to load active view:', error);
+    return null;
+  }
+}
+
+/**
+ * Save default view ID to localStorage
+ */
+export function saveDefaultView(sheetId: string, viewId: string | null): void {
+  if (typeof window === 'undefined') return;
+  try {
+    if (viewId === null) {
+      localStorage.removeItem(STORAGE_KEYS.defaultView(sheetId));
+    } else {
+      localStorage.setItem(STORAGE_KEYS.defaultView(sheetId), viewId);
+    }
+  } catch (error) {
+    console.error('Failed to save default view:', error);
+  }
+}
+
+/**
+ * Load default view ID from localStorage
+ */
+export function loadDefaultView(sheetId: string): string | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    return localStorage.getItem(STORAGE_KEYS.defaultView(sheetId));
+  } catch (error) {
+    console.error('Failed to load default view:', error);
+    return null;
+  }
+}
+
+/**
+ * Save a single view (updates existing or adds new)
+ */
+export function saveView(sheetId: string, view: UserView): void {
+  const views = loadViews(sheetId);
+  const existingIndex = views.findIndex(v => v.id === view.id);
+  
+  if (existingIndex >= 0) {
+    views[existingIndex] = view;
+  } else {
+    views.push(view);
+  }
+  
+  saveViews(sheetId, views);
+}
+
+/**
+ * Delete a view by ID
+ */
+export function deleteView(sheetId: string, viewId: string): void {
+  const views = loadViews(sheetId);
+  const filteredViews = views.filter(v => v.id !== viewId);
+  saveViews(sheetId, filteredViews);
+  
+  // If the deleted view was active, clear active view
+  const activeViewId = loadActiveView(sheetId);
+  if (activeViewId === viewId) {
+    saveActiveView(sheetId, null);
+  }
+  
+  // If the deleted view was default, clear default view
+  const defaultViewId = loadDefaultView(sheetId);
+  if (defaultViewId === viewId) {
+    saveDefaultView(sheetId, null);
+  }
+}
+
 export function clearSheetStorage(sheetId: string): void {
   if (typeof window === 'undefined') return;
   try {
@@ -258,6 +389,9 @@ export function clearSheetStorage(sheetId: string): void {
     localStorage.removeItem(STORAGE_KEYS.columnOrder(sheetId));
     localStorage.removeItem(STORAGE_KEYS.groupByColumn(sheetId));
     localStorage.removeItem(STORAGE_KEYS.collapsedGroups(sheetId));
+    localStorage.removeItem(STORAGE_KEYS.views(sheetId));
+    localStorage.removeItem(STORAGE_KEYS.activeView(sheetId));
+    localStorage.removeItem(STORAGE_KEYS.defaultView(sheetId));
   } catch (error) {
     console.error('Failed to clear sheet storage:', error);
   }
