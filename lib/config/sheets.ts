@@ -117,6 +117,22 @@ export const escalationSheetConfig: SheetConfig = {
       options: manualCaseOptions,
     },
     {
+      id: 'entity_name',
+      label: 'Entity Name',
+      type: 'text',
+      width: 150,
+      required: false,
+      editable: false,
+    },
+    {
+      id: 'master_partner',
+      label: 'Master Partner',
+      type: 'text',
+      width: 150,
+      required: false,
+      editable: false,
+    },
+    {
       id: 'partner_remarks',
       label: 'Partner Remarks',
       type: 'longtext',
