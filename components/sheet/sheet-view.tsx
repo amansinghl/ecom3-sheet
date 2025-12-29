@@ -490,41 +490,43 @@ export function SheetView({ config, userRole }: SheetViewProps) {
           
           setData((prev) => [...prev, tempRow]);
           
-          // Fetch details and auto-focus manual_case
-          try {
-            toast.loading('Fetching escalation details...', { id: 'fetch-escalation' });
-            const response = await sheetApiService.updateEscalationSheet(shipmentNumbers[0]);
-            
-            if (response.data?.escalation) {
-              const backendId = response.data.escalation.id;
-              setData((prev) =>
-                prev.map((row) => {
-                  if (String(row.id) === rowIdString) {
-                    return {
-                      ...row,
-                      ...response.data.escalation,
-                      id: backendId,
-                      updatedAt: new Date(),
-                    };
-                  }
-                  return row;
-                })
-              );
-              toast.success('Escalation details loaded successfully', { id: 'fetch-escalation' });
+          // Defer API call to next tick so UI updates immediately (prevents paste lag)
+          setTimeout(async () => {
+            try {
+              toast.loading('Fetching escalation details...', { id: 'fetch-escalation' });
+              const response = await sheetApiService.updateEscalationSheet(shipmentNumbers[0]);
               
-              setTimeout(() => {
-                const manualCaseColumn = config.columns.find((col) => col.id === 'manual_case');
-                if (manualCaseColumn) {
-                  setEditingCell({ rowId: backendId, columnId: 'manual_case' });
-                }
-              }, 100);
-            } else {
-              toast.error('No escalation data received', { id: 'fetch-escalation' });
+              if (response.data?.escalation) {
+                const backendId = response.data.escalation.id;
+                setData((prev) =>
+                  prev.map((row) => {
+                    if (String(row.id) === rowIdString) {
+                      return {
+                        ...row,
+                        ...response.data.escalation,
+                        id: backendId,
+                        updatedAt: new Date(),
+                      };
+                    }
+                    return row;
+                  })
+                );
+                toast.success('Escalation details loaded successfully', { id: 'fetch-escalation' });
+                
+                setTimeout(() => {
+                  const manualCaseColumn = config.columns.find((col) => col.id === 'manual_case');
+                  if (manualCaseColumn) {
+                    setEditingCell({ rowId: backendId, columnId: 'manual_case' });
+                  }
+                }, 100);
+              } else {
+                toast.error('No escalation data received', { id: 'fetch-escalation' });
+              }
+            } catch (error: any) {
+              console.error('Failed to fetch escalation details:', error);
+              toast.error(error.message || 'Failed to fetch escalation details', { id: 'fetch-escalation' });
             }
-          } catch (error: any) {
-            console.error('Failed to fetch escalation details:', error);
-            toast.error(error.message || 'Failed to fetch escalation details', { id: 'fetch-escalation' });
-          }
+          }, 0);
         } else {
           // Multiple shipment numbers - create rows and process all directly
           toast.info(`Processing ${shipmentNumbers.length} shipments...`);
@@ -602,38 +604,41 @@ export function SheetView({ config, userRole }: SheetViewProps) {
             })
           );
 
-          try {
-            toast.loading('Fetching escalation details...', { id: 'fetch-escalation' });
-            const response = await sheetApiService.updateEscalationSheet(shipmentNumbers[0]);
-            
-            if (response.data?.escalation) {
-              const backendId = response.data.escalation.id;
-              setData((prev) =>
-                prev.map((row) => {
-                  if (String(row.id) === rowIdString) {
-                    return {
-                      ...row,
-                      ...response.data.escalation,
-                      id: backendId,
-                      updatedAt: new Date(),
-                    };
-                  }
-                  return row;
-                })
-              );
-              toast.success('Escalation details loaded successfully', { id: 'fetch-escalation' });
+          // Defer API call to next tick so UI updates immediately (prevents paste lag)
+          setTimeout(async () => {
+            try {
+              toast.loading('Fetching escalation details...', { id: 'fetch-escalation' });
+              const response = await sheetApiService.updateEscalationSheet(shipmentNumbers[0]);
               
-              setTimeout(() => {
-                const manualCaseColumn = config.columns.find((col) => col.id === 'manual_case');
-                if (manualCaseColumn) {
-                  setEditingCell({ rowId: backendId, columnId: 'manual_case' });
-                }
-              }, 100);
+              if (response.data?.escalation) {
+                const backendId = response.data.escalation.id;
+                setData((prev) =>
+                  prev.map((row) => {
+                    if (String(row.id) === rowIdString) {
+                      return {
+                        ...row,
+                        ...response.data.escalation,
+                        id: backendId,
+                        updatedAt: new Date(),
+                      };
+                    }
+                    return row;
+                  })
+                );
+                toast.success('Escalation details loaded successfully', { id: 'fetch-escalation' });
+                
+                setTimeout(() => {
+                  const manualCaseColumn = config.columns.find((col) => col.id === 'manual_case');
+                  if (manualCaseColumn) {
+                    setEditingCell({ rowId: backendId, columnId: 'manual_case' });
+                  }
+                }, 100);
+              }
+            } catch (error: any) {
+              console.error('Failed to fetch escalation details:', error);
+              toast.error(error.message || 'Failed to fetch escalation details', { id: 'fetch-escalation' });
             }
-          } catch (error: any) {
-            console.error('Failed to fetch escalation details:', error);
-            toast.error(error.message || 'Failed to fetch escalation details', { id: 'fetch-escalation' });
-          }
+          }, 0);
         } else {
           // Multiple shipment numbers - create additional rows and process all directly
           toast.info(`Processing ${shipmentNumbers.length} shipments...`);
