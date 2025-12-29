@@ -68,7 +68,6 @@ export function SheetView({ config, userRole }: SheetViewProps) {
   const [editingView, setEditingView] = useState<UserView | null>(null);
   const [viewDialogMode, setViewDialogMode] = useState<'create' | 'edit'>('create');
   const toolbarRef = useRef<ToolbarRef>(null);
-  const hasAppliedDefaultFilters = useRef(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
 
@@ -98,35 +97,9 @@ export function SheetView({ config, userRole }: SheetViewProps) {
     loadGroupingForSheet(config.id);
     // Load views from localStorage and merge with system views from config
     // Pass userName to create a default personal view if none exists
+    // This also applies the active view's state (filters, columns, etc.)
     loadViewsForSheet(config.id, config.views, userName);
-    hasAppliedDefaultFilters.current = false;
   }, [config.id, setActiveSheetId, loadViewStateForSheet, loadColumnWidthsForSheet, loadColumnOrderForSheet, loadGroupingForSheet, loadViewsForSheet, config.views, userName]);
-
-  // Apply default view filters if no filters are already set (after state loads)
-  useEffect(() => {
-    // Only apply default filters once on initial mount
-    if (hasAppliedDefaultFilters.current) return;
-    
-    const defaultView = config.views?.find((v) => v.isDefault) || config.views?.[0];
-    if (defaultView?.filters && Object.keys(viewState.columnFilters).length === 0) {
-      hasAppliedDefaultFilters.current = true;
-      const columnFilters: Record<string, ColumnFilter> = {};
-      defaultView.filters.forEach((filter) => {
-        columnFilters[filter.columnId] = {
-          type: 'condition',
-          condition: {
-            operator: filter.operator,
-            value: filter.value,
-          },
-        };
-      });
-      
-      // Apply the filters
-      Object.entries(columnFilters).forEach(([columnId, filter]) => {
-        setColumnFilter(columnId, filter);
-      });
-    }
-  }, [config.views, viewState.columnFilters, setColumnFilter]);
 
   // Update data when API data changes
   useEffect(() => {

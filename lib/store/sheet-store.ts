@@ -1,22 +1,10 @@
 import { create } from 'zustand';
 import { ViewState, RowData, ColumnFilter, UserView, ViewConfig, Filter, Sort } from '@/types';
 import { 
-  saveFilters, 
-  loadFilters, 
   saveRowHeight, 
   loadRowHeight,
   saveColumnWidths,
   loadColumnWidths,
-  saveHiddenColumns,
-  loadHiddenColumns,
-  savePinnedColumns,
-  loadPinnedColumns,
-  saveColumnOrder,
-  loadColumnOrder,
-  saveGroupByColumn,
-  loadGroupByColumn,
-  saveCollapsedGroups,
-  loadCollapsedGroups,
   // Views storage
   saveViews,
   loadViews,
@@ -24,6 +12,19 @@ import {
   loadActiveView,
   saveDefaultView,
   loadDefaultView,
+  // Per-view state storage
+  saveViewFilters,
+  loadViewFilters,
+  saveViewHiddenColumns,
+  loadViewHiddenColumns,
+  saveViewPinnedColumns,
+  loadViewPinnedColumns,
+  saveViewColumnOrder,
+  loadViewColumnOrder,
+  saveViewSorts,
+  loadViewSorts,
+  saveViewGroupBy,
+  loadViewGroupBy,
 } from '@/lib/utils/storage';
 
 export type RowHeight = 'compact' | 'comfortable' | 'spacious';
@@ -78,6 +79,9 @@ interface SheetStore {
   toggleColumnPin: (columnId: string) => void;
   resetViewState: () => void;
   loadViewStateForSheet: (sheetId: string) => void;
+
+  // Sync current state to active view
+  syncStateToActiveView: () => void;
 
   // Column order (for user customization)
   columnOrder: string[];
@@ -210,8 +214,6 @@ export const useSheetStore = create<SheetStore>((set, get) => ({
       } else {
         newFilters[columnId] = filter;
       }
-      const { activeSheetId } = get();
-      saveFilters(activeSheetId, newFilters);
       return {
         viewState: {
           ...state.viewState,
@@ -219,13 +221,12 @@ export const useSheetStore = create<SheetStore>((set, get) => ({
         },
       };
     });
+    get().syncStateToActiveView();
   },
   clearColumnFilter: (columnId) => {
     set((state) => {
       const newFilters = { ...state.viewState.columnFilters };
       delete newFilters[columnId];
-      const { activeSheetId } = get();
-      saveFilters(activeSheetId, newFilters);
       return {
         viewState: {
           ...state.viewState,
@@ -233,18 +234,20 @@ export const useSheetStore = create<SheetStore>((set, get) => ({
         },
       };
     });
+    get().syncStateToActiveView();
   },
   clearAllFilters: () => {
     set((state) => ({
       viewState: { ...state.viewState, columnFilters: {} },
     }));
-    const { activeSheetId } = get();
-    saveFilters(activeSheetId, {});
+    get().syncStateToActiveView();
   },
-  setSorts: (sorts) =>
+  setSorts: (sorts) => {
     set((state) => ({
       viewState: { ...state.viewState, sorts },
-    })),
+    }));
+    get().syncStateToActiveView();
+  },
   setSearchQuery: (query) =>
     set((state) => ({
       viewState: { ...state.viewState, searchQuery: query },
@@ -253,15 +256,13 @@ export const useSheetStore = create<SheetStore>((set, get) => ({
     set((state) => ({
       viewState: { ...state.viewState, hiddenColumns: columns },
     }));
-    const { activeSheetId } = get();
-    saveHiddenColumns(activeSheetId, columns);
+    get().syncStateToActiveView();
   },
   setPinnedColumns: (columns) => {
     set((state) => ({
       viewState: { ...state.viewState, pinnedColumns: columns },
     }));
-    const { activeSheetId } = get();
-    savePinnedColumns(activeSheetId, columns);
+    get().syncStateToActiveView();
   },
   toggleColumnPin: (columnId) => {
     set((state) => {
@@ -270,41 +271,74 @@ export const useSheetStore = create<SheetStore>((set, get) => ({
         ? pinnedColumns.filter((id) => id !== columnId)
         : [...pinnedColumns, columnId];
       
-      const { activeSheetId } = get();
-      savePinnedColumns(activeSheetId, newPinnedColumns);
-      
       return {
         viewState: { ...state.viewState, pinnedColumns: newPinnedColumns },
       };
     });
+    get().syncStateToActiveView();
   },
   resetViewState: () => {
     set({ viewState: defaultViewState });
-    const { activeSheetId } = get();
-    saveFilters(activeSheetId, {});
-    saveHiddenColumns(activeSheetId, []);
-    savePinnedColumns(activeSheetId, []);
+    get().syncStateToActiveView();
   },
-  loadViewStateForSheet: (sheetId) => {
-    const columnFilters = loadFilters(sheetId);
-    const hiddenColumns = loadHiddenColumns(sheetId);
-    const pinnedColumns = loadPinnedColumns(sheetId);
+  loadViewStateForSheet: (_sheetId) => {
     set((state) => ({
       viewState: {
-        ...state.viewState,
-        columnFilters,
-        hiddenColumns,
-        pinnedColumns,
+        ...defaultViewState,
+        searchQuery: state.viewState.searchQuery,
       },
     }));
   },
 
-  // Column order (for user customization)
+  syncStateToActiveView: () => {
+    const { activeViewId, views, activeSheetId, viewState, columnOrder, groupByColumn } = get();
+    
+    if (!activeViewId) return;
+    
+    const activeView = views.find((v) => v.id === activeViewId);
+    if (!activeView) return;
+    
+    saveViewFilters(activeSheetId, activeViewId, viewState.columnFilters);
+    saveViewHiddenColumns(activeSheetId, activeViewId, viewState.hiddenColumns);
+    saveViewPinnedColumns(activeSheetId, activeViewId, viewState.pinnedColumns);
+    saveViewColumnOrder(activeSheetId, activeViewId, columnOrder);
+    saveViewSorts(activeSheetId, activeViewId, viewState.sorts);
+    saveViewGroupBy(activeSheetId, activeViewId, groupByColumn);
+    
+    if (!activeView.isSystem) {
+      const filters: Filter[] = Object.entries(viewState.columnFilters)
+        .filter(([_, filter]) => filter.condition)
+        .map(([columnId, filter]) => ({
+          columnId,
+          operator: filter.condition!.operator,
+          value: filter.condition!.value,
+        }));
+      
+      const updatedView: UserView = {
+        ...activeView,
+        filters,
+        hiddenColumns: viewState.hiddenColumns,
+        pinnedColumns: viewState.pinnedColumns,
+        columnOrder,
+        sorts: viewState.sorts,
+        groupByColumn,
+        updatedAt: new Date().toISOString(),
+      };
+      
+      set((state) => ({
+        views: state.views.map((view) =>
+          view.id === activeViewId ? updatedView : view
+        ),
+      }));
+      
+      saveViews(activeSheetId, get().views);
+    }
+  },
+
   columnOrder: [],
   setColumnOrder: (order) => {
     set({ columnOrder: order });
-    const { activeSheetId } = get();
-    saveColumnOrder(activeSheetId, order);
+    get().syncStateToActiveView();
   },
   moveColumn: (columnId, direction) => {
     const { columnOrder } = get();
@@ -322,12 +356,10 @@ export const useSheetStore = create<SheetStore>((set, get) => ({
     newOrder.splice(newIndex, 0, columnId);
     
     set({ columnOrder: newOrder });
-    const { activeSheetId } = get();
-    saveColumnOrder(activeSheetId, newOrder);
+    get().syncStateToActiveView();
   },
-  loadColumnOrderForSheet: (sheetId) => {
-    const order = loadColumnOrder(sheetId);
-    set({ columnOrder: order });
+  loadColumnOrderForSheet: (_sheetId) => {
+    set({ columnOrder: [] });
   },
 
   selectedRows: new Set(),
@@ -541,15 +573,12 @@ export const useSheetStore = create<SheetStore>((set, get) => ({
   
   clearHistory: () => set({ undoStack: [], redoStack: [] }),
 
-  // Row grouping
   groupByColumn: null,
   collapsedGroups: new Set(),
 
   setGroupByColumn: (columnId) => {
     set({ groupByColumn: columnId, collapsedGroups: new Set() });
-    const { activeSheetId } = get();
-    saveGroupByColumn(activeSheetId, columnId);
-    saveCollapsedGroups(activeSheetId, []);
+    get().syncStateToActiveView();
   },
 
   toggleGroupCollapse: (groupValue) => {
@@ -560,32 +589,20 @@ export const useSheetStore = create<SheetStore>((set, get) => ({
       } else {
         newCollapsed.add(groupValue);
       }
-      const { activeSheetId } = get();
-      saveCollapsedGroups(activeSheetId, Array.from(newCollapsed));
       return { collapsedGroups: newCollapsed };
     });
   },
 
   collapseAllGroups: (groupValues) => {
-    const newCollapsed = new Set(groupValues);
-    set({ collapsedGroups: newCollapsed });
-    const { activeSheetId } = get();
-    saveCollapsedGroups(activeSheetId, groupValues);
+    set({ collapsedGroups: new Set(groupValues) });
   },
 
   expandAllGroups: () => {
     set({ collapsedGroups: new Set() });
-    const { activeSheetId } = get();
-    saveCollapsedGroups(activeSheetId, []);
   },
 
-  loadGroupingForSheet: (sheetId) => {
-    const groupByColumn = loadGroupByColumn(sheetId);
-    const collapsedGroups = loadCollapsedGroups(sheetId);
-    set({ 
-      groupByColumn, 
-      collapsedGroups: new Set(collapsedGroups) 
-    });
+  loadGroupingForSheet: (_sheetId) => {
+    set({ groupByColumn: null, collapsedGroups: new Set() });
   },
 
   // Views management
@@ -708,12 +725,10 @@ export const useSheetStore = create<SheetStore>((set, get) => ({
   },
 
   loadViewsForSheet: (sheetId, systemViews = [], userName) => {
-    // Load user views from localStorage
     let userViews = loadViews(sheetId);
     const activeViewId = loadActiveView(sheetId);
     const defaultViewId = loadDefaultView(sheetId);
     
-    // Convert system views (from config) to UserView format
     const now = new Date().toISOString();
     const systemUserViews: UserView[] = systemViews.map((sv) => ({
       id: sv.id,
@@ -733,7 +748,6 @@ export const useSheetStore = create<SheetStore>((set, get) => ({
       updatedAt: now,
     }));
     
-    // Create default personal view if user has no views and we have a username
     if (userViews.length === 0 && userName) {
       const defaultPersonalView: UserView = {
         id: `view-personal-${Date.now()}`,
@@ -743,7 +757,7 @@ export const useSheetStore = create<SheetStore>((set, get) => ({
         isDefault: false,
         isSystem: false,
         icon: 'User',
-        color: '#8b5cf6', // Purple
+        color: '#8b5cf6',
         hiddenColumns: [],
         pinnedColumns: [],
         columnOrder: [],
@@ -753,21 +767,16 @@ export const useSheetStore = create<SheetStore>((set, get) => ({
         updatedAt: now,
       };
       userViews = [defaultPersonalView];
-      // Save the new default personal view
       saveViews(sheetId, userViews);
     }
     
-    // Merge system views with user views
     const allViews = [...systemUserViews, ...userViews];
     
-    // Determine active view (saved or default from config or first system view)
     let effectiveActiveViewId = activeViewId;
     if (!effectiveActiveViewId || !allViews.find(v => v.id === effectiveActiveViewId)) {
-      // Use default view if set
       if (defaultViewId && allViews.find(v => v.id === defaultViewId)) {
         effectiveActiveViewId = defaultViewId;
       } else {
-        // Fall back to first system default or first view
         const defaultView = allViews.find(v => v.isDefault) || allViews[0];
         effectiveActiveViewId = defaultView?.id || null;
       }
@@ -778,6 +787,51 @@ export const useSheetStore = create<SheetStore>((set, get) => ({
       activeViewId: effectiveActiveViewId,
       defaultViewId: defaultViewId,
     });
+    
+    const viewToApply = allViews.find((v) => v.id === effectiveActiveViewId);
+    if (viewToApply) {
+      const savedFilters = loadViewFilters(sheetId, viewToApply.id);
+      const savedHiddenColumns = loadViewHiddenColumns(sheetId, viewToApply.id);
+      const savedPinnedColumns = loadViewPinnedColumns(sheetId, viewToApply.id);
+      const savedColumnOrder = loadViewColumnOrder(sheetId, viewToApply.id);
+      const savedSorts = loadViewSorts(sheetId, viewToApply.id);
+      const savedGroupBy = loadViewGroupBy(sheetId, viewToApply.id);
+      
+      let columnFilters: Record<string, ColumnFilter>;
+      
+      if (Object.keys(savedFilters).length > 0) {
+        columnFilters = savedFilters;
+      } else {
+        columnFilters = {};
+        viewToApply.filters.forEach((filter) => {
+          columnFilters[filter.columnId] = {
+            type: 'condition',
+            condition: {
+              operator: filter.operator,
+              value: filter.value,
+            },
+          };
+        });
+      }
+      
+      const hiddenColumns = savedHiddenColumns.length > 0 ? savedHiddenColumns : viewToApply.hiddenColumns;
+      const pinnedColumns = savedPinnedColumns.length > 0 ? savedPinnedColumns : viewToApply.pinnedColumns;
+      const columnOrder = savedColumnOrder.length > 0 ? savedColumnOrder : viewToApply.columnOrder;
+      const sorts = savedSorts.length > 0 ? savedSorts : viewToApply.sorts;
+      const groupByColumn = savedGroupBy !== null ? savedGroupBy : viewToApply.groupByColumn;
+      
+      set((state) => ({
+        viewState: {
+          ...state.viewState,
+          columnFilters,
+          hiddenColumns,
+          pinnedColumns,
+          sorts,
+        },
+        columnOrder: columnOrder.length > 0 ? columnOrder : state.columnOrder,
+        groupByColumn,
+      }));
+    }
   },
 
   saveCurrentStateAsView: (name, description) => {
@@ -797,46 +851,56 @@ export const useSheetStore = create<SheetStore>((set, get) => ({
   applyView: (view) => {
     const { activeSheetId } = get();
     
-    // Apply filters from view
-    const columnFilters: Record<string, ColumnFilter> = {};
-    view.filters.forEach((filter) => {
-      columnFilters[filter.columnId] = {
-        type: 'condition',
-        condition: {
-          operator: filter.operator,
-          value: filter.value,
-        },
-      };
-    });
+    const savedFilters = loadViewFilters(activeSheetId, view.id);
+    const savedHiddenColumns = loadViewHiddenColumns(activeSheetId, view.id);
+    const savedPinnedColumns = loadViewPinnedColumns(activeSheetId, view.id);
+    const savedColumnOrder = loadViewColumnOrder(activeSheetId, view.id);
+    const savedSorts = loadViewSorts(activeSheetId, view.id);
+    const savedGroupBy = loadViewGroupBy(activeSheetId, view.id);
+    
+    let columnFilters: Record<string, ColumnFilter>;
+    
+    if (Object.keys(savedFilters).length > 0) {
+      columnFilters = savedFilters;
+    } else {
+      columnFilters = {};
+      view.filters.forEach((filter) => {
+        columnFilters[filter.columnId] = {
+          type: 'condition',
+          condition: {
+            operator: filter.operator,
+            value: filter.value,
+          },
+        };
+      });
+    }
+    
+    const hiddenColumns = savedHiddenColumns.length > 0 ? savedHiddenColumns : view.hiddenColumns;
+    const pinnedColumns = savedPinnedColumns.length > 0 ? savedPinnedColumns : view.pinnedColumns;
+    const columnOrder = savedColumnOrder.length > 0 ? savedColumnOrder : view.columnOrder;
+    const sorts = savedSorts.length > 0 ? savedSorts : view.sorts;
+    const groupByColumn = savedGroupBy !== null ? savedGroupBy : view.groupByColumn;
     
     set((state) => ({
       viewState: {
         ...state.viewState,
         columnFilters,
-        hiddenColumns: view.hiddenColumns,
-        pinnedColumns: view.pinnedColumns,
-        sorts: view.sorts,
+        hiddenColumns,
+        pinnedColumns,
+        sorts,
       },
-      columnOrder: view.columnOrder.length > 0 ? view.columnOrder : state.columnOrder,
-      groupByColumn: view.groupByColumn,
+      columnOrder: columnOrder.length > 0 ? columnOrder : state.columnOrder,
+      groupByColumn,
       activeViewId: view.id,
+      collapsedGroups: new Set(),
     }));
     
-    // Persist the changes
-    saveFilters(activeSheetId, columnFilters);
-    saveHiddenColumns(activeSheetId, view.hiddenColumns);
-    savePinnedColumns(activeSheetId, view.pinnedColumns);
-    if (view.columnOrder.length > 0) {
-      saveColumnOrder(activeSheetId, view.columnOrder);
-    }
-    saveGroupByColumn(activeSheetId, view.groupByColumn);
     saveActiveView(activeSheetId, view.id);
   },
 
   getCurrentViewState: () => {
     const { viewState, columnOrder, groupByColumn } = get();
     
-    // Convert column filters to Filter[] format
     const filters: Filter[] = Object.entries(viewState.columnFilters)
       .filter(([_, filter]) => filter.condition)
       .map(([columnId, filter]) => ({
