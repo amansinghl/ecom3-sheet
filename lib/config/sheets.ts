@@ -167,8 +167,8 @@ export const escalationSheetConfig: SheetConfig = {
     {
       id: 'vamashipper',
       label: 'Vamashipper',
-      type: 'user-avatar',
-      width: 160,
+      type: 'text',
+      width: 120,
       required: false,
       editable: false,
     },
