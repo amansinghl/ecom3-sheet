@@ -148,12 +148,14 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
   const setEditingCellRef = useRef(setEditingCell);
   const onCellUpdateRef = useRef(onCellUpdate);
   const globalSearchRef = useRef(globalSearch);
+  const focusedCellRef = useRef(focusedCell);
   
   // Keep refs up to date
   editingCellRef.current = editingCell;
   setEditingCellRef.current = setEditingCell;
   onCellUpdateRef.current = onCellUpdate;
   globalSearchRef.current = globalSearch;
+  focusedCellRef.current = focusedCell;
   
   // Initialize column visibility (empty on server to avoid hydration mismatch)
   const [internalColumnVisibility, setInternalColumnVisibility] = useState<Record<string, boolean>>({});
@@ -799,76 +801,88 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
   }, [focusedCell, selectionRange, selectedCells, rows, orderedColumns]);
 
   // Paste from clipboard to focused/selected cells
-  const handlePaste = useCallback(async () => {
-    if (!focusedCell) return;
+  // Takes clipboard text directly from the native paste event (no permission required)
+  const handlePaste = useCallback((clipboardText: string) => {
+    if (!focusedCell || !clipboardText) return;
     
-    try {
-      const clipboardText = await navigator.clipboard.readText();
-      if (!clipboardText) return;
+    // Parse clipboard data (tab-separated columns, newline-separated rows)
+    const clipboardRows = clipboardText.split('\n').map(row => row.split('\t'));
+    
+    if (selectionRange) {
+      // Paste into selection range
+      const minRow = Math.min(selectionRange.start.rowIndex, selectionRange.end.rowIndex);
+      const maxRow = Math.max(selectionRange.start.rowIndex, selectionRange.end.rowIndex);
+      const minCol = Math.min(selectionRange.start.colIndex, selectionRange.end.colIndex);
+      const maxCol = Math.max(selectionRange.start.colIndex, selectionRange.end.colIndex);
       
-      // Parse clipboard data (tab-separated columns, newline-separated rows)
-      const clipboardRows = clipboardText.split('\n').map(row => row.split('\t'));
-      
-      if (selectionRange) {
-        // Paste into selection range
-        const minRow = Math.min(selectionRange.start.rowIndex, selectionRange.end.rowIndex);
-        const maxRow = Math.max(selectionRange.start.rowIndex, selectionRange.end.rowIndex);
-        const minCol = Math.min(selectionRange.start.colIndex, selectionRange.end.colIndex);
-        const maxCol = Math.max(selectionRange.start.colIndex, selectionRange.end.colIndex);
+      for (let r = minRow; r <= maxRow; r++) {
+        const row = rows[r];
+        if (!row) continue;
         
-        for (let r = minRow; r <= maxRow; r++) {
-          const row = rows[r];
-          if (!row) continue;
-          
-          const clipboardRowIndex = (r - minRow) % clipboardRows.length;
-          const clipboardRow = clipboardRows[clipboardRowIndex];
-          
-          for (let c = minCol; c <= maxCol; c++) {
-            const columnId = orderedColumns[c]?.id;
-            const colConfig = config.columns.find(col => col.id === columnId);
-            
-            // Skip if column is not editable
-            if (!columnId || !colConfig || !(colConfig.editable ?? true)) continue;
-            
-            const clipboardColIndex = (c - minCol) % clipboardRow.length;
-            const value = clipboardRow[clipboardColIndex];
-            
-            if (value !== undefined) {
-              onCellUpdate(row.id, columnId, value);
-            }
-          }
-        }
-      } else {
-        // Paste starting from focused cell
-        const startRow = focusedCell.rowIndex;
-        const startCol = focusedCell.colIndex;
+        const clipboardRowIndex = (r - minRow) % clipboardRows.length;
+        const clipboardRow = clipboardRows[clipboardRowIndex];
         
-        for (let r = 0; r < clipboardRows.length; r++) {
-          const rowIndex = startRow + r;
-          const row = rows[rowIndex];
-          if (!row) continue;
+        for (let c = minCol; c <= maxCol; c++) {
+          const columnId = orderedColumns[c]?.id;
+          const colConfig = config.columns.find(col => col.id === columnId);
           
-          const clipboardRow = clipboardRows[r];
+          // Skip if column is not editable
+          if (!columnId || !colConfig || !(colConfig.editable ?? true)) continue;
           
-          for (let c = 0; c < clipboardRow.length; c++) {
-            const colIndex = startCol + c;
-            const columnId = orderedColumns[colIndex]?.id;
-            const colConfig = config.columns.find(col => col.id === columnId);
-            
-            // Skip if column is not editable
-            if (!columnId || !colConfig || !(colConfig.editable ?? true)) continue;
-            
-            const value = clipboardRow[c];
-            if (value !== undefined) {
-              onCellUpdate(row.id, columnId, value);
-            }
+          const clipboardColIndex = (c - minCol) % clipboardRow.length;
+          const value = clipboardRow[clipboardColIndex];
+          
+          if (value !== undefined) {
+            onCellUpdate(row.id, columnId, value);
           }
         }
       }
-    } catch (err) {
-      console.error('Failed to paste from clipboard:', err);
+    } else {
+      // Paste starting from focused cell
+      const startRow = focusedCell.rowIndex;
+      const startCol = focusedCell.colIndex;
+      
+      for (let r = 0; r < clipboardRows.length; r++) {
+        const rowIndex = startRow + r;
+        const row = rows[rowIndex];
+        if (!row) continue;
+        
+        const clipboardRow = clipboardRows[r];
+        
+        for (let c = 0; c < clipboardRow.length; c++) {
+          const colIndex = startCol + c;
+          const columnId = orderedColumns[colIndex]?.id;
+          const colConfig = config.columns.find(col => col.id === columnId);
+          
+          // Skip if column is not editable
+          if (!columnId || !colConfig || !(colConfig.editable ?? true)) continue;
+          
+          const value = clipboardRow[c];
+          if (value !== undefined) {
+            onCellUpdate(row.id, columnId, value);
+          }
+        }
+      }
     }
   }, [focusedCell, selectionRange, rows, orderedColumns, config.columns, onCellUpdate]);
+
+  // Handle paste via document listener (works without special permissions)
+  useEffect(() => {
+    const handlePasteEvent = (e: ClipboardEvent) => {
+      if (editingCellRef.current) return;
+      if (!focusedCellRef.current) return;
+      
+      const activeEl = document.activeElement;
+      if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA')) return;
+      
+      e.preventDefault();
+      const clipboardText = e.clipboardData?.getData('text') || '';
+      if (clipboardText) handlePaste(clipboardText);
+    };
+    
+    document.addEventListener('paste', handlePasteEvent);
+    return () => document.removeEventListener('paste', handlePasteEvent);
+  }, [handlePaste]);
 
   // Track when rapid navigation ends
   const rapidNavTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -909,19 +923,11 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
     
     const isArrowKey = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key);
     const isCopy = (e.ctrlKey || e.metaKey) && e.key === 'c';
-    const isPaste = (e.ctrlKey || e.metaKey) && e.key === 'v';
     
     // Handle copy (Ctrl+C / Cmd+C)
     if (isCopy) {
       e.preventDefault();
       handleCopy();
-      return;
-    }
-    
-    // Handle paste (Ctrl+V / Cmd+V)
-    if (isPaste) {
-      e.preventDefault();
-      handlePaste();
       return;
     }
     
@@ -1041,7 +1047,7 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
         }
       }
     }
-  }, [editingCell, focusedCell, selectionRange, setFocusedCell, setSelectionRange, moveFocus, moveToExtreme, rows, rowVirtualizer, orderedColumns, setEditingCell, clearCellSelection, handleCopy, handlePaste, finishRapidNav, onUndo, onRedo, config.columns, canEdit]);
+  }, [editingCell, focusedCell, selectionRange, setFocusedCell, setSelectionRange, moveFocus, moveToExtreme, rows, rowVirtualizer, orderedColumns, setEditingCell, clearCellSelection, handleCopy, finishRapidNav, onUndo, onRedo, config.columns, canEdit]);
 
   // Track if we have multi-selected cells (avoid recalculating on every render)
   const hasSelectedCells = selectedCells.size > 0;
