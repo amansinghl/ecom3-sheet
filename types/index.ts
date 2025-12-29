@@ -24,6 +24,7 @@ export type CellType =
   | 'url'
   | 'status'
   | 'user'
+  | 'user-avatar'
   | 'highlights';
 
 export interface DropdownOption {

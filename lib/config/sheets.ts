@@ -167,8 +167,8 @@ export const escalationSheetConfig: SheetConfig = {
     {
       id: 'vamashipper',
       label: 'Vamashipper',
-      type: 'text',
-      width: 120,
+      type: 'user-avatar',
+      width: 160,
       required: false,
       editable: false,
     },
@@ -248,8 +248,8 @@ export const escalationSheetConfig: SheetConfig = {
     {
       id: 'last_modified_by',
       label: 'Last Modified By',
-      type: 'text',
-      width: 150,
+      type: 'user-avatar',
+      width: 180,
       required: false,
       editable: false,
     },

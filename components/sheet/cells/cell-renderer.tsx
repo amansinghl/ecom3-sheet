@@ -10,6 +10,7 @@ import { DropdownCell } from './dropdown-cell';
 import { CheckboxCell } from './checkbox-cell';
 import { StatusCell } from './status-cell';
 import { UserCell } from './user-cell';
+import { UserAvatarCell } from './user-avatar-cell';
 import { EmailCell } from './email-cell';
 import { PhoneCell } from './phone-cell';
 import { UrlCell } from './url-cell';
@@ -53,8 +54,8 @@ function arePropsEqual(prev: CellRendererProps, next: CellRendererProps): boolea
   // Column config changes rarely, check by id
   if (prev.columnConfig.id !== next.columnConfig.id) return false;
   
-  // For highlights cell, check rowData
-  if (next.columnConfig.type === 'highlights' && prev.rowData !== next.rowData) return false;
+  // For highlights and user-avatar cells, check rowData
+  if ((next.columnConfig.type === 'highlights' || next.columnConfig.type === 'user-avatar') && prev.rowData !== next.rowData) return false;
   
   // Don't check callback references - they're stable from parent
   return true;
@@ -105,6 +106,8 @@ export const CellRenderer = memo(function CellRenderer({
       return <StatusCell {...cellProps} />;
     case 'user':
       return <UserCell {...cellProps} />;
+    case 'user-avatar':
+      return <UserAvatarCell {...cellProps} rowData={rowData} />;
     case 'email':
       return <EmailCell {...cellProps} />;
     case 'phone':
