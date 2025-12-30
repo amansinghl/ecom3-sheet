@@ -133,6 +133,14 @@ export const escalationSheetConfig: SheetConfig = {
       editable: false,
     },
     {
+      id: 'ops_remarks',
+      label: 'OPS Remarks',
+      type: 'text',
+      width: 200,
+      required: false,
+      editable: true,
+    },
+    {
       id: 'partner_remarks',
       label: 'Partner Remarks',
       type: 'longtext',
