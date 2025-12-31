@@ -21,7 +21,11 @@ export function getRandomAvatar(userId?: string | null): string {
   }
   
   const index = Math.abs(hash) % avatars.length;
-  // return '/images/avatar10.jpg';
+
+  if(userId === 'aman.singh@vamaship.com') {
+    return '/images/avatar12.jpg';
+  }
+
   return `/images/${avatars[index]}`;
 }
 
