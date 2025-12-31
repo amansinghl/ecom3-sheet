@@ -417,6 +417,7 @@ export function SheetView({ config, userRole }: SheetViewProps) {
       'notes',
       'manual_case',
       'followup_remarks',
+      'ops_remarks',
       'source_of_complaint',
       'manual_ticket_status',
       'email_subject',
