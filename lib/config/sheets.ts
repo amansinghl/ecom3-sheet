@@ -24,6 +24,7 @@ const manualCaseOptions: StatusOption[] = [
   { label: 'Wrong RTO', value: 'Wrong RTO', color: '#f43f5e' },
   { label: 'Misrouted Shipment', value: 'Misrouted Shipment', color: '#fbbf24' },
   { label: 'Revoke RTO', value: 'Revoke RTO', color: '#f97167' },
+  { label: 'B2B Appointment', value: 'B2B Appointment', color: '#22c55e' },
 ];
 
 // Manual Ticket Status Options
