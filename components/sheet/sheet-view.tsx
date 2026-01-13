@@ -224,14 +224,28 @@ export function SheetView({ config, userRole }: SheetViewProps) {
     }).filter(Boolean); // Remove null entries
 
     // Identify and mark duplicate rows based on shipment_no + manual_case combination
-    // Only for escalations sheet and only in "Open Escalations" view
+    // Only for escalations sheet and only when viewing open escalations (is_closed === 0)
     if (config.id === 'escalations') {
-      // Check if we're in the "Open Escalations" view (is_closed === 0)
-      const isOpenEscalationsView = activeViewId === 'open' || 
+      // Check if we're viewing open escalations (is_closed === 0)
+      // This works for both system views and custom views
+      const isOpenEscalationsView = 
+        activeViewId === 'open' || 
         (viewState.columnFilters['is_closed']?.condition?.operator === 'equals' && 
-         viewState.columnFilters['is_closed']?.condition?.value === 0);
+         viewState.columnFilters['is_closed']?.condition?.value === 0) ||
+        // Check if the active view has filters that show open escalations
+        (activeView && activeView.filters?.some(
+          (filter: any) => filter.columnId === 'is_closed' && 
+                          filter.operator === 'equals' && 
+                          filter.value === 0
+        )) ||
+        // Fallback: Check if filtered data contains open escalations
+        result.some((row) => {
+          const idString = String(row.id);
+          if (idString.startsWith('row-') || idString.startsWith('empty-')) return false;
+          return row.is_closed === 0;
+        });
       
-      // Only process duplicates if in Open Escalations view
+      // Only process duplicates if viewing open escalations
       if (isOpenEscalationsView) {
         // Group rows by shipment_no + manual_case combination
         const duplicateMap = new Map<string, RowData[]>();
@@ -295,7 +309,7 @@ export function SheetView({ config, userRole }: SheetViewProps) {
     }
 
     return [...result, ...emptyRows];
-  }, [data, viewState.columnFilters, config.columns, config.id, globalSearch, activeViewId]);
+  }, [data, viewState.columnFilters, config.columns, config.id, globalSearch, activeViewId, activeView]);
 
   const visibleRowCount = useMemo(() => {
     return filteredData.filter((row) => !String(row.id).startsWith('empty-')).length;
