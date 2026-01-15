@@ -78,7 +78,7 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
     toggleGroupCollapse,
   } = useSheetStore();
   const [sorting, setSorting] = useState<SortingState>([]);
-  const [columnResizeMode] = useState<ColumnResizeMode>('onChange');
+  const columnResizeMode = useState<ColumnResizeMode>('onChange')[0];
   const [hoveredRow, setHoveredRow] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; rowId: string } | null>(null);
   const [openFilterPopover, setOpenFilterPopover] = useState<string | null>(null);
@@ -414,7 +414,7 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
           // PERFORMANCE: Read from refs to avoid recreating columns on state change
           const currentEditingCell = editingCellRef.current;
           const isEditing =
-            currentEditingCell?.rowId === row.id && currentEditingCell?.columnId === column.id;
+            currentEditingCell?.rowId === String(row.id) && currentEditingCell?.columnId === column.id;
           const value = row.getValue(column.id);
           
           // Check if this is shipment_no column and if row is existing (numeric ID)
@@ -438,7 +438,7 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
               rowData={row.original}
               globalSearch={globalSearchRef.current}
               initialValue={isEditing ? currentEditingCell?.initialValue : undefined}
-              onEdit={() => setEditingCellRef.current({ rowId: row.id, columnId: column.id })}
+              onEdit={() => setEditingCellRef.current({ rowId: String(row.id), columnId: column.id })}
               onSave={(newValue) => {
                 onCellUpdateRef.current(row.id, column.id, newValue);
                 setEditingCellRef.current(null);

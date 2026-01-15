@@ -302,7 +302,7 @@ export const Toolbar = forwardRef<ToolbarRef, ToolbarProps>(({ config, data, use
           <span className="text-xs text-muted-foreground whitespace-nowrap">
             Total: {visibleRowCount}
           </span>
-          {onRefresh && config.id === 'escalations' && (
+          {onRefresh && (config.id === 'escalations' || config.id === 'lsd') && (
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button 
