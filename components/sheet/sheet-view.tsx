@@ -154,6 +154,40 @@ export function SheetView({ config, userRole }: SheetViewProps) {
       result = result.filter((row) => isTemporaryRow(row) || filteredIds.has(String(row.id)));
     }
 
+    // Apply LSD sheet view filtering (Unpaid/Paid) - frontend only
+    if (config.id === 'lsd') {
+      const isPaidView = activeViewId === 'paid';
+      const isUnpaidView = activeViewId === 'unpaid';
+      
+      if (isPaidView || isUnpaidView) {
+        result = result.filter((row) => {
+          const idString = String(row.id);
+          // Always show temporary rows (row-* or empty-*) - they're being processed
+          if (idString.startsWith('row-') || idString.startsWith('empty-')) {
+            return true;
+          }
+          
+          // For rows with backend IDs, check the credit note fields
+          const creditNoteNo = row.credit_note_no_utr_no;
+          const creditNoteDate = row.credit_note_date_refund_date;
+          
+          // Check if both fields are filled
+          const isPaid = creditNoteNo && creditNoteDate && 
+                         String(creditNoteNo).trim() !== '' && 
+                         String(creditNoteDate).trim() !== '';
+          
+          if (isPaidView) {
+            return isPaid;
+          } else if (isUnpaidView) {
+            // Unpaid view: show entries where at least one field is not filled
+            return !isPaid;
+          }
+          
+          return true;
+        });
+      }
+    }
+
     // Apply global search across visible data (excluding empty rows)
     if (globalSearch.trim()) {
       const searchTerm = globalSearch.trim().toLowerCase();
@@ -224,7 +258,8 @@ export function SheetView({ config, userRole }: SheetViewProps) {
     }).filter(Boolean); // Remove null entries
 
     // Identify and mark duplicate rows based on shipment_no + manual_case combination
-    // Only for escalations sheet and only when viewing open escalations (is_closed === 0)
+    // For escalations sheet: only when viewing open escalations (is_closed === 0)
+    // For LSD sheet: always check for duplicates
     if (config.id === 'escalations') {
       // Check if we're viewing open escalations (is_closed === 0)
       // This works for both system views and custom views
@@ -306,10 +341,88 @@ export function SheetView({ config, userRole }: SheetViewProps) {
           }
         });
       }
+    } else if (config.id === 'lsd') {
+      // For LSD sheet: always check for duplicates based on manual_case + shipment_no
+      // Group rows by shipment_no + manual_case combination
+      const duplicateMap = new Map<string, RowData[]>();
+      
+      result.forEach((row) => {
+        const idString = String(row.id);
+        // Skip temporary and empty rows
+        if (idString.startsWith('row-') || idString.startsWith('empty-')) return;
+        
+        const shipmentNo = row.shipment_no;
+        const manualCase = row.manual_case;
+        
+        // Skip rows with empty/null/undefined manual_case or shipment_no
+        if (!manualCase || manualCase === '' || manualCase === null || manualCase === undefined ||
+            !shipmentNo || shipmentNo === '' || shipmentNo === null || shipmentNo === undefined) {
+          return;
+        }
+        
+        // Create a key from shipment_no and manual_case
+        const key = `${shipmentNo}_${manualCase}`;
+        
+        if (!duplicateMap.has(key)) {
+          duplicateMap.set(key, []);
+        }
+        duplicateMap.get(key)!.push(row);
+      });
+      
+      // Process duplicates: mark all entries EXCEPT the oldest (lowest ID) as duplicate (highlight in red)
+      duplicateMap.forEach((rows) => {
+        if (rows.length > 1) {
+          // Sort by id (lowest id = oldest entry first)
+          rows.sort((a, b) => {
+            const idA = typeof a.id === 'number' ? a.id : parseInt(String(a.id), 10);
+            const idB = typeof b.id === 'number' ? b.id : parseInt(String(b.id), 10);
+            
+            // If both are valid numbers, compare numerically (ascending - lowest first)
+            if (!isNaN(idA) && !isNaN(idB)) {
+              return idA - idB; // Ascending order (lowest ID first = oldest)
+            }
+            // Otherwise compare as strings (ascending)
+            return String(a.id).localeCompare(String(b.id));
+          });
+          
+          // Keep the oldest entry (first one after sorting - lowest ID) normal (not highlighted)
+          // Mark all other entries (newer ones) as duplicates (highlight in red)
+          for (let i = 1; i < rows.length; i++) {
+            rows[i]._isDuplicate = true; // Flag for styling - highlight newer entries in red
+          }
+          
+          // Ensure oldest entry is not highlighted
+          if (rows[0]._isDuplicate) {
+            delete rows[0]._isDuplicate;
+          }
+        }
+      });
+    }
+
+    // For LSD sheet: sort by ID ascending (oldest at top, latest at bottom) if no manual sort is applied
+    if (config.id === 'lsd' && viewState.sorts.length === 0) {
+      result = [...result].sort((a, b) => {
+        const idA = typeof a.id === 'number' ? a.id : parseInt(String(a.id || 0), 10);
+        const idB = typeof b.id === 'number' ? b.id : parseInt(String(b.id || 0), 10);
+        
+        // Skip temporary and empty rows - keep them at their position
+        const aIsTemp = String(a.id).startsWith('row-') || String(a.id).startsWith('empty-');
+        const bIsTemp = String(b.id).startsWith('row-') || String(b.id).startsWith('empty-');
+        
+        if (aIsTemp && !bIsTemp) return 1; // Temp rows go to bottom
+        if (!aIsTemp && bIsTemp) return -1; // Real rows stay on top
+        if (aIsTemp && bIsTemp) return 0; // Keep temp rows in their order
+        
+        // Sort by ID ascending (oldest first, latest last)
+        if (!isNaN(idA) && !isNaN(idB)) {
+          return idA - idB;
+        }
+        return String(a.id).localeCompare(String(b.id));
+      });
     }
 
     return [...result, ...emptyRows];
-  }, [data, viewState.columnFilters, config.columns, config.id, globalSearch, activeViewId, activeView]);
+  }, [data, viewState.columnFilters, config.columns, config.id, globalSearch, activeViewId, activeView, viewState.sorts.length]);
 
   const visibleRowCount = useMemo(() => {
     return filteredData.filter((row) => !String(row.id).startsWith('empty-')).length;
@@ -392,10 +505,113 @@ export function SheetView({ config, userRole }: SheetViewProps) {
     }
   };
 
+  /**
+   * Process a single LSD shipment number
+   */
+  const processLSDShipment = async (
+    shipmentNo: string,
+    rowId: string
+  ) => {
+    try {
+      toast.loading(`Fetching LSD details for shipment ${shipmentNo}...`, { id: `fetch-lsd-${shipmentNo}` });
+      const response = await sheetApiService.updateLSDSheet(shipmentNo);
+      
+      // Extract response data - handle different response structures
+      let responseData: any = null;
+      let backendId: number | string | null = null;
+      
+      // Check for lsd_record (actual API response structure)
+      if (response.data?.lsd_record) {
+        responseData = response.data.lsd_record;
+        backendId = responseData.id;
+      } 
+      // Check for lsd (alternative structure)
+      else if (response.data?.lsd) {
+        responseData = response.data.lsd;
+        backendId = responseData.id;
+      } 
+      // Try flat structure
+      else if (response.data && typeof response.data === 'object' && !Array.isArray(response.data)) {
+        // Check if response.data itself has an id (flat structure)
+        if (response.data.id) {
+          responseData = response.data;
+          backendId = response.data.id;
+        } else {
+          // Try to find the first object with an id
+          for (const key in response.data) {
+            if (response.data[key] && typeof response.data[key] === 'object' && response.data[key].id) {
+              responseData = response.data[key];
+              backendId = response.data[key].id;
+              break;
+            }
+          }
+        }
+      }
+      
+      if (responseData && backendId) {
+        // Update the row with data from backend
+        setData((prev) => {
+          const rowExists = prev.some((row) => String(row.id) === rowId);
+          
+          if (rowExists) {
+            // Update existing row
+            return prev.map((row) => {
+              if (String(row.id) === rowId) {
+                return {
+                  ...row,
+                  ...responseData,
+                  id: backendId,
+                  shipment_no: shipmentNo, // Ensure shipment_no is set
+                  updatedAt: new Date(),
+                };
+              }
+              return row;
+            });
+          } else {
+            // Row doesn't exist, add it
+            return [
+              ...prev,
+              {
+                ...responseData,
+                id: backendId,
+                shipment_no: shipmentNo,
+                createdAt: new Date(),
+                updatedAt: new Date(),
+              },
+            ];
+          }
+        });
+        
+        toast.success(`LSD details for shipment ${shipmentNo} loaded successfully`, { id: `fetch-lsd-${shipmentNo}` });
+        
+        // Auto-focus on manual_case after data is loaded
+        // Use setTimeout to ensure state has updated with the new backendId
+        setTimeout(() => {
+          const manualCaseColumn = config.columns.find((col) => col.id === 'manual_case');
+          if (manualCaseColumn && backendId) {
+            // Use the backendId which is now the row's ID
+            setEditingCell({ rowId: String(backendId), columnId: 'manual_case' });
+          }
+        }, 500);
+        
+        return backendId;
+      } else {
+        console.error('LSD API Response:', response);
+        toast.error(`No data received for shipment ${shipmentNo}`, { id: `fetch-lsd-${shipmentNo}` });
+        return null;
+      }
+    } catch (error: any) {
+      console.error(`Failed to fetch LSD details for ${shipmentNo}:`, error);
+      toast.error(error.message || `Failed to fetch LSD details for shipment ${shipmentNo}`, { id: `fetch-lsd-${shipmentNo}` });
+      return null;
+    }
+  };
+
   const handleCellUpdate = async (rowId: string, columnId: string, value: any) => {
-    // Check if this is the shipment_no column for escalation sheet
+    // Check if this is the shipment_no column for escalation or LSD sheet
     // Check for null/undefined explicitly to allow 0 as a valid value
-    const isShipmentNoUpdate = columnId === 'shipment_no' && config.id === 'escalations' && (value !== null && value !== undefined && value !== '');
+    const isShipmentNoUpdate = columnId === 'shipment_no' && (config.id === 'escalations' || config.id === 'lsd') && (value !== null && value !== undefined && value !== '');
+    const isLSDShipmentNoUpdate = columnId === 'shipment_no' && config.id === 'lsd' && (value !== null && value !== undefined && value !== '');
 
     // Convert rowId to string to handle cases where it might be a number from API
     const rowIdString = String(rowId);
@@ -421,13 +637,14 @@ export function SheetView({ config, userRole }: SheetViewProps) {
       const isExistingRow = typeof actualRowId === 'number' || (typeof actualRowId === 'string' && !actualRowId.startsWith('row-') && !actualRowId.startsWith('empty-'));
       
       if (isExistingRow) {
-        toast.error('Shipment number cannot be changed for existing escalations');
+        const sheetName = config.id === 'escalations' ? 'escalations' : config.id === 'lsd' ? 'LSD entries' : 'entries';
+        toast.error(`Shipment number cannot be changed for existing ${sheetName}`);
         return;
       }
     }
 
-    // Fields that should trigger the update-entries API call
-    const updatableFields = [
+    // Fields that should trigger the update-entries API call for escalation sheet
+    const escalationUpdatableFields = [
       'notes',
       'manual_case',
       'followup_remarks',
@@ -439,8 +656,37 @@ export function SheetView({ config, userRole }: SheetViewProps) {
       'closure_datetime', // Also handle closure_datetime
     ];
 
-    // Check if this is an updatable field for escalation sheet
-    const isUpdatableField = config.id === 'escalations' && updatableFields.includes(columnId);
+    // Fields that should trigger the update-entries API call for LSD sheet
+    // All editable fields in LSD sheet should trigger API call
+    const lsdUpdatableFields = [
+      'credit_note_refund',
+      'shipment_no',
+      'lost_damage_service_failure',
+      'credit_note_refund_2',
+      'credit_note_amount_to_customer',
+      'remarks',
+      'finance_update',
+      'credit_note_no_utr_no',
+      'credit_note_date_refund_date',
+      'credit_note_refund_amount',
+      'ops_name',
+      'investigation_status',
+      'partner_debit_note_no_utr_no',
+      'partner_debit_note_date_refund_date',
+      'partner_debit_note_amount_refund_amount',
+      'operations_remarks',
+      'partners_email_subject',
+      'email_link_of_partner',
+      'partners_email_subject_for_cn_followup',
+      'email_link_of_partner_for_cn',
+      'approved_by_ops_lead',
+      'manual_case',
+    ];
+
+    // Check if this is an updatable field
+    const isUpdatableField = 
+      (config.id === 'escalations' && escalationUpdatableFields.includes(columnId)) ||
+      (config.id === 'lsd' && lsdUpdatableFields.includes(columnId));
 
     // Check if this is an empty row being edited
     if (rowIdString.startsWith('empty-')) {
@@ -481,38 +727,45 @@ export function SheetView({ config, userRole }: SheetViewProps) {
           // Defer API call to next tick so UI updates immediately (prevents paste lag)
           setTimeout(async () => {
             try {
-              toast.loading('Fetching escalation details...', { id: 'fetch-escalation' });
-              const response = await sheetApiService.updateEscalationSheet(shipmentNumbers[0]);
-              
-              if (response.data?.escalation) {
-                const backendId = response.data.escalation.id;
-                setData((prev) =>
-                  prev.map((row) => {
-                    if (String(row.id) === rowIdString) {
-                      return {
-                        ...row,
-                        ...response.data.escalation,
-                        id: backendId,
-                        updatedAt: new Date(),
-                      };
-                    }
-                    return row;
-                  })
-                );
-                toast.success('Escalation details loaded successfully', { id: 'fetch-escalation' });
-                
-                setTimeout(() => {
-                  const manualCaseColumn = config.columns.find((col) => col.id === 'manual_case');
-                  if (manualCaseColumn) {
-                    setEditingCell({ rowId: backendId, columnId: 'manual_case' });
-                  }
-                }, 100);
+              if (config.id === 'lsd') {
+                // Handle LSD sheet
+                await processLSDShipment(shipmentNumbers[0], rowIdString);
               } else {
-                toast.error('No escalation data received', { id: 'fetch-escalation' });
+                // Handle escalation sheet
+                toast.loading('Fetching escalation details...', { id: 'fetch-escalation' });
+                const response = await sheetApiService.updateEscalationSheet(shipmentNumbers[0]);
+                
+                if (response.data?.escalation) {
+                  const backendId = response.data.escalation.id;
+                  setData((prev) =>
+                    prev.map((row) => {
+                      if (String(row.id) === rowIdString) {
+                        return {
+                          ...row,
+                          ...response.data.escalation,
+                          id: backendId,
+                          updatedAt: new Date(),
+                        };
+                      }
+                      return row;
+                    })
+                  );
+                  toast.success('Escalation details loaded successfully', { id: 'fetch-escalation' });
+                  
+                  setTimeout(() => {
+                    const manualCaseColumn = config.columns.find((col) => col.id === 'manual_case');
+                    if (manualCaseColumn) {
+                      setEditingCell({ rowId: backendId, columnId: 'manual_case' });
+                    }
+                  }, 100);
+                } else {
+                  toast.error('No escalation data received', { id: 'fetch-escalation' });
+                }
               }
             } catch (error: any) {
-              console.error('Failed to fetch escalation details:', error);
-              toast.error(error.message || 'Failed to fetch escalation details', { id: 'fetch-escalation' });
+              console.error('Failed to fetch details:', error);
+              const errorMsg = config.id === 'lsd' ? 'Failed to fetch LSD details' : 'Failed to fetch escalation details';
+              toast.error(error.message || errorMsg, { id: 'fetch-escalation' });
             }
           }, 0);
         } else {
@@ -542,7 +795,11 @@ export function SheetView({ config, userRole }: SheetViewProps) {
             setData((prev) => [...prev, tempRow]);
             
             // Process each shipment directly without showing dialog
-            processShipmentWithManualCase(shipmentNo, newRowId);
+            if (config.id === 'lsd') {
+              processLSDShipment(shipmentNo, newRowId);
+            } else {
+              processShipmentWithManualCase(shipmentNo, newRowId);
+            }
           }
         }
       } else {
@@ -595,36 +852,43 @@ export function SheetView({ config, userRole }: SheetViewProps) {
           // Defer API call to next tick so UI updates immediately (prevents paste lag)
           setTimeout(async () => {
             try {
-              toast.loading('Fetching escalation details...', { id: 'fetch-escalation' });
-              const response = await sheetApiService.updateEscalationSheet(shipmentNumbers[0]);
-              
-              if (response.data?.escalation) {
-                const backendId = response.data.escalation.id;
-                setData((prev) =>
-                  prev.map((row) => {
-                    if (String(row.id) === rowIdString) {
-                      return {
-                        ...row,
-                        ...response.data.escalation,
-                        id: backendId,
-                        updatedAt: new Date(),
-                      };
-                    }
-                    return row;
-                  })
-                );
-                toast.success('Escalation details loaded successfully', { id: 'fetch-escalation' });
+              if (config.id === 'lsd') {
+                // Handle LSD sheet
+                await processLSDShipment(shipmentNumbers[0], rowIdString);
+              } else {
+                // Handle escalation sheet
+                toast.loading('Fetching escalation details...', { id: 'fetch-escalation' });
+                const response = await sheetApiService.updateEscalationSheet(shipmentNumbers[0]);
                 
-                setTimeout(() => {
-                  const manualCaseColumn = config.columns.find((col) => col.id === 'manual_case');
-                  if (manualCaseColumn) {
-                    setEditingCell({ rowId: backendId, columnId: 'manual_case' });
-                  }
-                }, 100);
+                if (response.data?.escalation) {
+                  const backendId = response.data.escalation.id;
+                  setData((prev) =>
+                    prev.map((row) => {
+                      if (String(row.id) === rowIdString) {
+                        return {
+                          ...row,
+                          ...response.data.escalation,
+                          id: backendId,
+                          updatedAt: new Date(),
+                        };
+                      }
+                      return row;
+                    })
+                  );
+                  toast.success('Escalation details loaded successfully', { id: 'fetch-escalation' });
+                  
+                  setTimeout(() => {
+                    const manualCaseColumn = config.columns.find((col) => col.id === 'manual_case');
+                    if (manualCaseColumn) {
+                      setEditingCell({ rowId: backendId, columnId: 'manual_case' });
+                    }
+                  }, 100);
+                }
               }
             } catch (error: any) {
-              console.error('Failed to fetch escalation details:', error);
-              toast.error(error.message || 'Failed to fetch escalation details', { id: 'fetch-escalation' });
+              console.error('Failed to fetch details:', error);
+              const errorMsg = config.id === 'lsd' ? 'Failed to fetch LSD details' : 'Failed to fetch escalation details';
+              toast.error(error.message || errorMsg, { id: 'fetch-escalation' });
             }
           }, 0);
         } else {
@@ -646,7 +910,11 @@ export function SheetView({ config, userRole }: SheetViewProps) {
           );
           
           // Process first shipment
-          processShipmentWithManualCase(shipmentNumbers[0], rowIdString);
+          if (config.id === 'lsd') {
+            processLSDShipment(shipmentNumbers[0], rowIdString);
+          } else {
+            processShipmentWithManualCase(shipmentNumbers[0], rowIdString);
+          }
           
           // Create additional rows for remaining shipments and process them
           shipmentNumbers.slice(1).forEach((shipmentNo, index) => {
@@ -671,7 +939,11 @@ export function SheetView({ config, userRole }: SheetViewProps) {
             setData((prev) => [...prev, tempRow]);
             
             // Process this shipment directly without showing dialog
-            processShipmentWithManualCase(shipmentNo, newRowId);
+            if (config.id === 'lsd') {
+              processLSDShipment(shipmentNo, newRowId);
+            } else {
+              processShipmentWithManualCase(shipmentNo, newRowId);
+            }
           });
         }
       } else {
@@ -688,6 +960,27 @@ export function SheetView({ config, userRole }: SheetViewProps) {
             return row;
           })
         );
+        
+        // Sequential flow for LSD sheet in new rows: manual_case -> credit_note_refund -> remarks
+        if (config.id === 'lsd') {
+          if (columnId === 'manual_case') {
+            // After manual_case is saved, auto-focus on credit_note_refund
+            setTimeout(() => {
+              const creditNoteRefundColumn = config.columns.find((col) => col.id === 'credit_note_refund');
+              if (creditNoteRefundColumn) {
+                setEditingCell({ rowId: rowIdString, columnId: 'credit_note_refund' });
+              }
+            }, 100);
+          } else if (columnId === 'credit_note_refund') {
+            // After credit_note_refund is saved, auto-focus on remarks
+            setTimeout(() => {
+              const remarksColumn = config.columns.find((col) => col.id === 'remarks');
+              if (remarksColumn) {
+                setEditingCell({ rowId: rowIdString, columnId: 'remarks' });
+              }
+            }, 100);
+          }
+        }
       }
     } else {
       // Update existing row
@@ -713,9 +1006,23 @@ export function SheetView({ config, userRole }: SheetViewProps) {
         try {
           const updatePayload: Record<string, any> = {};
           
-          // Handle closure_datetime separately - convert Date to ISO string or null
-          if (columnId === 'closure_datetime') {
-            // updatePayload.closure_datetime = value ? (value instanceof Date ? value.toISOString() : value) : null;
+          // Handle date fields for LSD sheet
+          if (config.id === 'lsd') {
+            if (columnId === 'entry_date' || columnId === 'credit_note_date_refund_date' || columnId === 'partner_debit_note_date_refund_date') {
+              // Handle date fields - convert Date to YYYY-MM-DD format or keep as is
+              if (value instanceof Date) {
+                updatePayload[columnId] = value.toISOString().split('T')[0];
+              } else if (value) {
+                updatePayload[columnId] = value;
+              } else {
+                updatePayload[columnId] = null;
+              }
+            } else {
+              updatePayload[columnId] = value;
+            }
+          } 
+          // Handle closure_datetime for escalation sheet
+          else if (columnId === 'closure_datetime') {
             updatePayload.closure_datetime = value;
           } else {
             updatePayload[columnId] = value;
@@ -756,13 +1063,17 @@ export function SheetView({ config, userRole }: SheetViewProps) {
             }
           }
 
-          // Add vamashipper to the update payload
-          if (currentRow?.vamashipper) {
+          // Add vamashipper to the update payload for escalation sheet
+          if (config.id === 'escalations' && currentRow?.vamashipper) {
             updatePayload.vamashipper = currentRow.vamashipper;
           }
 
-          // Call the update-entries API
-          await sheetApiService.updateEscalationEntries(actualRowId, updatePayload);
+          // Call the update-entries API based on sheet type
+          if (config.id === 'lsd') {
+            await sheetApiService.updateLSDEntries(actualRowId, updatePayload);
+          } else if (config.id === 'escalations') {
+            await sheetApiService.updateEscalationEntries(actualRowId, updatePayload);
+          }
           
           // Show success message with row identifier
           const columnLabel = config.columns.find((col) => col.id === columnId)?.label || columnId;
@@ -772,6 +1083,27 @@ export function SheetView({ config, userRole }: SheetViewProps) {
           toast.success(`Updated ${columnLabel} for ${rowIdentifier}`, { 
             id: `update-${actualRowId}-${columnId}` 
           });
+          
+          // Sequential flow for LSD sheet: manual_case -> credit_note_refund -> remarks
+          if (config.id === 'lsd' && actualRowId) {
+            if (columnId === 'manual_case') {
+              // After manual_case is saved, auto-focus on credit_note_refund
+              setTimeout(() => {
+                const creditNoteRefundColumn = config.columns.find((col) => col.id === 'credit_note_refund');
+                if (creditNoteRefundColumn) {
+                  setEditingCell({ rowId: String(actualRowId), columnId: 'credit_note_refund' });
+                }
+              }, 100);
+            } else if (columnId === 'credit_note_refund') {
+              // After credit_note_refund is saved, auto-focus on remarks
+              setTimeout(() => {
+                const remarksColumn = config.columns.find((col) => col.id === 'remarks');
+                if (remarksColumn) {
+                  setEditingCell({ rowId: String(actualRowId), columnId: 'remarks' });
+                }
+              }, 100);
+            }
+          }
         } catch (error: any) {
           // Extract error message from ApiError object or Error instance
           const errorMessage = error?.message || error?.error || 'Failed to update field';
@@ -857,8 +1189,8 @@ export function SheetView({ config, userRole }: SheetViewProps) {
       return !isExistingRow || !row.shipment_no;
     });
     
-    // Delete from backend if escalation sheet and rows have shipment_no and id
-    if (config.id === 'escalations' && rowsToDelete.length > 0) {
+    // Delete from backend if escalation or LSD sheet and rows have id
+    if ((config.id === 'escalations' || config.id === 'lsd') && rowsToDelete.length > 0) {
       toast.loading(`Deleting ${rowsToDelete.length} row${rowsToDelete.length > 1 ? 's' : ''}...`, { id: 'delete-rows' });
       
       try {
@@ -866,9 +1198,13 @@ export function SheetView({ config, userRole }: SheetViewProps) {
         await Promise.all(
           rowsToDelete
             .filter((row) => row.id) // Only delete rows that have an id
-            .map((row) => 
-              sheetApiService.deleteEscalation(row.id, row.shipment_no, row.vamashipper)
-            )
+            .map((row) => {
+              if (config.id === 'lsd') {
+                return sheetApiService.deleteLSD(row.id, row.vamashipper || '');
+              } else {
+                return sheetApiService.deleteEscalation(row.id, row.shipment_no, row.vamashipper);
+              }
+            })
         );
         
         // Only remove successfully deleted rows from UI
@@ -1078,15 +1414,22 @@ export function SheetView({ config, userRole }: SheetViewProps) {
     const isExistingRow = typeof rowToDelete.id === 'number' || (typeof rowToDelete.id === 'string' && !rowToDelete.id.startsWith('row-') && !rowToDelete.id.startsWith('empty-'));
     const hasShipmentNo = rowToDelete.shipment_no;
     
-    // Delete from backend if escalation sheet and row has shipment_no and id
-    if (config.id === 'escalations' && isExistingRow && hasShipmentNo && rowToDelete.id) {
+    // Delete from backend if escalation or LSD sheet and row has id
+    if ((config.id === 'escalations' || config.id === 'lsd') && isExistingRow && rowToDelete.id) {
       toast.loading('Deleting row...', { id: `delete-${rowIdString}` });
       
       try {
-        await sheetApiService.deleteEscalation(rowToDelete.id, rowToDelete.shipment_no, rowToDelete.vamashipper);
+        if (config.id === 'lsd') {
+          await sheetApiService.deleteLSD(rowToDelete.id, rowToDelete.vamashipper || '');
+        } else {
+          await sheetApiService.deleteEscalation(rowToDelete.id, rowToDelete.shipment_no, rowToDelete.vamashipper);
+        }
         // Only remove from UI after successful deletion
         setData((prev) => prev.filter((row) => String(row.id) !== rowIdString));
-        toast.success(`Deleted row (shipment_no: ${rowToDelete.shipment_no}, vamashipper: ${rowToDelete.vamashipper})`, { 
+        const rowIdentifier = rowToDelete.shipment_no 
+          ? `shipment_no: ${rowToDelete.shipment_no}` 
+          : `row ID: ${rowIdString}`;
+        toast.success(`Deleted row (${rowIdentifier})`, { 
           id: `delete-${rowIdString}` 
         });
       } catch (error: any) {
@@ -1098,7 +1441,7 @@ export function SheetView({ config, userRole }: SheetViewProps) {
         // Row stays visible - no need to restore it since we never removed it
       }
     } else {
-      // For new rows or non-escalation sheets, optimistically remove from UI
+      // For new rows or non-escalation/LSD sheets, optimistically remove from UI
       setData((prev) => prev.filter((row) => String(row.id) !== rowIdString));
       const rowIdentifier = rowToDelete.shipment_no 
         ? `shipment_no: ${rowToDelete.shipment_no}` 
@@ -1126,8 +1469,8 @@ export function SheetView({ config, userRole }: SheetViewProps) {
       return !isExistingRow || !row.shipment_no;
     });
 
-    // Delete from backend if escalation sheet and rows have shipment_no and id
-    if (config.id === 'escalations' && rowsToDelete.length > 0) {
+    // Delete from backend if escalation or LSD sheet and rows have id
+    if ((config.id === 'escalations' || config.id === 'lsd') && rowsToDelete.length > 0) {
       toast.loading(`Deleting ${rowsToDelete.length} row${rowsToDelete.length > 1 ? 's' : ''}...`, { id: 'delete-rows-bulk' });
 
       try {
@@ -1135,9 +1478,13 @@ export function SheetView({ config, userRole }: SheetViewProps) {
         await Promise.all(
           rowsToDelete
             .filter((row) => row.id)
-            .map((row) =>
-              sheetApiService.deleteEscalation(row.id, row.shipment_no, row.vamashipper)
-            )
+            .map((row) => {
+              if (config.id === 'lsd') {
+                return sheetApiService.deleteLSD(row.id, row.vamashipper || '');
+              } else {
+                return sheetApiService.deleteEscalation(row.id, row.shipment_no, row.vamashipper);
+              }
+            })
         );
 
         // Only remove successfully deleted rows from UI
@@ -1185,7 +1532,8 @@ export function SheetView({ config, userRole }: SheetViewProps) {
     const scrollTop = scrollContainerRef.current?.scrollTop || 0;
     
     // Show loading toast
-    toast.loading('Refreshing escalation sheet...', { id: 'refresh' });
+    const sheetDisplayName = config.id === 'escalations' ? 'escalation' : config.id === 'lsd' ? 'LSD' : 'sheet';
+    toast.loading(`Refreshing ${sheetDisplayName} sheet...`, { id: 'refresh' });
     
     // Invalidate query cache to force fresh fetch
     const sheetName = config.id === 'escalations' ? 'escalation' : config.id;
@@ -1195,9 +1543,9 @@ export function SheetView({ config, userRole }: SheetViewProps) {
     if (refetch) {
       try {
         await refetch();
-        toast.success('Escalation sheet refreshed successfully', { id: 'refresh' });
+        toast.success(`${sheetDisplayName.charAt(0).toUpperCase() + sheetDisplayName.slice(1)} sheet refreshed successfully`, { id: 'refresh' });
       } catch (error: any) {
-        toast.error('Failed to refresh escalation sheet', { id: 'refresh' });
+        toast.error(`Failed to refresh ${sheetDisplayName} sheet`, { id: 'refresh' });
       }
     }
     

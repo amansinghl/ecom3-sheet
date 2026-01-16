@@ -18,6 +18,7 @@ import { RowData } from '@/types';
 export interface SheetData {
   escalations?: RowData[];  // Escalation sheet format
   tech?: RowData[];         // Tech sheet format
+  lsd?: RowData[];          // LSD sheet format
   rows?: RowData[];         // Generic format
   [key: string]: any;       // Allow other sheet types
   total?: number;
@@ -33,6 +34,12 @@ export interface EscalationResponse {
   escalation: RowData;
 }
 
+export interface LSDResponse {
+  lsd?: RowData;
+  lsd_record?: RowData; // Actual API response structure
+  [key: string]: any;
+}
+
 /**
  * Helper function to extract rows from different response formats
  * Provides flexibility for different backend response structures
@@ -46,6 +53,9 @@ function extractRowsFromResponse(data: SheetData): RowData[] {
   }
   if (Array.isArray(data.tech)) {
     return data.tech;
+  }
+  if (Array.isArray(data.lsd)) {
+    return data.lsd;
   }
   // Fallback: check for array properties
   for (const key in data) {
@@ -262,6 +272,97 @@ class SheetApiService {
       return response;
     } catch (error) {
       console.error(`Failed to update ${sheetName} sheet:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Update LSD sheet data by shipment number
+   * Fetches/updates LSD details for a specific shipment
+   * 
+   * @param shipment_no Shipment number to update
+   * @returns API response with LSD details
+   * @throws Error if API request fails
+   */
+  async updateLSDSheet(shipment_no: string): Promise<ApiResponse<LSDResponse>> {
+    try {
+      const response = await apiClient.post<ApiResponse<LSDResponse>>(
+        `/sheets/lsd/update/${shipment_no}`
+      );
+
+      return response;
+    } catch (error) {
+      console.error('Failed to update LSD sheet:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get LSD sheet data
+   * Fetches LSD records from backend
+   * 
+   * @returns Array of LSD rows
+   * @throws Error if API request fails
+   */
+  async getLSDSheet(): Promise<RowData[]> {
+    try {
+      const response = await apiClient.get<ApiResponse<SheetData>>(
+        '/sheets/lsd'
+      );
+
+      return extractRowsFromResponse(response.data);
+    } catch (error) {
+      console.error('Failed to fetch LSD sheet:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Update LSD sheet entries
+   * Updates specific fields in an LSD record
+   * 
+   * @param id The ID of the LSD record
+   * @param payload Object containing the fields to update
+   * @returns API response with operation result
+   * @throws Error if API request fails
+   */
+  async updateLSDEntries(
+    id: number | string,
+    payload: Record<string, any>
+  ): Promise<ApiResponse<any>> {
+    try {
+      const response = await apiClient.post<ApiResponse<any>>(
+        '/sheets/lsd/update-entries',
+        {
+          id: Number(id),
+          ...payload,
+        }
+      );
+
+      return response;
+    } catch (error) {
+      // Error is handled in the component with user-friendly toast messages
+      throw error;
+    }
+  }
+
+  /**
+   * Delete LSD entry by id
+   * 
+   * @param id The ID of the LSD record
+   * @param vamashipper Vamashipper for authorization
+   * @returns API response
+   * @throws Error if API request fails
+   */
+  async deleteLSD(id: number | string, vamashipper: string | number): Promise<ApiResponse<any>> {
+    try {
+      const response = await apiClient.post<ApiResponse<any>>(
+        `/sheets/lsd/delete/${id}`,
+        { vamashipper: vamashipper }
+      );
+      return response;
+    } catch (error) {
+      // Error is handled in the component with user-friendly toast messages
       throw error;
     }
   }
