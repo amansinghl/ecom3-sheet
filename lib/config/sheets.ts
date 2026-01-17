@@ -241,14 +241,14 @@ export const escalationSheetConfig: SheetConfig = {
       required: false,
       editable: false,
     },
-    {
-      id: 'consignee_no',
-      label: 'Consignee No',
-      type: 'phone',
-      width: 120,
-      required: false,
-      editable: false,
-    },
+    // {
+    //   id: 'consignee_no',
+    //   label: 'Consignee No',
+    //   type: 'phone',
+    //   width: 120,
+    //   required: false,
+    //   editable: false,
+    // },
     {
       id: 'duplicate_awb',
       label: 'Duplicate AWB',
