@@ -1160,6 +1160,10 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
                 const colIndex = columnId === 'select' ? -1 : orderedColumns.findIndex(c => c.id === columnId);
                 const isColumnHighlighted = colIndex >= 0 && selectionState.highlightedColumns.has(colIndex);
                 
+                // Check if this column is editable
+                const headerColConfig = config.columns.find(c => c.id === columnId);
+                const isHeaderEditable = headerColConfig ? canEdit && (headerColConfig.editable ?? true) : true;
+                
                 return (
                   <th
                     key={header.id}
@@ -1171,14 +1175,23 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
                       // Column highlight styling
                       isColumnHighlighted 
                         ? 'bg-primary/15 border-b-2 border-b-primary' 
-                        : 'bg-gray-100'
+                        : 'bg-gray-100',
+                      // Non-editable column header styling
+                      !isHeaderEditable && columnId !== 'select' && 'non-editable-column-header'
                     )}
                     style={{ 
                       width: `${header.getSize()}px`, 
                       maxWidth: `${header.getSize()}px`,
                       ...(isPinned ? { 
                         left: `${stickyLeft}px`,
-                        backgroundColor: isColumnHighlighted ? 'rgba(99, 102, 241, 0.15)' : '#f3f4f6'
+                        backgroundColor: isColumnHighlighted 
+                          ? 'rgba(99, 102, 241, 0.15)' 
+                          : (!isHeaderEditable && columnId !== 'select' ? '#ffe8e8' : '#f3f4f6')
+                      } : {}),
+                      // Apply light red/pink background for non-editable column headers
+                      // Note: CSS class will override this, but keeping for consistency
+                      ...(!isHeaderEditable && columnId !== 'select' && !isColumnHighlighted && !isPinned ? {
+                        backgroundColor: '#ffe8e8' // Light red/pink for headers
                       } : {})
                     }}
                   >
@@ -1330,9 +1343,11 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
                         } else if (isEmptyRow) {
                           return '#f9fafb'; // gray-50
                         } else if (idx % 2 === 0) {
-                          return '#ffffff'; // white
+                          // For non-editable columns, use light red/pink background
+                          return !isEditable && isDataCell ? '#fff0f0' : '#ffffff'; // white or very light red/pink
                         } else {
-                          return '#f9fafb'; // gray-50
+                          // For non-editable columns, use light red/pink background
+                          return !isEditable && isDataCell ? '#ffe8e8' : '#f9fafb'; // gray-50 or light red/pink
                         }
                       };
                       
@@ -1352,7 +1367,10 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
                           // Focus styling - primary border ring
                           cellIsFocused && isDataCell && 'cell-focused-ring',
                           // Fill drag target highlight
-                          isInFillRange && isDataCell && 'fill-target'
+                          isInFillRange && isDataCell && 'fill-target',
+                          // Non-editable column styling - only apply if NOT a duplicate row
+                          // Duplicate rows should show red background, not the non-editable column color
+                          !isEditable && isDataCell && !isDuplicate && 'non-editable-column'
                         )}
                         style={{ 
                           width: `${cell.column.getSize()}px`, 
@@ -1363,7 +1381,7 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
                           } : {}),
                           // Apply red background for duplicate rows (non-pinned cells)
                           ...(!isPinned && row.original._isDuplicate === true && !isEmptyRow ? {
-                            backgroundColor: '#fecaca' // red-200
+                            backgroundColor: '#fecaca' // red-200 - duplicate row color
                           } : {})
                         }}
                       >

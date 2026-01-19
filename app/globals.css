@@ -394,3 +394,22 @@ tr[data-group-header] {
 tr[data-group-header] td {
   background-color: inherit;
 }
+
+/* Non-editable column styling - very light/faint appearance with colored background */
+.non-editable-column {
+  background-color: #fff0f0 !important; /* Very light red/pink background */
+}
+
+.non-editable-column * {
+  color: #374151 !important; /* Dark gray text for better visibility */
+  opacity: 1 !important; /* Full opacity for text to ensure visibility */
+}
+
+.non-editable-column-header {
+  background-color: #ffe8e8 !important; /* Slightly darker light red/pink for headers */
+}
+
+.non-editable-column-header * {
+  color: #1f2937 !important; /* Dark gray text for headers */
+  opacity: 1 !important; /* Full opacity for header text */
+}
