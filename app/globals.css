@@ -400,31 +400,9 @@ tr[data-group-header] td {
   background-color: #fff0f0 !important; /* Very light red/pink background */
 }
 
-/* Duplicate row background takes precedence over non-editable column background */
-tr.bg-red-200 .non-editable-column,
-tr.bg-red-300 .non-editable-column,
-tr[style*="background-color: rgb(254, 202, 202)"] .non-editable-column,
-tr[style*="background-color:#fecaca"] .non-editable-column {
-  background-color: #fecaca !important; /* red-200 - duplicate row color */
-}
-
-/* Also handle when duplicate background is applied directly to the cell */
-td[style*="background-color: rgb(254, 202, 202)"].non-editable-column,
-td[style*="background-color:#fecaca"].non-editable-column {
-  background-color: #fecaca !important; /* red-200 - duplicate row color */
-}
-
 .non-editable-column * {
   color: #374151 !important; /* Dark gray text for better visibility */
   opacity: 1 !important; /* Full opacity for text to ensure visibility */
-}
-
-/* Ensure badges and spans in highlights column are visible */
-.non-editable-column .badge,
-.non-editable-column span,
-.non-editable-column div {
-  color: #374151 !important;
-  opacity: 1 !important;
 }
 
 .non-editable-column-header {

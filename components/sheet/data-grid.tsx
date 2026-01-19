@@ -1379,14 +1379,9 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
                             left: `${stickyLeft}px`,
                             backgroundColor: getBgColor()
                           } : {}),
-                          // Apply light red/pink background for non-editable columns (non-pinned)
-                          // Only apply if NOT a duplicate row (duplicate takes precedence)
-                          ...(!isEditable && isDataCell && !isPinned && !row.original._isDuplicate ? {
-                            backgroundColor: idx % 2 === 0 ? '#fff0f0' : '#ffe8e8' // Very light red/pink
-                          } : {}),
-                          // Apply red background for duplicate rows (non-pinned cells) - MUST be last to override
+                          // Apply red background for duplicate rows (non-pinned cells)
                           ...(!isPinned && row.original._isDuplicate === true && !isEmptyRow ? {
-                            backgroundColor: '#fecaca' // red-200 - duplicate row color takes precedence
+                            backgroundColor: '#fecaca' // red-200 - duplicate row color
                           } : {})
                         }}
                       >
