@@ -44,6 +44,14 @@ const manualTicketStatusOptions: StatusOption[] = [
   { label: 'Close', value: 'Close', color: '#10b981' },
 ];
 
+const investigationStatusOptions: StatusOption[] = [
+  { label: 'Accepted By Partner', value: 'Accepted By Partner', color: '#10b981' }, 
+  { label: 'Rejected By Partner', value: 'Rejected By Partner', color: '#ef4444' }, 
+  { label: 'Under Investigation', value: 'Under Investigation', color: '#f59e0b' }, 
+  { label: 'Partner To be debited', value: 'Partner To be debited', color: '#ef4444' }, 
+  { label: 'Happiness Discount', value: 'Happiness Discount', color: '#22c55e' },
+];
+
 // Escalation Sheet Configuration
 export const escalationSheetConfig: SheetConfig = {
   id: 'escalations',
@@ -476,22 +484,22 @@ export const lsdSheetConfig: SheetConfig = {
       required: false,
       editable: false,
     },
-    {
-      id: 'duplicate_entry_count',
-      label: 'Duplicate Entry Count',
-      type: 'number',
-      width: 160,
-      required: false,
-      editable: false,
-    },
-    {
-      id: 'duplicate_with_last_year',
-      label: 'Duplicate with last year',
-      type: 'text',
-      width: 180,
-      required: false,
-      editable: false,
-    },
+    // {
+    //   id: 'duplicate_entry_count',
+    //   label: 'Duplicate Entry Count',
+    //   type: 'number',
+    //   width: 160,
+    //   required: false,
+    //   editable: false,
+    // },
+    // {
+    //   id: 'duplicate_with_last_year',
+    //   label: 'Duplicate with last year',
+    //   type: 'text',
+    //   width: 180,
+    //   required: false,
+    //   editable: false,
+    // },
     {
       id: 'latest_tracking_status',
       label: 'Latest Tracking Status',
@@ -532,14 +540,14 @@ export const lsdSheetConfig: SheetConfig = {
       required: false,
       editable: false,
     },
-    {
-      id: 'lost_damage_service_failure',
-      label: 'Lost & Damage / Service Failure',
-      type: 'text',
-      width: 220,
-      required: false,
-      editable: true,
-    },
+    // {
+    //   id: 'lost_damage_service_failure',
+    //   label: 'Lost & Damage / Service Failure',
+    //   type: 'text',
+    //   width: 220,
+    //   required: false,
+    //   editable: true,
+    // },
     {
       id: 'credit_note_amount_to_customer',
       label: 'Credit Note Amount to be given to Customer',
@@ -579,6 +587,7 @@ export const lsdSheetConfig: SheetConfig = {
       width: 200,
       required: false,
       editable: true,
+      backgroundColor: '#d9efda', // Light green
     },
     {
       id: 'credit_note_date_refund_date',
@@ -587,6 +596,7 @@ export const lsdSheetConfig: SheetConfig = {
       width: 220,
       required: false,
       editable: true,
+      backgroundColor: '#d9efda', // Light green
     },
     {
       id: 'credit_note_refund_amount',
@@ -595,6 +605,7 @@ export const lsdSheetConfig: SheetConfig = {
       width: 220,
       required: false,
       editable: true,
+      backgroundColor: '#d9efda', // Light green
     },
     {
       id: 'ops_name',
@@ -603,14 +614,17 @@ export const lsdSheetConfig: SheetConfig = {
       width: 120,
       required: false,
       editable: true,
+      backgroundColor: '#fff9c4', // Light yellow
     },
     {
       id: 'investigation_status',
       label: 'Investigation Status',
-      type: 'text',
+      type: 'status',
       width: 180,
       required: false,
       editable: true,
+      options: investigationStatusOptions,
+      backgroundColor: '#fff9c4', // Light yellow
     },
     {
       id: 'partner_debit_note_no_utr_no',
@@ -619,6 +633,7 @@ export const lsdSheetConfig: SheetConfig = {
       width: 250,
       required: false,
       editable: true,
+      backgroundColor: '#fff9c4', // Light yellow
     },
     {
       id: 'partner_debit_note_date_refund_date',
@@ -627,6 +642,7 @@ export const lsdSheetConfig: SheetConfig = {
       width: 280,
       required: false,
       editable: true,
+      backgroundColor: '#fff9c4', // Light yellow
     },
     {
       id: 'partner_debit_note_amount_refund_amount',
@@ -635,6 +651,7 @@ export const lsdSheetConfig: SheetConfig = {
       width: 300,
       required: false,
       editable: true,
+      backgroundColor: '#fff9c4', // Light yellow
     },
     {
       id: 'operations_remarks',
@@ -643,6 +660,7 @@ export const lsdSheetConfig: SheetConfig = {
       width: 200,
       required: false,
       editable: true,
+      backgroundColor: '#fff9c4', // Light yellow
     },
     {
       id: 'partners_email_subject',
@@ -651,6 +669,7 @@ export const lsdSheetConfig: SheetConfig = {
       width: 200,
       required: false,
       editable: true,
+      backgroundColor: '#fff9c4', // Light yellow
     },
     {
       id: 'email_link_of_partner',
@@ -659,6 +678,7 @@ export const lsdSheetConfig: SheetConfig = {
       width: 200,
       required: false,
       editable: true,
+      backgroundColor: '#fff9c4', // Light yellow
     },
     {
       id: 'partners_email_subject_for_cn_followup',
@@ -667,6 +687,7 @@ export const lsdSheetConfig: SheetConfig = {
       width: 280,
       required: false,
       editable: true,
+      backgroundColor: '#fff9c4', // Light yellow
     },
     {
       id: 'email_link_of_partner_for_cn',
@@ -675,6 +696,7 @@ export const lsdSheetConfig: SheetConfig = {
       width: 220,
       required: false,
       editable: true,
+      backgroundColor: '#fff9c4', // Light yellow
     },
     {
       id: 'approved_by_ops_lead',

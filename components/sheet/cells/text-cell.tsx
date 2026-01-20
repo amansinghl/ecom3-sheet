@@ -22,6 +22,7 @@ interface TextCellProps {
 
 export const TextCell = memo(function TextCell({
   value,
+  columnConfig,
   isEditing,
   canEdit,
   rowHeight,
@@ -99,7 +100,23 @@ export const TextCell = memo(function TextCell({
     );
   }
 
-  const displayValue = value || '';
+  // Format entry_month column as "January 2026" instead of "2026-01"
+  let displayValue = value || '';
+  if (columnConfig.id === 'entry_month' && displayValue) {
+    try {
+      // Parse "2026-01" format
+      const [year, month] = displayValue.split('-');
+      if (year && month) {
+        const date = new Date(parseInt(year), parseInt(month) - 1, 1);
+        const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 
+                           'July', 'August', 'September', 'October', 'November', 'December'];
+        displayValue = `${monthNames[date.getMonth()]} ${year}`;
+      }
+    } catch (e) {
+      // If parsing fails, use original value
+    }
+  }
+  
   const highlightedValue = !isEditing && globalSearch.trim() 
     ? highlightText(displayValue, globalSearch.trim())
     : displayValue;

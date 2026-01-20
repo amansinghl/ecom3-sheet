@@ -53,6 +53,7 @@ export interface ColumnConfig {
     pattern?: RegExp;
     message?: string;
   };
+  backgroundColor?: string; // Background color for the column
 }
 
 // Sheet Configuration
