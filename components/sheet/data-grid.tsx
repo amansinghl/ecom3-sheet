@@ -1165,22 +1165,35 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
                 const isHeaderEditable = headerColConfig ? canEdit && (headerColConfig.editable ?? true) : true;
                 const columnBgColor = headerColConfig?.backgroundColor;
                 
-                // Determine header background color with precedence:
-                // 1. Column highlight (highest)
-                // 2. Column backgroundColor from config
-                // 3. Non-editable styling
-                // 4. Default
+                // Determine if CSS class will be applied (which has !important and overrides inline styles)
+                const willHavePinkClass = columnId !== 'select' && (
+                  config.id === 'escalations' 
+                    ? isHeaderEditable // Escalations: editable gets pink class
+                    : config.id === 'lsd'
+                    ? false // LSD: no pink classes
+                    : !isHeaderEditable // Other sheets: non-editable gets pink class
+                );
+                
+                // Only set inline backgroundColor when CSS class is NOT applied
+                // CSS classes with !important will override inline styles anyway
                 const getHeaderBgColor = () => {
+                  if (willHavePinkClass) return undefined; // CSS class handles it
+                  
                   if (isColumnHighlighted) {
                     return 'rgba(99, 102, 241, 0.15)';
                   }
                   if (columnBgColor) {
                     return columnBgColor;
                   }
-                  if (!isHeaderEditable && columnId !== 'select') {
-                    return '#ffe8e8'; // Light red/pink for non-editable
+                  if (columnId === 'select') {
+                    return '#f3f4f6';
                   }
-                  return '#f3f4f6'; // Default gray
+                  // Escalations non-editable or LSD: normal gray
+                  if (config.id === 'escalations' || config.id === 'lsd') {
+                    return '#f3f4f6';
+                  }
+                  // Other sheets editable: normal gray
+                  return '#f3f4f6';
                 };
                 
                 return (
@@ -1196,13 +1209,22 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
                       isColumnHighlighted 
                         ? 'bg-primary/15 border-b-2 border-b-primary' 
                         : 'bg-gray-100',
-                      // Non-editable column header styling
-                      !isHeaderEditable && columnId !== 'select' && 'non-editable-column-header'
+                      // Column header styling - sheet-specific
+                      // Escalations: editable = pink (apply class), non-editable = normal (no class)
+                      // LSD: no pink (no class for anyone)
+                      // Other sheets: non-editable = pink (apply class)
+                      columnId !== 'select' && (
+                        config.id === 'escalations' 
+                          ? (isHeaderEditable && 'non-editable-column-header')
+                          : config.id === 'lsd'
+                          ? null
+                          : (!isHeaderEditable && 'non-editable-column-header')
+                      )
                     )}
                     style={{ 
                       width: `${header.getSize()}px`, 
                       maxWidth: `${header.getSize()}px`,
-                      backgroundColor: getHeaderBgColor(),
+                      ...(getHeaderBgColor() && { backgroundColor: getHeaderBgColor() }),
                       ...(isPinned ? { 
                         left: `${stickyLeft}px`
                       } : {})
@@ -1344,7 +1366,7 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
                       // 3. Row selection
                       // 4. Column backgroundColor from config (applies to all rows including empty)
                       // 5. Empty row default (only if no column color)
-                      // 6. Non-editable styling
+                      // 6. CSS class for editable/non-editable (sheet-specific, handled via className)
                       // 7. Default (alternating rows)
                       const getBgColor = () => {
                         const isDuplicate = row.original._isDuplicate === true;
@@ -1373,13 +1395,22 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
                           return '#f9fafb'; // gray-50
                         }
                         
-                        // For non-editable columns, use light red/pink background
-                        if (!isEditable && isDataCell) {
-                          return idx % 2 === 0 ? '#fff0f0' : '#ffe8e8'; // Very light red/pink
+                        // Determine if CSS class will be applied (which has !important and overrides inline styles)
+                        const willHavePinkClass = isDataCell && !isDuplicate && (
+                          config.id === 'escalations'
+                            ? isEditable // Escalations: editable gets pink class
+                            : config.id === 'lsd'
+                            ? false // LSD: no pink classes
+                            : !isEditable // Other sheets: non-editable gets pink class
+                        );
+                        
+                        // Only set inline backgroundColor when CSS class is NOT applied
+                        if (willHavePinkClass) {
+                          return undefined; // CSS class handles it
                         }
                         
-                        // Default alternating row colors
-                        return idx % 2 === 0 ? '#ffffff' : '#f9fafb'; // white or gray-50
+                        // Normal alternating row colors for columns without CSS class
+                        return idx % 2 === 0 ? '#ffffff' : '#f9fafb';
                       };
                       
                       return (
@@ -1399,14 +1430,20 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
                           cellIsFocused && isDataCell && 'cell-focused-ring',
                           // Fill drag target highlight
                           isInFillRange && isDataCell && 'fill-target',
-                          // Non-editable column styling - only apply if NOT a duplicate row
-                          // Duplicate rows should show red background, not the non-editable column color
-                          !isEditable && isDataCell && !isDuplicate && 'non-editable-column'
+                          // Column styling - sheet-specific, only apply if NOT a duplicate row
+                          // Duplicate rows should show red background, not the column color
+                          isDataCell && !isDuplicate && (
+                            config.id === 'escalations'
+                              ? (isEditable && 'non-editable-column') // Escalations: editable gets pink
+                              : config.id === 'lsd'
+                              ? null // LSD: no pink classes
+                              : (!isEditable && 'non-editable-column') // Other sheets: non-editable gets pink
+                          )
                         )}
                         style={{ 
                           width: `${cell.column.getSize()}px`, 
                           maxWidth: `${cell.column.getSize()}px`,
-                          backgroundColor: getBgColor(),
+                          ...(getBgColor() && { backgroundColor: getBgColor() }),
                           ...(isPinned ? { 
                             left: `${stickyLeft}px`
                           } : {})
