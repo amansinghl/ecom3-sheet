@@ -336,13 +336,13 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
           return (
             <div
               className={cn(
-                "flex items-center gap-1 group/header",
+                "flex items-start gap-1 group/header",
                 !isEditable && "cursor-not-allowed"
               )}
             >
               <button
                 className={cn(
-                  'p-0.5 rounded hover:bg-muted transition-all shrink-0',
+                  'p-0.5 rounded hover:bg-muted transition-all shrink-0 mt-0.5',
                   'opacity-0 group-hover/header:opacity-100',
                   isPinned && 'text-primary opacity-100'
                 )}
@@ -358,9 +358,9 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
                   <Pin className="h-3 w-3" />
                 )}
               </button>
-              <span className="font-semibold flex-1 truncate">{colConfig.label}</span>
+              <span className="font-semibold flex-1 whitespace-normal break-words">{colConfig.label}</span>
               {isSorted && (
-                <span className="shrink-0">
+                <span className="shrink-0 mt-0.5">
                   {isSorted === 'asc' ? (
                     <ChevronUp className="h-3 w-3" />
                   ) : (
@@ -375,7 +375,7 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
                 <PopoverTrigger asChild>
                   <button
                     className={cn(
-                      'p-0.5 rounded hover:bg-muted transition-all shrink-0',
+                      'p-0.5 rounded hover:bg-muted transition-all shrink-0 mt-0.5',
                       'opacity-0 group-hover/header:opacity-100',
                       hasFilter && 'text-primary opacity-100'
                     )}
@@ -1163,13 +1163,33 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
                 // Check if this column is editable
                 const headerColConfig = config.columns.find(c => c.id === columnId);
                 const isHeaderEditable = headerColConfig ? canEdit && (headerColConfig.editable ?? true) : true;
+                const columnBgColor = headerColConfig?.backgroundColor;
+                
+                // Determine header background color with precedence:
+                // 1. Column highlight (highest)
+                // 2. Column backgroundColor from config
+                // 3. Non-editable styling
+                // 4. Default
+                const getHeaderBgColor = () => {
+                  if (isColumnHighlighted) {
+                    return 'rgba(99, 102, 241, 0.15)';
+                  }
+                  if (columnBgColor) {
+                    return columnBgColor;
+                  }
+                  if (!isHeaderEditable && columnId !== 'select') {
+                    return '#ffe8e8'; // Light red/pink for non-editable
+                  }
+                  return '#f3f4f6'; // Default gray
+                };
                 
                 return (
                   <th
                     key={header.id}
                     className={cn(
-                      'relative border-r border-border px-3 text-left text-xs font-medium overflow-hidden',
-                      rowHeightClasses[rowHeight],
+                      'relative border-r border-border px-3 text-left text-xs font-medium',
+                      // Use min-height instead of fixed height to allow wrapping
+                      rowHeight === 'compact' ? 'min-h-6' : rowHeight === 'comfortable' ? 'min-h-10' : 'min-h-14',
                       isPinned ? 'sticky z-40' : '',
                       isLastPinned && 'shadow-[2px_0_4px_rgba(0,0,0,0.1)]',
                       // Column highlight styling
@@ -1182,16 +1202,9 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
                     style={{ 
                       width: `${header.getSize()}px`, 
                       maxWidth: `${header.getSize()}px`,
+                      backgroundColor: getHeaderBgColor(),
                       ...(isPinned ? { 
-                        left: `${stickyLeft}px`,
-                        backgroundColor: isColumnHighlighted 
-                          ? 'rgba(99, 102, 241, 0.15)' 
-                          : (!isHeaderEditable && columnId !== 'select' ? '#ffe8e8' : '#f3f4f6')
-                      } : {}),
-                      // Apply light red/pink background for non-editable column headers
-                      // Note: CSS class will override this, but keeping for consistency
-                      ...(!isHeaderEditable && columnId !== 'select' && !isColumnHighlighted && !isPinned ? {
-                        backgroundColor: '#ffe8e8' // Light red/pink for headers
+                        left: `${stickyLeft}px`
                       } : {})
                     }}
                   >
@@ -1322,10 +1335,18 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
                           rowIndex < fillDragState.sourceCell.rowIndex && 
                           rowIndex >= fillDragState.targetEndRow));
                       
-                      // Determine background color for pinned cells
+                      // Get column background color from config
+                      const columnBgColor = colConfig?.backgroundColor;
+                      
+                      // Determine background color for cells with precedence:
+                      // 1. Duplicate row (highest)
+                      // 2. Cell selection
+                      // 3. Row selection
+                      // 4. Column backgroundColor from config (applies to all rows including empty)
+                      // 5. Empty row default (only if no column color)
+                      // 6. Non-editable styling
+                      // 7. Default (alternating rows)
                       const getBgColor = () => {
-                        if (!isPinned) return undefined;
-                        
                         const isDuplicate = row.original._isDuplicate === true;
                         
                         // Duplicate row styling takes highest precedence
@@ -1340,15 +1361,25 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
                         
                         if (selectedRows.has(row.id) && !isEmptyRow) {
                           return '#dbeafe'; // blue-50
-                        } else if (isEmptyRow) {
-                          return '#f9fafb'; // gray-50
-                        } else if (idx % 2 === 0) {
-                          // For non-editable columns, use light red/pink background
-                          return !isEditable && isDataCell ? '#fff0f0' : '#ffffff'; // white or very light red/pink
-                        } else {
-                          // For non-editable columns, use light red/pink background
-                          return !isEditable && isDataCell ? '#ffe8e8' : '#f9fafb'; // gray-50 or light red/pink
                         }
+                        
+                        // Column backgroundColor from config - applies to all rows including empty
+                        if (columnBgColor && isDataCell) {
+                          return columnBgColor;
+                        }
+                        
+                        // Empty row default (only if no column color)
+                        if (isEmptyRow) {
+                          return '#f9fafb'; // gray-50
+                        }
+                        
+                        // For non-editable columns, use light red/pink background
+                        if (!isEditable && isDataCell) {
+                          return idx % 2 === 0 ? '#fff0f0' : '#ffe8e8'; // Very light red/pink
+                        }
+                        
+                        // Default alternating row colors
+                        return idx % 2 === 0 ? '#ffffff' : '#f9fafb'; // white or gray-50
                       };
                       
                       return (
@@ -1375,13 +1406,9 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
                         style={{ 
                           width: `${cell.column.getSize()}px`, 
                           maxWidth: `${cell.column.getSize()}px`,
+                          backgroundColor: getBgColor(),
                           ...(isPinned ? { 
-                            left: `${stickyLeft}px`,
-                            backgroundColor: getBgColor()
-                          } : {}),
-                          // Apply red background for duplicate rows (non-pinned cells)
-                          ...(!isPinned && row.original._isDuplicate === true && !isEmptyRow ? {
-                            backgroundColor: '#fecaca' // red-200 - duplicate row color
+                            left: `${stickyLeft}px`
                           } : {})
                         }}
                       >

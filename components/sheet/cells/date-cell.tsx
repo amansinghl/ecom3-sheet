@@ -79,10 +79,19 @@ export const DateCell = memo(function DateCell({
     );
   }
 
+  // Check if this is an LSD sheet date column (entry_date, credit_note_date_refund_date, partner_debit_note_date_refund_date)
+  const isLSDDateColumn = columnConfig.id === 'entry_date' || 
+                          columnConfig.id === 'credit_note_date_refund_date' || 
+                          columnConfig.id === 'partner_debit_note_date_refund_date';
+  
   const displayValue = value
     ? format(
         value instanceof Date ? value : new Date(value),
-        isDateTime ? 'MMM dd, yyyy hh:mm a' : 'MMM dd, yyyy'
+        isDateTime 
+          ? 'MMM dd, yyyy hh:mm a' 
+          : isLSDDateColumn 
+            ? 'dd MMM yyyy'  // Format: 13 Jan 2026 for LSD sheet
+            : 'MMM dd, yyyy'  // Default format for other sheets
       )
     : '';
 
