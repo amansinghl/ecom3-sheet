@@ -174,17 +174,20 @@ export const Toolbar = forwardRef<ToolbarRef, ToolbarProps>(({ config, data, use
     })
   );
 
-  // Get ordered columns for the dropdown
+  // Get ordered columns for the dropdown (excludes fixed columns)
   const getOrderedColumns = () => {
+    // Filter out fixed columns - they should not appear in the dropdown
+    const nonFixedColumns = config.columns.filter(col => !col.fixed);
+    
     const orderedCols = columnOrder.length > 0 
       ? columnOrder
-          .map(id => config.columns.find(c => c.id === id))
+          .map(id => nonFixedColumns.find(c => c.id === id))
           .filter((col): col is ColumnConfig => col !== undefined)
-      : config.columns;
+      : nonFixedColumns;
     
     // Add any new columns not in the order
     const orderedIds = new Set(columnOrder);
-    const newCols = config.columns.filter(c => !orderedIds.has(c.id));
+    const newCols = nonFixedColumns.filter(c => !orderedIds.has(c.id));
     
     return [...orderedCols, ...newCols];
   };

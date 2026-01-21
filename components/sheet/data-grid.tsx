@@ -190,30 +190,36 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
     spacious: 'py-3',
   };
 
-  // Initialize column order if not set
+  // Initialize column order if not set (exclude fixed columns)
   useEffect(() => {
     if (columnOrder.length === 0 && config.columns.length > 0) {
-      setColumnOrder(config.columns.map(col => col.id));
+      // Only include non-fixed columns in the order
+      const nonFixedColumnIds = config.columns.filter(col => !col.fixed).map(col => col.id);
+      setColumnOrder(nonFixedColumnIds);
     }
   }, [config.columns, columnOrder.length, setColumnOrder]);
 
-  // Reorder columns: use custom order, filter visible, then put pinned first
+  // Reorder columns: fixed columns first, then pinned, then others
   const orderedColumns = useMemo(() => {
     const pinnedIds = viewState.pinnedColumns;
     
-    // Get columns in custom order (or config order if no custom order)
-    const orderedIds = columnOrder.length > 0 ? columnOrder : config.columns.map(c => c.id);
+    // Separate fixed and non-fixed columns
+    const fixedColumns = config.columns.filter(col => col.fixed && columnVisibility[col.id] !== false);
+    const nonFixedColumns = config.columns.filter(col => !col.fixed);
     
-    // Filter to only visible columns
+    // Get non-fixed columns in custom order (or config order if no custom order)
+    const orderedIds = columnOrder.length > 0 ? columnOrder : nonFixedColumns.map(c => c.id);
+    
+    // Filter to only visible non-fixed columns
     const visibleColumns = orderedIds
-      .map(id => config.columns.find(c => c.id === id))
+      .map(id => nonFixedColumns.find(c => c.id === id))
       .filter((col): col is typeof config.columns[0] => 
         col !== undefined && columnVisibility[col.id] !== false
       );
     
-    // Add any new columns that aren't in the order yet
+    // Add any new non-fixed columns that aren't in the order yet
     const orderedSet = new Set(orderedIds);
-    const newColumns = config.columns.filter(
+    const newColumns = nonFixedColumns.filter(
       col => !orderedSet.has(col.id) && columnVisibility[col.id] !== false
     );
     
@@ -223,7 +229,8 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
     const pinned = allVisibleColumns.filter(col => pinnedIds.includes(col.id));
     const unpinned = allVisibleColumns.filter(col => !pinnedIds.includes(col.id));
     
-    return [...pinned, ...unpinned];
+    // Fixed columns always come first, then pinned, then unpinned
+    return [...fixedColumns, ...pinned, ...unpinned];
   }, [config.columns, viewState.pinnedColumns, columnOrder, columnVisibility]);
 
   const isGroupHeader = (item: RowData | GroupHeader): item is GroupHeader => {

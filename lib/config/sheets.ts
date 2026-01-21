@@ -418,6 +418,8 @@ export const lsdSheetConfig: SheetConfig = {
       width: 120,
       required: false,
       editable: true,
+      fixed: true,
+      backgroundColor: '#fffee0',
     },
     {
       id: 'manual_case',
@@ -427,6 +429,8 @@ export const lsdSheetConfig: SheetConfig = {
       required: false,
       editable: true,
       options: manualCaseLSDOptions,
+      fixed: true,
+      backgroundColor: '#fffee0',
     },
     {
       id: 'credit_note_refund',
@@ -436,6 +440,8 @@ export const lsdSheetConfig: SheetConfig = {
       required: false,
       editable: true,
       options: cnRefundLSDOptions,
+      fixed: true,
+      backgroundColor: '#fffee0',
     },
     {
       id: 'remarks',
@@ -444,6 +450,8 @@ export const lsdSheetConfig: SheetConfig = {
       width: 200,
       required: false,
       editable: true,
+      fixed: true,
+      backgroundColor: '#fffee0',
     },
     {
       id: 'vamashipper',
