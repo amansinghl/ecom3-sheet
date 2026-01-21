@@ -28,6 +28,9 @@ interface SheetViewProps {
 export function SheetView({ config, userRole }: SheetViewProps) {
   // Get user session for personalized views
   const { data: session } = useSession();
+  
+  // Ref to track row ID counter for unique temporary row IDs
+  const rowIdCounterRef = useRef(0);
   const userName = session?.user?.name || 'User';
   
   const [data, setData] = useState<RowData[]>([]);
@@ -774,7 +777,8 @@ export function SheetView({ config, userRole }: SheetViewProps) {
           
           for (let index = 0; index < shipmentNumbers.length; index++) {
             const shipmentNo = shipmentNumbers[index];
-            const newRowId = index === 0 ? rowIdString : `row-${Date.now()}-${index}`;
+            // Use unique counter-based ID to prevent duplicate keys
+            const newRowId = index === 0 ? rowIdString : `row-${Date.now()}-${++rowIdCounterRef.current}`;
             const tempRow: any = {
               id: newRowId,
               createdAt: new Date(),
@@ -918,7 +922,7 @@ export function SheetView({ config, userRole }: SheetViewProps) {
           
           // Create additional rows for remaining shipments and process them
           shipmentNumbers.slice(1).forEach((shipmentNo, index) => {
-            const newRowId = `row-${Date.now()}-${index}`;
+            const newRowId = `row-${Date.now()}-${++rowIdCounterRef.current}`;
             const tempRow: any = {
               id: newRowId,
               createdAt: new Date(),
@@ -1139,7 +1143,7 @@ export function SheetView({ config, userRole }: SheetViewProps) {
       return;
     }
 
-    const newRowId = `row-${Date.now()}`;
+    const newRowId = `row-${Date.now()}-${++rowIdCounterRef.current}`;
     const newRow: any = {
       id: newRowId,
       createdAt: new Date(),
@@ -1257,7 +1261,7 @@ export function SheetView({ config, userRole }: SheetViewProps) {
 
     const newRow: any = {
       ...rowToDuplicate,
-      id: `row-${Date.now()}`,
+      id: `row-${Date.now()}-${++rowIdCounterRef.current}`,
       createdAt: new Date(),
       updatedAt: new Date(),
       createdBy: 'user-1',
@@ -1288,7 +1292,7 @@ export function SheetView({ config, userRole }: SheetViewProps) {
 
       const newRow: any = {
         ...rowToDuplicate,
-        id: `row-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        id: `row-${Date.now()}-${++rowIdCounterRef.current}`,
         createdAt: new Date(),
         updatedAt: new Date(),
         createdBy: 'user-1',
