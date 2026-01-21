@@ -63,11 +63,27 @@ export function ColumnFilterDropdown({
       ? currentFilter.condition.operator
       : operatorsByType[column.type]?.[0] || 'equals'
   );
-  const [conditionValue, setConditionValue] = useState<any>(
-    currentFilter?.type === 'condition' && currentFilter.condition
-      ? currentFilter.condition.value
-      : ''
-  );
+  const [conditionValue, setConditionValue] = useState<any>(() => {
+    if (currentFilter?.type === 'condition' && currentFilter.condition) {
+      // Don't store arrays in conditionValue - arrays are handled by conditionSelectedValues
+      if (Array.isArray(currentFilter.condition.value)) {
+        return '';
+      }
+      return currentFilter.condition.value;
+    }
+    return '';
+  });
+  const [conditionSelectedValues, setConditionSelectedValues] = useState<Set<any>>(() => {
+    if (currentFilter?.type === 'condition' && currentFilter.condition) {
+      if (Array.isArray(currentFilter.condition.value)) {
+        return new Set(currentFilter.condition.value);
+      }
+      if (currentFilter.condition.value != null && currentFilter.condition.value !== '') {
+        return new Set([currentFilter.condition.value]);
+      }
+    }
+    return new Set();
+  });
   const [selectedValues, setSelectedValues] = useState<Set<any>>(
     new Set(currentFilter?.type === 'values' && currentFilter.values ? currentFilter.values : [])
   );
@@ -106,6 +122,29 @@ export function ColumnFilterDropdown({
 
   const handleApplyCondition = () => {
     const needsValue = !['isEmpty', 'isNotEmpty'].includes(conditionOperator);
+    
+    // For equals/notEquals, use multi-select for ALL column types
+    const isMultiSelect = conditionOperator === 'equals' || conditionOperator === 'notEquals';
+    
+    if (isMultiSelect) {
+      if (conditionSelectedValues.size === 0) {
+        // Don't apply if no values selected
+        return;
+      }
+      // Convert selected values to array, handling (Empty) placeholder
+      const values = Array.from(conditionSelectedValues).map((v) => 
+        v === '(Empty)' ? null : v
+      );
+      onFilterChange({
+        type: 'condition',
+        condition: {
+          operator: conditionOperator,
+          value: values,
+        },
+      });
+      return;
+    }
+    
     if (needsValue && !conditionValue && conditionValue !== 0) {
       // Don't apply if value is required but not provided
       return;
@@ -292,7 +331,17 @@ export function ColumnFilterDropdown({
           {/* Operator Select */}
           <Select
             value={conditionOperator}
-            onValueChange={(val) => setConditionOperator(val as FilterOperator)}
+            onValueChange={(val) => {
+              const newOperator = val as FilterOperator;
+              setConditionOperator(newOperator);
+              // Reset condition value when operator changes
+              const isMultiSelect = newOperator === 'equals' || newOperator === 'notEquals';
+              if (isMultiSelect) {
+                setConditionSelectedValues(new Set());
+              } else {
+                setConditionValue('');
+              }
+            }}
           >
             <SelectTrigger className="h-7 text-xs">
               <SelectValue />
@@ -313,6 +362,9 @@ export function ColumnFilterDropdown({
               operator={conditionOperator}
               value={conditionValue}
               onChange={setConditionValue}
+              selectedValues={conditionSelectedValues}
+              onSelectedValuesChange={setConditionSelectedValues}
+              data={data}
             />
           )}
 
@@ -347,22 +399,188 @@ interface ConditionValueInputProps {
   operator: FilterOperator;
   value: any;
   onChange: (value: any) => void;
+  selectedValues?: Set<any>;
+  onSelectedValuesChange?: (values: Set<any>) => void;
+  data?: RowData[];
 }
 
-function ConditionValueInput({ column, operator, value, onChange }: ConditionValueInputProps) {
-  // Dropdown/Status with options
-  if (
-    (column.type === 'dropdown' || column.type === 'status') &&
-    column.options &&
-    operator !== 'isAnyOf'
-  ) {
+function ConditionValueInput({ 
+  column, 
+  operator, 
+  value, 
+  onChange, 
+  selectedValues,
+  onSelectedValuesChange,
+  data = []
+}: ConditionValueInputProps) {
+  const [searchValue, setSearchValue] = useState('');
+  
+  // Get unique values from data for this column (for multi-select from actual data)
+  const uniqueValues = useMemo(() => {
+    const values = new Set<any>();
+    data.forEach((row) => {
+      const val = row[column.id];
+      if (val !== null && val !== undefined && val !== '') {
+        values.add(val);
+      } else {
+        values.add('(Empty)');
+      }
+    });
+    return Array.from(values).sort((a, b) => {
+      if (a === '(Empty)') return 1;
+      if (b === '(Empty)') return -1;
+      return String(a).localeCompare(String(b));
+    });
+  }, [data, column.id]);
+
+  // For dropdown/status columns, use column options if available
+  const hasColumnOptions = (column.type === 'dropdown' || column.type === 'status') && column.options;
+  
+  // Filter options/values based on search
+  const filteredItems = useMemo(() => {
+    if (hasColumnOptions) {
+      // Use column options
+      if (!searchValue) return column.options || [];
+      const search = searchValue.toLowerCase();
+      return (column.options || []).filter(opt =>
+        opt.label.toLowerCase().includes(search) ||
+        opt.value.toLowerCase().includes(search)
+      );
+    } else {
+      // Use unique values from data
+      if (!searchValue) return uniqueValues;
+      const search = searchValue.toLowerCase();
+      return uniqueValues.filter(val => {
+        const valStr = val === '(Empty)' ? '(Empty)' : String(val);
+        return valStr.toLowerCase().includes(search);
+      });
+    }
+  }, [hasColumnOptions, column.options, uniqueValues, searchValue]);
+
+  // For equals and notEquals operators, show multi-select for ALL column types
+  if (operator === 'equals' || operator === 'notEquals') {
+    const handleToggleValue = (itemValue: any) => {
+      if (!onSelectedValuesChange || !selectedValues) return;
+      const newSelected = new Set(selectedValues);
+      if (newSelected.has(itemValue)) {
+        newSelected.delete(itemValue);
+      } else {
+        newSelected.add(itemValue);
+      }
+      onSelectedValuesChange(newSelected);
+    };
+
+    const handleSelectAll = () => {
+      if (!onSelectedValuesChange) return;
+      if (hasColumnOptions) {
+        const allValues = new Set(filteredItems.map((opt: any) => opt.value));
+        onSelectedValuesChange(allValues);
+      } else {
+        const allValues = new Set(filteredItems);
+        onSelectedValuesChange(allValues);
+      }
+    };
+
+    const handleClearAll = () => {
+      if (!onSelectedValuesChange) return;
+      onSelectedValuesChange(new Set());
+    };
+
+    return (
+      <div className="space-y-2">
+        {/* Search */}
+        <div className="relative">
+          <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Search values..."
+            value={searchValue}
+            onChange={(e) => setSearchValue(e.target.value)}
+            className="h-7 pl-7 text-xs"
+          />
+        </div>
+
+        {/* Select/Clear All */}
+        <div className="flex gap-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="flex-1 h-6 text-xs"
+            onClick={handleSelectAll}
+          >
+            Select all
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="flex-1 h-6 text-xs"
+            onClick={handleClearAll}
+          >
+            Clear
+          </Button>
+        </div>
+
+        {/* Options/Values List */}
+        <ScrollArea className="h-48">
+          <div className="space-y-1 pr-3">
+            {hasColumnOptions ? (
+              // Render from column options
+              filteredItems.map((opt: any) => (
+                <div
+                  key={opt.value}
+                  className="flex items-center space-x-2 py-1 hover:bg-muted/50 rounded px-1 cursor-pointer"
+                  onClick={() => handleToggleValue(opt.value)}
+                >
+                  <Checkbox
+                    checked={selectedValues?.has(opt.value) || false}
+                    onCheckedChange={() => handleToggleValue(opt.value)}
+                  />
+                  <span className="text-xs flex-1 truncate">{opt.label}</span>
+                </div>
+              ))
+            ) : (
+              // Render from unique values in data
+              filteredItems.map((val: any, idx: number) => (
+                <div
+                  key={idx}
+                  className="flex items-center space-x-2 py-1 hover:bg-muted/50 rounded px-1 cursor-pointer"
+                  onClick={() => handleToggleValue(val)}
+                >
+                  <Checkbox
+                    checked={selectedValues?.has(val) || false}
+                    onCheckedChange={() => handleToggleValue(val)}
+                  />
+                  <span className="text-xs flex-1 truncate">
+                    {val === '(Empty)' ? (
+                      <span className="italic text-muted-foreground">(Empty)</span>
+                    ) : (
+                      String(val)
+                    )}
+                  </span>
+                </div>
+              ))
+            )}
+            {filteredItems.length === 0 && (
+              <div className="text-xs text-muted-foreground text-center py-4">
+                No values found
+              </div>
+            )}
+          </div>
+        </ScrollArea>
+      </div>
+    );
+  }
+
+  // For other operators, show single select/input based on column type
+  
+  // Dropdown/Status with options - single select
+  if (hasColumnOptions && operator !== 'isAnyOf') {
     return (
       <Select value={value || ''} onValueChange={onChange}>
         <SelectTrigger className="h-7 text-xs">
           <SelectValue placeholder="Select..." />
         </SelectTrigger>
         <SelectContent>
-          {column.options.map((opt) => (
+          {column.options?.map((opt) => (
             <SelectItem key={opt.value} value={opt.value}>
               {opt.label}
             </SelectItem>
