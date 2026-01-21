@@ -412,6 +412,40 @@ export const lsdSheetConfig: SheetConfig = {
   ],
   columns: [
     {
+      id: 'shipment_no',
+      label: 'Shipment No.',
+      type: 'number',
+      width: 120,
+      required: false,
+      editable: true,
+    },
+    {
+      id: 'manual_case',
+      label: 'Manual Case',
+      type: 'status',
+      width: 180,
+      required: false,
+      editable: true,
+      options: manualCaseLSDOptions,
+    },
+    {
+      id: 'credit_note_refund',
+      label: 'Credit Note / Refund',
+      type: 'status',
+      width: 180,
+      required: false,
+      editable: true,
+      options: cnRefundLSDOptions,
+    },
+    {
+      id: 'remarks',
+      label: 'Remarks',
+      type: 'text',
+      width: 200,
+      required: false,
+      editable: true,
+    },
+    {
       id: 'vamashipper',
       label: 'Vamashipper',
       type: 'text',
@@ -444,29 +478,12 @@ export const lsdSheetConfig: SheetConfig = {
       editable: false,
     },
     {
-      id: 'credit_note_refund',
-      label: 'Credit Note / Refund',
-      type: 'status',
-      width: 180,
-      required: false,
-      editable: true,
-      options: cnRefundLSDOptions,
-    },
-    {
       id: 'email_id',
       label: 'Email id',
       type: 'text',
       width: 200,
       required: false,
       editable: false,
-    },
-    {
-      id: 'shipment_no',
-      label: 'Shipment No.',
-      type: 'number',
-      width: 120,
-      required: false,
-      editable: true,
     },
     {
       id: 'awb_no',
@@ -557,14 +574,6 @@ export const lsdSheetConfig: SheetConfig = {
       editable: true,
     },
     {
-      id: 'remarks',
-      label: 'Remarks',
-      type: 'text',
-      width: 200,
-      required: false,
-      editable: true,
-    },
-    {
       id: 'finance_update',
       label: 'Finance Update',
       type: 'text',
@@ -614,7 +623,7 @@ export const lsdSheetConfig: SheetConfig = {
       width: 120,
       required: false,
       editable: true,
-      backgroundColor: '#fff9c4', // Light yellow
+      backgroundColor: '#fffee0', // Light yellow
     },
     {
       id: 'investigation_status',
@@ -624,7 +633,7 @@ export const lsdSheetConfig: SheetConfig = {
       required: false,
       editable: true,
       options: investigationStatusOptions,
-      backgroundColor: '#fff9c4', // Light yellow
+      backgroundColor: '#fffee0', // Light yellow
     },
     {
       id: 'partner_debit_note_no_utr_no',
@@ -633,7 +642,7 @@ export const lsdSheetConfig: SheetConfig = {
       width: 250,
       required: false,
       editable: true,
-      backgroundColor: '#fff9c4', // Light yellow
+      backgroundColor: '#fffee0', // Light yellow
     },
     {
       id: 'partner_debit_note_date_refund_date',
@@ -642,7 +651,7 @@ export const lsdSheetConfig: SheetConfig = {
       width: 280,
       required: false,
       editable: true,
-      backgroundColor: '#fff9c4', // Light yellow
+      backgroundColor: '#fffee0', // Light yellow
     },
     {
       id: 'partner_debit_note_amount_refund_amount',
@@ -651,7 +660,7 @@ export const lsdSheetConfig: SheetConfig = {
       width: 300,
       required: false,
       editable: true,
-      backgroundColor: '#fff9c4', // Light yellow
+      backgroundColor: '#fffee0', // Light yellow
     },
     {
       id: 'operations_remarks',
@@ -660,7 +669,7 @@ export const lsdSheetConfig: SheetConfig = {
       width: 200,
       required: false,
       editable: true,
-      backgroundColor: '#fff9c4', // Light yellow
+      backgroundColor: '#fffee0', // Light yellow
     },
     {
       id: 'partners_email_subject',
@@ -669,7 +678,7 @@ export const lsdSheetConfig: SheetConfig = {
       width: 200,
       required: false,
       editable: true,
-      backgroundColor: '#fff9c4', // Light yellow
+      backgroundColor: '#fffee0', // Light yellow
     },
     {
       id: 'email_link_of_partner',
@@ -678,7 +687,7 @@ export const lsdSheetConfig: SheetConfig = {
       width: 200,
       required: false,
       editable: true,
-      backgroundColor: '#fff9c4', // Light yellow
+      backgroundColor: '#fffee0', // Light yellow
     },
     {
       id: 'partners_email_subject_for_cn_followup',
@@ -687,7 +696,7 @@ export const lsdSheetConfig: SheetConfig = {
       width: 280,
       required: false,
       editable: true,
-      backgroundColor: '#fff9c4', // Light yellow
+      backgroundColor: '#fffee0', // Light yellow
     },
     {
       id: 'email_link_of_partner_for_cn',
@@ -696,7 +705,7 @@ export const lsdSheetConfig: SheetConfig = {
       width: 220,
       required: false,
       editable: true,
-      backgroundColor: '#fff9c4', // Light yellow
+      backgroundColor: '#fffee0', // Light yellow
     },
     {
       id: 'approved_by_ops_lead',
@@ -705,15 +714,6 @@ export const lsdSheetConfig: SheetConfig = {
       width: 180,
       required: false,
       editable: true,
-    },
-    {
-      id: 'manual_case',
-      label: 'Manual Case',
-      type: 'status',
-      width: 180,
-      required: false,
-      editable: true,
-      options: manualCaseLSDOptions,
     },
   ],
   defaultSort: {

@@ -550,65 +550,14 @@ export const Toolbar = forwardRef<ToolbarRef, ToolbarProps>(({ config, data, use
             <DialogTitle className="text-xl font-bold">
               {config.id === 'escalations' 
                 ? 'Escalation Sheet Auto-Closure Logic' 
-                : 'LSD Sheet Rules and Guidelines'}
+                : 'Alert'}
             </DialogTitle>
           </DialogHeader>
           <ScrollArea className="max-h-[calc(90vh-8rem)] pr-4">
             <div className="space-y-6 text-sm">
               {config.id === 'lsd' ? (
                 <>
-
-                  {/* Color Coding Rules */}
-                  <div className="space-y-3">
-                    <h3 className="font-semibold text-base text-foreground">Column Color Coding</h3>
-                    
-                    {/* Light Green Columns */}
-                    <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-2">
-                      <div className="flex items-center gap-2 mb-2">
-                        <div className="w-6 h-6 rounded border border-border" style={{ backgroundColor: '#d9efda' }}></div>
-                        <h4 className="font-medium text-foreground">Light Green Columns</h4>
-                      </div>
-                      <ul className="space-y-1 pl-4 text-muted-foreground text-xs">
-                        <li>• <span className="font-bold">Credit Note No. / UTR No.</span> - Document reference number</li>
-                        <li>• <span className="font-bold">Credit Note Date / Refund Date</span> - Date of credit note or refund</li>
-                        <li>• <span className="font-bold">Credit Note / Refund Amount</span> - Amount credited or refunded</li>
-                      </ul>
-                    </div>
-
-                    {/* Light Yellow Columns */}
-                    <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-2">
-                      <div className="flex items-center gap-2 mb-2">
-                        <div className="w-6 h-6 rounded border border-border" style={{ backgroundColor: '#fff9c4' }}></div>
-                        <h4 className="font-medium text-foreground">Light Yellow Columns</h4>
-                      </div>
-                      <ul className="space-y-1 pl-4 text-muted-foreground text-xs">
-                        <li>• <span className="font-bold">Ops Name</span> - Operations team member name</li>
-                        <li>• <span className="font-bold">Investigation Status</span> - Current investigation state</li>
-                        <li>• <span className="font-bold">Partner Debit Note No. / UTR No.</span> - Partner document reference</li>
-                        <li>• <span className="font-bold">Partner Debit Note Date / Refund Date</span> - Partner document date</li>
-                        <li>• <span className="font-bold">Partner Debit Note Amount / Refund Amount</span> - Partner amount</li>
-                        <li>• <span className="font-bold">Operations Remarks</span> - Internal operations notes</li>
-                        <li>• <span className="font-bold">Partners Email Subject</span> - Email subject for partner communication</li>
-                        <li>• <span className="font-bold">Email Link of Partner</span> - Link to partner email thread</li>
-                        <li>• <span className="font-bold">Partners Email Subject FOR CN Followup</span> - Follow-up email subject</li>
-                        <li>• <span className="font-bold">Email Link of Partner For CN</span> - Follow-up email link</li>
-                      </ul>
-                    </div>
-                  </div>
-
-                  {/* Duplicate Entry Detection */}
-                  <div className="space-y-3 pt-2 border-t border-border">
-                    <h3 className="font-semibold text-base text-foreground">Duplicate Entry Detection</h3>
-                    <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-2">
-                      <p className="text-muted-foreground text-xs mb-2">
-                        The system automatically detects and highlights duplicate entries in the sheet:
-                      </p>
-                      <ul className="space-y-1 pl-4 text-muted-foreground text-xs">
-                        <li>• If combination of Shipment No. and Manual Case is same, then it is a duplicate entry.</li>
-                        <li>• Duplicate rows are highlighted with a <span className="font-medium text-red-600 dark:text-red-400">red background</span> for easy identification</li>
-                      </ul>
-                    </div>
-                  </div>
+                <h5 className="text-2xl font-bold"> Yaha Se Columns Info Chori Hogaya Hai!!!</h5>
                 </>
               ) : (
                 <>
