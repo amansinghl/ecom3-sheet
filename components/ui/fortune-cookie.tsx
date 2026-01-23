@@ -21,6 +21,8 @@ const fortunes = [
   "Data filter karo, life easy ho jayegi!",
   "Aaj ka target complete? Shabaash!",
   "Agar data organize nahi hai, toh tension mat lo - Arbaz ji fix kar denge!",
+  "Everybody to Radhika: 'जल्दी बोल कल सुबह पनवेल निकलना है'",
+  "Jagannath on 5th : 'कभी कभी लगता है अपुन ही भगवान है'",
 
   // hindi fortunes
   "काम उतना ही करो कि पगार ज्यादा लगे",

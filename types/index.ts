@@ -54,6 +54,7 @@ export interface ColumnConfig {
     message?: string;
   };
   backgroundColor?: string; // Background color for the column
+  fixed?: boolean; // If true, column is fixed at the beginning and cannot be moved or hidden from column config
 }
 
 // Sheet Configuration

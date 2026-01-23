@@ -45,12 +45,33 @@ export function applyFilters(
 
         switch (operator) {
           case 'equals':
+            // Handle array of values for multi-select
+            if (Array.isArray(filterValue)) {
+              return filterValue.some((fv) => {
+                const fvString = String(fv ?? '').toLowerCase();
+                if (isNumericComparison) {
+                  return Number(value) === Number(fv);
+                }
+                return stringValue === fvString;
+              });
+            }
             if (isNumericComparison) {
               return Number(value) === Number(filterValue);
             }
             return stringValue === filterValueString;
 
           case 'notEquals':
+            // Handle array of values for multi-select
+            if (Array.isArray(filterValue)) {
+              // For "is not", return true if value is NOT in any of the selected values
+              return !filterValue.some((fv) => {
+                const fvString = String(fv ?? '').toLowerCase();
+                if (isNumericComparison) {
+                  return Number(value) === Number(fv);
+                }
+                return stringValue === fvString;
+              });
+            }
             if (isNumericComparison) {
               return Number(value) !== Number(filterValue);
             }
