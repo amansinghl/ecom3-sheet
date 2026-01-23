@@ -13,6 +13,7 @@ export interface UseSheetDataOptions {
   retry?: number | false;
   staleTime?: number;
   cacheTime?: number;
+  refetchInterval?: number | false;
 }
 
 /**
@@ -32,6 +33,10 @@ export function useEscalationSheetData(
     staleTime: options.staleTime ?? 5 * 60 * 1000, // 5 minutes
     gcTime: options.cacheTime ?? 10 * 60 * 1000, // 10 minutes
     refetchOnWindowFocus: false,
+    // Auto-refresh every 30 seconds by default, or use provided interval
+    refetchInterval: options.refetchInterval !== undefined 
+      ? options.refetchInterval 
+      : 30 * 1000, // 30 seconds
   });
 }
 
@@ -52,6 +57,10 @@ export function useTechSheetData(
     staleTime: options.staleTime ?? 5 * 60 * 1000,
     gcTime: options.cacheTime ?? 10 * 60 * 1000,
     refetchOnWindowFocus: false,
+    // Auto-refresh every 30 seconds by default, or use provided interval
+    refetchInterval: options.refetchInterval !== undefined 
+      ? options.refetchInterval 
+      : 30 * 1000, // 30 seconds
   });
 }
 
@@ -83,6 +92,11 @@ export function useSheetData(
     gcTime: options.cacheTime ?? 10 * 60 * 1000,
     // Disable auto-refetch on window focus to prevent overwriting local edits
     refetchOnWindowFocus: false,
+    // Auto-refresh every 30 seconds by default, or use provided interval
+    // Set to false to disable auto-refresh
+    refetchInterval: options.refetchInterval !== undefined 
+      ? options.refetchInterval 
+      : 30 * 1000, // 30 seconds
   });
 }
 
