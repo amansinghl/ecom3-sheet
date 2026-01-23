@@ -579,7 +579,7 @@ export const lsdSheetConfig: SheetConfig = {
       type: 'number',
       width: 280,
       required: false,
-      editable: true,
+      editable: false,
     },
     {
       id: 'finance_update',
