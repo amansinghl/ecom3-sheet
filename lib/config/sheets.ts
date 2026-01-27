@@ -52,6 +52,11 @@ const investigationStatusOptions: StatusOption[] = [
   { label: 'Happiness Discount', value: 'Happiness Discount', color: '#22c55e' },
 ];
 
+const paymentStatusOptions: StatusOption[] = [
+  { label: 'PAID', value: 'PAID', color: '#10b981' },
+  { label: 'UNPAID', value: 'UNPAID', color: '#ef4444' },
+];
+
 // Escalation Sheet Configuration
 export const escalationSheetConfig: SheetConfig = {
   id: 'escalations',
@@ -396,18 +401,11 @@ export const lsdSheetConfig: SheetConfig = {
   description: 'Lost & Damage / Service Failure tracking and credit note management',
   views: [
     {
-      id: 'unpaid',
-      name: 'Unpaid View',
-      description: 'View all entries without credit note/refund details',
+      id: 'master',
+      name: 'Master View',
+      description: 'View all entries',
       filters: [],
       isDefault: true,
-    },
-    {
-      id: 'paid',
-      name: 'Paid View',
-      description: 'View all entries with credit note/refund details',
-      filters: [],
-      isDefault: false,
     },
   ],
   columns: [
@@ -574,6 +572,14 @@ export const lsdSheetConfig: SheetConfig = {
     //   editable: true,
     // },
     {
+      id: 'pre_gst_value',
+      label: 'Pre GST Value',
+      type: 'number',
+      width: 280,
+      required: false,
+      editable: false,
+    },
+    {
       id: 'credit_note_amount_to_customer',
       label: 'Credit Note Amount to be given to Customer',
       type: 'number',
@@ -623,6 +629,15 @@ export const lsdSheetConfig: SheetConfig = {
       required: false,
       editable: true,
       backgroundColor: '#d9efda', // Light green
+    },
+    {
+      id: 'status',
+      label: 'Status',
+      type: 'status',
+      width: 120,
+      required: false,
+      editable: false,
+      options: paymentStatusOptions,
     },
     {
       id: 'ops_name',
