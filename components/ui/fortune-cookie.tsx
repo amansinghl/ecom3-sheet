@@ -23,6 +23,7 @@ const fortunes = [
   "Agar data organize nahi hai, toh tension mat lo - Arbaz ji fix kar denge!",
   "Everybody to Radhika: 'जल्दी बोल कल सुबह पनवेल निकलना है'",
   "Jagannath on 5th : 'कभी कभी लगता है अपुन ही भगवान है'",
+  "Since Dishima complained, unka naam nahi aaya, so.... DISHIMA.",
 
   // hindi fortunes
   "काम उतना ही करो कि पगार ज्यादा लगे",
