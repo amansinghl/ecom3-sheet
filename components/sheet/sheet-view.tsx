@@ -157,39 +157,6 @@ export function SheetView({ config, userRole }: SheetViewProps) {
       result = result.filter((row) => isTemporaryRow(row) || filteredIds.has(String(row.id)));
     }
 
-    // Apply LSD sheet view filtering (Unpaid/Paid) - frontend only
-    if (config.id === 'lsd') {
-      const isPaidView = activeViewId === 'paid';
-      const isUnpaidView = activeViewId === 'unpaid';
-      
-      if (isPaidView || isUnpaidView) {
-        result = result.filter((row) => {
-          const idString = String(row.id);
-          // Always show temporary rows (row-* or empty-*) - they're being processed
-          if (idString.startsWith('row-') || idString.startsWith('empty-')) {
-            return true;
-          }
-          
-          // For rows with backend IDs, check the credit note fields
-          const creditNoteNo = row.credit_note_no_utr_no;
-          const creditNoteDate = row.credit_note_date_refund_date;
-          
-          // Check if both fields are filled
-          const isPaid = creditNoteNo && creditNoteDate && 
-                         String(creditNoteNo).trim() !== '' && 
-                         String(creditNoteDate).trim() !== '';
-          
-          if (isPaidView) {
-            return isPaid;
-          } else if (isUnpaidView) {
-            // Unpaid view: show entries where at least one field is not filled
-            return !isPaid;
-          }
-          
-          return true;
-        });
-      }
-    }
 
     // Apply global search across visible data (excluding empty rows)
     if (globalSearch.trim()) {
@@ -1075,6 +1042,13 @@ export function SheetView({ config, userRole }: SheetViewProps) {
           // Call the update-entries API based on sheet type
           if (config.id === 'lsd') {
             await sheetApiService.updateLSDEntries(actualRowId, updatePayload);
+            // Auto-refresh the sheet after successful LSD update only for manual_case
+            if (columnId === 'manual_case') {
+              await queryClient.invalidateQueries({ queryKey: ['sheet', 'lsd'] });
+              if (refetch) {
+                await refetch();
+              }
+            }
           } else if (config.id === 'escalations') {
             await sheetApiService.updateEscalationEntries(actualRowId, updatePayload);
           }

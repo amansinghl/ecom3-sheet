@@ -332,9 +332,32 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
     orderedColumns.forEach((colConfig) => {
       const isPinned = viewState.pinnedColumns.includes(colConfig.id);
       
+      // For status column in LSD sheet, compute value based on credit_note_amount_to_customer and credit_note_refund_amount
+      const isStatusColumn = colConfig.id === 'status' && config.id === 'lsd';
+      
       cols.push({
         id: colConfig.id,
-        accessorKey: colConfig.id,
+        accessorKey: isStatusColumn ? undefined : colConfig.id,
+        accessorFn: isStatusColumn ? (row: RowData) => {
+          const amountToCustomer = row.credit_note_amount_to_customer;
+          const refundAmount = row.credit_note_refund_amount;
+          
+          // Convert to numbers for comparison, handling null/undefined/empty strings
+          const amount1 = amountToCustomer != null && amountToCustomer !== '' 
+            ? parseFloat(String(amountToCustomer)) 
+            : null;
+          const amount2 = refundAmount != null && refundAmount !== '' 
+            ? parseFloat(String(refundAmount)) 
+            : null;
+          
+          // If either value is null/undefined, return UNPAID
+          if (amount1 === null || amount2 === null) {
+            return 'UNPAID';
+          }
+          
+          // Compare values (allowing for small floating point differences)
+          return Math.abs(amount1 - amount2) < 0.01 ? 'PAID' : 'UNPAID';
+        } : undefined,
         header: ({ column }) => {
           const isSorted = column.getIsSorted();
           const hasFilter = !!viewState.columnFilters[colConfig.id];
