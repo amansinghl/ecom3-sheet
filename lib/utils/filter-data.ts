@@ -1,9 +1,52 @@
 import { ColumnFilter, RowData, ColumnConfig } from '@/types';
 
+// Helper function to compute status value for LSD sheet status column
+function computeStatusValue(row: RowData, columnId: string, sheetId?: string): any {
+  if (columnId === 'status' && sheetId === 'lsd') {
+    const amountToCustomer = row.credit_note_amount_to_customer;
+    const refundAmount = row.credit_note_refund_amount;
+    
+    // Convert to numbers for comparison, handling null/undefined/empty strings
+    const amount1 = amountToCustomer != null && amountToCustomer !== '' 
+      ? parseFloat(String(amountToCustomer)) 
+      : null;
+    const amount2 = refundAmount != null && refundAmount !== '' 
+      ? parseFloat(String(refundAmount)) 
+      : null;
+    
+    // If both values are null/empty, return null (blank)
+    if (amount1 === null && (amount2 === null || amount2 === 0)) {
+      return null;
+    }
+    
+    // If refund amount is 0 or NULL, return UNPAID
+    if (amount2 === null || amount2 === 0) {
+      return 'UNPAID';
+    }
+    
+    // If amount to customer is null, return UNPAID
+    if (amount1 === null) {
+      return 'UNPAID';
+    }
+    
+    // If refund amount is less than amount to customer, return PARTIALLY PAID
+    if (amount2 < amount1) {
+      return 'PARTIALLY PAID';
+    }
+    
+    // If refund amount equals amount to customer (allowing for small floating point differences), return PAID
+    return Math.abs(amount1 - amount2) < 0.01 ? 'PAID' : 'UNPAID';
+  }
+  
+  // For other columns, return the raw value
+  return row[columnId];
+}
+
 export function applyFilters(
   data: RowData[],
   columnFilters: Record<string, ColumnFilter>,
-  columns: ColumnConfig[]
+  columns: ColumnConfig[],
+  sheetId?: string
 ): RowData[] {
   const filterKeys = Object.keys(columnFilters);
   if (filterKeys.length === 0) return data;
@@ -12,7 +55,8 @@ export function applyFilters(
     // All column filters must match (AND logic)
     return filterKeys.every((columnId) => {
       const columnFilter = columnFilters[columnId];
-      const value = row[columnId];
+      // Use helper function to get computed value for status column
+      const value = computeStatusValue(row, columnId, sheetId);
       const column = columns.find((c) => c.id === columnId);
 
       // Handle value-based filtering (show only selected values)

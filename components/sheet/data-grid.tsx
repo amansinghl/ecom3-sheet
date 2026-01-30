@@ -350,12 +350,27 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
             ? parseFloat(String(refundAmount)) 
             : null;
           
-          // If either value is null/undefined, return UNPAID
-          if (amount1 === null || amount2 === null) {
+          // If both values are null/empty, return null (blank)
+          if (amount1 === null && (amount2 === null || amount2 === 0)) {
+            return null;
+          }
+          
+          // If refund amount is 0 or NULL, return UNPAID
+          if (amount2 === null || amount2 === 0) {
             return 'UNPAID';
           }
           
-          // Compare values (allowing for small floating point differences)
+          // If amount to customer is null, return UNPAID
+          if (amount1 === null) {
+            return 'UNPAID';
+          }
+          
+          // If refund amount is less than amount to customer, return PARTIALLY PAID
+          if (amount2 < amount1) {
+            return 'PARTIALLY PAID';
+          }
+          
+          // If refund amount equals amount to customer (allowing for small floating point differences), return PAID
           return Math.abs(amount1 - amount2) < 0.01 ? 'PAID' : 'UNPAID';
         } : undefined,
         header: ({ column }) => {
@@ -406,14 +421,17 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
                   <button
                     className={cn(
                       'p-0.5 rounded hover:bg-muted transition-all shrink-0 mt-0.5',
-                      'opacity-0 group-hover/header:opacity-100',
-                      hasFilter && 'text-primary opacity-100'
+                      hasFilter ? 'text-primary opacity-100' : 'opacity-70 group-hover/header:opacity-100'
                     )}
                     onClick={(e) => {
                       e.stopPropagation();
                     }}
                   >
-                    <Filter className="h-3 w-3" />
+                    <Filter 
+                      className={hasFilter ? "h-6 w-5" : "h-4 w-4"}
+                      strokeWidth={hasFilter ? 0 : 1.5}
+                      fill={hasFilter ? "red" : "none"}
+                    />
                   </button>
                 </PopoverTrigger>
                 <PopoverContent
@@ -434,6 +452,7 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
                       column.toggleSorting(direction === 'desc');
                       setOpenFilterPopover(null);
                     }}
+                    sheetId={config.id}
                   />
                 </PopoverContent>
               </Popover>
