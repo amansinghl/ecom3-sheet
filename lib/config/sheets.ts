@@ -54,6 +54,7 @@ const investigationStatusOptions: StatusOption[] = [
 
 const paymentStatusOptions: StatusOption[] = [
   { label: 'PAID', value: 'PAID', color: '#10b981' },
+  { label: 'PARTIALLY PAID', value: 'PARTIALLY PAID', color: '#f59e0b' },
   { label: 'UNPAID', value: 'UNPAID', color: '#ef4444' },
 ];
 
@@ -632,7 +633,7 @@ export const lsdSheetConfig: SheetConfig = {
     },
     {
       id: 'status',
-      label: 'Status',
+      label: 'Refund Status',
       type: 'status',
       width: 120,
       required: false,

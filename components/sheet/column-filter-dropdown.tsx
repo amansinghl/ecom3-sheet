@@ -17,6 +17,7 @@ interface ColumnFilterDropdownProps {
   currentFilter?: ColumnFilter;
   onFilterChange: (filter: ColumnFilter | null) => void;
   onSort: (direction: 'asc' | 'desc') => void;
+  sheetId?: string;
 }
 
 const operatorsByType: Record<string, FilterOperator[]> = {
@@ -48,12 +49,55 @@ const operatorLabels: Record<FilterOperator, string> = {
   isAnyOf: 'is any of',
 };
 
+// Helper function to compute status value for LSD sheet status column
+function computeStatusValue(row: RowData, columnId: string, sheetId?: string): any {
+  if (columnId === 'status' && sheetId === 'lsd') {
+    const amountToCustomer = row.credit_note_amount_to_customer;
+    const refundAmount = row.credit_note_refund_amount;
+    
+    // Convert to numbers for comparison, handling null/undefined/empty strings
+    const amount1 = amountToCustomer != null && amountToCustomer !== '' 
+      ? parseFloat(String(amountToCustomer)) 
+      : null;
+    const amount2 = refundAmount != null && refundAmount !== '' 
+      ? parseFloat(String(refundAmount)) 
+      : null;
+    
+    // If both values are null/empty, return null (blank)
+    if (amount1 === null && (amount2 === null || amount2 === 0)) {
+      return null;
+    }
+    
+    // If refund amount is 0 or NULL, return UNPAID
+    if (amount2 === null || amount2 === 0) {
+      return 'UNPAID';
+    }
+    
+    // If amount to customer is null, return UNPAID
+    if (amount1 === null) {
+      return 'UNPAID';
+    }
+    
+    // If refund amount is less than amount to customer, return PARTIALLY PAID
+    if (amount2 < amount1) {
+      return 'PARTIALLY PAID';
+    }
+    
+    // If refund amount equals amount to customer (allowing for small floating point differences), return PAID
+    return Math.abs(amount1 - amount2) < 0.01 ? 'PAID' : 'UNPAID';
+  }
+  
+  // For other columns, return the raw value
+  return row[columnId];
+}
+
 export function ColumnFilterDropdown({
   column,
   data,
   currentFilter,
   onFilterChange,
   onSort,
+  sheetId,
 }: ColumnFilterDropdownProps) {
   const [filterMode, setFilterMode] = useState<'values' | 'condition'>(
     currentFilter?.type || 'values'
@@ -93,7 +137,8 @@ export function ColumnFilterDropdown({
   const uniqueValues = useMemo(() => {
     const values = new Set<any>();
     data.forEach((row) => {
-      const val = row[column.id];
+      // Use helper function to get computed value for status column
+      const val = computeStatusValue(row, column.id, sheetId);
       if (val !== null && val !== undefined) {
         values.add(val);
       } else {
@@ -109,7 +154,7 @@ export function ColumnFilterDropdown({
     });
 
     return sortedValues;
-  }, [data, column.id]);
+  }, [data, column.id, sheetId]);
 
   // Filter values based on search
   const filteredValues = useMemo(() => {
@@ -365,6 +410,7 @@ export function ColumnFilterDropdown({
               selectedValues={conditionSelectedValues}
               onSelectedValuesChange={setConditionSelectedValues}
               data={data}
+              sheetId={sheetId}
             />
           )}
 
@@ -402,6 +448,7 @@ interface ConditionValueInputProps {
   selectedValues?: Set<any>;
   onSelectedValuesChange?: (values: Set<any>) => void;
   data?: RowData[];
+  sheetId?: string;
 }
 
 function ConditionValueInput({ 
@@ -411,7 +458,8 @@ function ConditionValueInput({
   onChange, 
   selectedValues,
   onSelectedValuesChange,
-  data = []
+  data = [],
+  sheetId
 }: ConditionValueInputProps) {
   const [searchValue, setSearchValue] = useState('');
   
@@ -419,7 +467,8 @@ function ConditionValueInput({
   const uniqueValues = useMemo(() => {
     const values = new Set<any>();
     data.forEach((row) => {
-      const val = row[column.id];
+      // Use helper function to get computed value for status column
+      const val = computeStatusValue(row, column.id, sheetId);
       if (val !== null && val !== undefined && val !== '') {
         values.add(val);
       } else {
@@ -431,7 +480,7 @@ function ConditionValueInput({
       if (b === '(Empty)') return -1;
       return String(a).localeCompare(String(b));
     });
-  }, [data, column.id]);
+  }, [data, column.id, sheetId]);
 
   // For dropdown/status columns, use column options if available
   const hasColumnOptions = (column.type === 'dropdown' || column.type === 'status') && column.options;
