@@ -60,8 +60,10 @@ export const TextCell = memo(function TextCell({
         }
       }
     }
+    // IMPORTANT: Don't reset editValue if value prop changes while editing
+    // This prevents the input from being cleared when data updates during editing
     prevIsEditingRef.current = isEditing;
-  }, [isEditing, value, initialValue]);
+  }, [isEditing, initialValue]); // Removed 'value' from dependencies to prevent reset during editing
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
