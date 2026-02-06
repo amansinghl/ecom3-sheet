@@ -149,6 +149,10 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
   const onCellUpdateRef = useRef(onCellUpdate);
   const globalSearchRef = useRef(globalSearch);
   const focusedCellRef = useRef(focusedCell);
+  const selectionRangeRef = useRef(selectionRange);
+  // Initialize with empty arrays - will be updated after rows and orderedColumns are defined
+  const rowsRef = useRef<any[]>([]);
+  const orderedColumnsRef = useRef<any[]>([]);
   
   // Keep refs up to date
   editingCellRef.current = editingCell;
@@ -156,6 +160,7 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
   onCellUpdateRef.current = onCellUpdate;
   globalSearchRef.current = globalSearch;
   focusedCellRef.current = focusedCell;
+  selectionRangeRef.current = selectionRange;
   
   // Initialize column visibility (empty on server to avoid hydration mismatch)
   const [internalColumnVisibility, setInternalColumnVisibility] = useState<Record<string, boolean>>({});
@@ -232,6 +237,11 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
     // Fixed columns always come first, then pinned, then unpinned
     return [...fixedColumns, ...pinned, ...unpinned];
   }, [config.columns, viewState.pinnedColumns, columnOrder, columnVisibility]);
+
+  // Update orderedColumns ref whenever it changes
+  useEffect(() => {
+    orderedColumnsRef.current = orderedColumns;
+  }, [orderedColumns]);
 
   const isGroupHeader = (item: RowData | GroupHeader): item is GroupHeader => {
     return (item as GroupHeader)._isGroupHeader === true;
@@ -593,6 +603,11 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
 
   const { rows } = table.getRowModel();
   
+  // Update rows ref whenever it changes (important for paste handler)
+  useEffect(() => {
+    rowsRef.current = rows;
+  }, [rows]);
+  
   const rowVirtualizer = useVirtualizer({
     count: groupedData.length,
     getScrollElement: () => tableContainerRef.current,
@@ -851,28 +866,36 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
 
   // Paste from clipboard to focused/selected cells
   // Takes clipboard text directly from the native paste event (no permission required)
+  // Uses refs to ensure we always have the latest state, especially after navigation
   const handlePaste = useCallback((clipboardText: string) => {
-    if (!focusedCell || !clipboardText) return;
+    // Read from refs to ensure we have the latest values (important after arrow key navigation)
+    const currentFocusedCell = focusedCellRef.current;
+    const currentSelectionRange = selectionRangeRef.current;
+    const currentRows = rowsRef.current;
+    const currentOrderedColumns = orderedColumnsRef.current;
+    
+    if (!currentFocusedCell || !clipboardText) return;
     
     // Parse clipboard data (tab-separated columns, newline-separated rows)
+    // Always parse fresh from the clipboard text to avoid stale data
     const clipboardRows = clipboardText.split('\n').map(row => row.split('\t'));
     
-    if (selectionRange) {
+    if (currentSelectionRange) {
       // Paste into selection range
-      const minRow = Math.min(selectionRange.start.rowIndex, selectionRange.end.rowIndex);
-      const maxRow = Math.max(selectionRange.start.rowIndex, selectionRange.end.rowIndex);
-      const minCol = Math.min(selectionRange.start.colIndex, selectionRange.end.colIndex);
-      const maxCol = Math.max(selectionRange.start.colIndex, selectionRange.end.colIndex);
+      const minRow = Math.min(currentSelectionRange.start.rowIndex, currentSelectionRange.end.rowIndex);
+      const maxRow = Math.max(currentSelectionRange.start.rowIndex, currentSelectionRange.end.rowIndex);
+      const minCol = Math.min(currentSelectionRange.start.colIndex, currentSelectionRange.end.colIndex);
+      const maxCol = Math.max(currentSelectionRange.start.colIndex, currentSelectionRange.end.colIndex);
       
       for (let r = minRow; r <= maxRow; r++) {
-        const row = rows[r];
+        const row = currentRows[r];
         if (!row) continue;
         
         const clipboardRowIndex = (r - minRow) % clipboardRows.length;
         const clipboardRow = clipboardRows[clipboardRowIndex];
         
         for (let c = minCol; c <= maxCol; c++) {
-          const columnId = orderedColumns[c]?.id;
+          const columnId = currentOrderedColumns[c]?.id;
           const colConfig = config.columns.find(col => col.id === columnId);
           
           // Skip if column is not editable
@@ -882,25 +905,25 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
           const value = clipboardRow[clipboardColIndex];
           
           if (value !== undefined) {
-            onCellUpdate(row.id, columnId, value);
+            onCellUpdateRef.current(row.id, columnId, value);
           }
         }
       }
     } else {
       // Paste starting from focused cell
-      const startRow = focusedCell.rowIndex;
-      const startCol = focusedCell.colIndex;
+      const startRow = currentFocusedCell.rowIndex;
+      const startCol = currentFocusedCell.colIndex;
       
       for (let r = 0; r < clipboardRows.length; r++) {
         const rowIndex = startRow + r;
-        const row = rows[rowIndex];
+        const row = currentRows[rowIndex];
         if (!row) continue;
         
         const clipboardRow = clipboardRows[r];
         
         for (let c = 0; c < clipboardRow.length; c++) {
           const colIndex = startCol + c;
-          const columnId = orderedColumns[colIndex]?.id;
+          const columnId = currentOrderedColumns[colIndex]?.id;
           const colConfig = config.columns.find(col => col.id === columnId);
           
           // Skip if column is not editable
@@ -908,12 +931,12 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
           
           const value = clipboardRow[c];
           if (value !== undefined) {
-            onCellUpdate(row.id, columnId, value);
+            onCellUpdateRef.current(row.id, columnId, value);
           }
         }
       }
     }
-  }, [focusedCell, selectionRange, rows, orderedColumns, config.columns, onCellUpdate]);
+  }, [config.columns]); // Only depend on config.columns which doesn't change
 
   // Handle paste via document listener (works without special permissions)
   useEffect(() => {
@@ -925,8 +948,14 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
       if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA')) return;
       
       e.preventDefault();
+      // Always read clipboard data fresh from the event to avoid stale data
+      // This is critical when pasting after navigation with arrow keys
       const clipboardText = e.clipboardData?.getData('text') || '';
-      if (clipboardText) handlePaste(clipboardText);
+      if (clipboardText) {
+        // handlePaste now uses refs to ensure it has the latest state values
+        // This prevents using stale focusedCell/rows after arrow key navigation
+        handlePaste(clipboardText);
+      }
     };
     
     document.addEventListener('paste', handlePasteEvent);
