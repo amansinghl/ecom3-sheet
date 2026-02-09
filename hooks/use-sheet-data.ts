@@ -14,6 +14,7 @@ export interface UseSheetDataOptions {
   staleTime?: number;
   cacheTime?: number;
   refetchInterval?: number | false;
+  isEditing?: boolean; // If true, disable auto-refetch to prevent overwriting edits
 }
 
 /**
@@ -34,9 +35,12 @@ export function useEscalationSheetData(
     gcTime: options.cacheTime ?? 10 * 60 * 1000, // 10 minutes
     refetchOnWindowFocus: false,
     // Auto-refresh every 30 seconds by default, or use provided interval
-    refetchInterval: options.refetchInterval !== undefined 
-      ? options.refetchInterval 
-      : 30 * 1000, // 30 seconds
+    // IMPORTANT: Disable refetch while editing to prevent overwriting user's editsOption 3: Disable refetch while editing (more complex, but better UX)
+    refetchInterval: options.isEditing 
+      ? false // Disable refetch while editing
+      : (options.refetchInterval !== undefined 
+          ? options.refetchInterval 
+          : 30 * 1000), // 30 seconds when not editing
   });
 }
 
@@ -58,9 +62,12 @@ export function useTechSheetData(
     gcTime: options.cacheTime ?? 10 * 60 * 1000,
     refetchOnWindowFocus: false,
     // Auto-refresh every 30 seconds by default, or use provided interval
-    refetchInterval: options.refetchInterval !== undefined 
-      ? options.refetchInterval 
-      : 30 * 1000, // 30 seconds
+    // IMPORTANT: Disable refetch while editing to prevent overwriting user's edits
+    refetchInterval: options.isEditing 
+      ? false // Disable refetch while editing
+      : (options.refetchInterval !== undefined 
+          ? options.refetchInterval 
+          : 30 * 1000), // 30 seconds when not editing
   });
 }
 
@@ -94,9 +101,12 @@ export function useSheetData(
     refetchOnWindowFocus: false,
     // Auto-refresh every 30 seconds by default, or use provided interval
     // Set to false to disable auto-refresh
-    refetchInterval: options.refetchInterval !== undefined 
-      ? options.refetchInterval 
-      : 30 * 1000, // 30 seconds
+    // IMPORTANT: Disable refetch while editing to prevent overwriting user's edits
+    refetchInterval: options.isEditing 
+      ? false // Disable refetch while editing
+      : (options.refetchInterval !== undefined 
+          ? options.refetchInterval 
+          : 30 * 1000), // 30 seconds when not editing
   });
 }
 

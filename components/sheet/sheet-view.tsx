@@ -41,6 +41,7 @@ export function SheetView({ config, userRole }: SheetViewProps) {
     selectedRows, 
     clearSelection, 
     setEditingCell, 
+    editingCell, // Get editing state to disable refetch while editing
     clearAllFilters,
     setColumnFilter,
     loadViewStateForSheet,
@@ -75,6 +76,8 @@ export function SheetView({ config, userRole }: SheetViewProps) {
   const queryClient = useQueryClient();
 
   // Fetch sheet data from API based on sheet ID
+  // Disable auto-refetch while editing to prevent overwriting user's edits
+  const isEditing = !!editingCell;
   const { 
     data: apiData, 
     isLoading, 
@@ -85,6 +88,7 @@ export function SheetView({ config, userRole }: SheetViewProps) {
     config.id === 'escalations' ? 'escalation' : config.id,
     {
       enabled: config.id !== 'portfolio', // Don't fetch for portfolio sheet
+      isEditing, // Pass editing state to disable refetch while editing
     }
   );
 
