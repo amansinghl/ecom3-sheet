@@ -19,6 +19,7 @@ export interface SheetData {
   escalations?: RowData[];  // Escalation sheet format
   tech?: RowData[];         // Tech sheet format
   lsd?: RowData[];          // LSD sheet format
+  logs?: RowData[];         // N8N logs sheet format
   rows?: RowData[];         // Generic format
   [key: string]: any;       // Allow other sheet types
   total?: number;
@@ -56,6 +57,9 @@ function extractRowsFromResponse(data: SheetData): RowData[] {
   }
   if (Array.isArray(data.lsd)) {
     return data.lsd;
+  }
+  if (Array.isArray(data.logs)) {
+    return data.logs;
   }
   // Fallback: check for array properties
   for (const key in data) {
@@ -239,11 +243,63 @@ class SheetApiService {
    */
   async getSheetData(sheetName: string): Promise<RowData[]> {
     try {
-      const response = await apiClient.get<ApiResponse<SheetData>>(
+      const response = await apiClient.get<any>(
         `/sheets/${sheetName}`
       );
 
-      return extractRowsFromResponse(response.data);
+      // Handle different response structures
+      // Backend may return: { data: { logs: [...] }, meta: {...} }
+      // Or: { data: { escalations: [...] } }
+      // Or: { data: { data: { logs: [...] } } } (nested)
+      let dataToExtract: SheetData;
+      
+      if (response && typeof response === 'object') {
+        // Check if response has a data property
+        if (response.data && typeof response.data === 'object') {
+          // Check if response.data has a data property (nested structure)
+          if (response.data.data && typeof response.data.data === 'object') {
+            dataToExtract = response.data.data;
+          } else {
+            // Use response.data directly (e.g., { logs: [...], count: 3 })
+            dataToExtract = response.data;
+          }
+        } else {
+          // Response itself is the data
+          dataToExtract = response as SheetData;
+        }
+      } else {
+        // Fallback: use response directly
+        dataToExtract = response as SheetData;
+      }
+
+      let extracted = extractRowsFromResponse(dataToExtract);
+      
+      // Ensure each row has an id field (required for DataGrid)
+      // For n8n-logs, use _unix_timestamp or _stored_at as id if available
+      if (sheetName === 'n8n-logs') {
+        extracted = extracted.map((row: RowData, index: number) => {
+          // Use _unix_timestamp as id if available, otherwise use index
+          if (!row.id) {
+            if (row._unix_timestamp) {
+              row.id = `n8n-${row._unix_timestamp}-${index}`;
+            } else if (row._stored_at) {
+              row.id = `n8n-${row._stored_at}-${index}`;
+            } else {
+              row.id = `n8n-${Date.now()}-${index}`;
+            }
+          }
+          return row;
+        });
+      }
+      
+      // Debug logging for n8n-logs
+      if (sheetName === 'n8n-logs') {
+        console.log('N8N Logs - Response structure:', response);
+        console.log('N8N Logs - Data to extract:', dataToExtract);
+        console.log('N8N Logs - Extracted rows:', extracted);
+      }
+      
+      return extracted;
     } catch (error) {
       console.error(`Failed to fetch ${sheetName} sheet:`, error);
       throw error;
