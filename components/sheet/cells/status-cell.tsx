@@ -283,7 +283,7 @@ export const StatusCell = memo(function StatusCell({
       )}
       onClick={canEdit ? onEdit : undefined}
     >
-      {currentOption && (
+      {currentOption ? (
         isUserField ? (
           // User field with avatar
           <div className="flex items-center gap-1.5">
@@ -321,7 +321,12 @@ export const StatusCell = memo(function StatusCell({
             {currentOption.label}
           </Badge>
         )
-      )}
+      ) : value ? (
+        // Fallback: Display raw value as plain text if it doesn't match any option
+        <span className={cn('text-gray-700 truncate', textSizeClass)}>
+          {typeof value === 'string' ? value : String(value)}
+        </span>
+      ) : null}
     </div>
   );
 });

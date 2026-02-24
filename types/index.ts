@@ -25,7 +25,8 @@ export type CellType =
   | 'status'
   | 'user'
   | 'user-avatar'
-  | 'highlights';
+  | 'highlights'
+  | 'action-button';
 
 export interface DropdownOption {
   label: string;

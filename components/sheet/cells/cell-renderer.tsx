@@ -16,6 +16,7 @@ import { PhoneCell } from './phone-cell';
 import { UrlCell } from './url-cell';
 import { LongTextCell } from './longtext-cell';
 import { HighlightsCell } from './highlights-cell';
+import { EscalationButtonCell } from './escalation-button-cell';
 
 interface CellRendererProps {
   value: any;
@@ -116,6 +117,8 @@ export const CellRenderer = memo(function CellRenderer({
       return <UrlCell {...cellProps} />;
     case 'highlights':
       return <HighlightsCell {...cellProps} rowData={rowData} />;
+    case 'action-button':
+      return <EscalationButtonCell {...cellProps} rowData={rowData} />;
     default:
       return <TextCell {...cellProps} />;
   }

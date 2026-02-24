@@ -934,6 +934,14 @@ export const n8nLogsSheetConfig: SheetConfig = {
       required: false,
       editable: false,
     },
+    {
+      id: 'add_to_escalations',
+      label: 'Add to Escalations',
+      type: 'action-button',
+      width: 150,
+      required: false,
+      editable: false,
+    },
   ],
   defaultSort: {
     columnId: 'timestamp',
