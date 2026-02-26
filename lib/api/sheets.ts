@@ -422,6 +422,36 @@ class SheetApiService {
       throw error;
     }
   }
+
+  /**
+   * Add escalation from N8N logs
+   * Adds an escalation entry from N8N log data
+   * 
+   * @param reference_number Reference number (AWB or shipment number)
+   * @param payload Object containing manual_case, notes, vamashipper, is_from_n8n, _redis_key
+   * @returns API response with operation result
+   * @throws Error if API request fails
+   */
+  async addEscalationFromN8N(
+    reference_number: string,
+    payload: {
+      manual_case: string;
+      notes: string;
+      is_from_n8n: number;
+      _redis_key?: string;
+    }
+  ): Promise<ApiResponse<any>> {
+    try {
+      const response = await apiClient.post<ApiResponse<any>>(
+        `/sheets/n8n-logs/update/${reference_number}`,
+        payload
+      );
+      return response;
+    } catch (error) {
+      console.error('Failed to add escalation from N8N:', error);
+      throw error;
+    }
+  }
 }
 
 // Export singleton instance
