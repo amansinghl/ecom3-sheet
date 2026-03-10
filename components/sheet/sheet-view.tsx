@@ -164,7 +164,7 @@ export function SheetView({ config, userRole }: SheetViewProps) {
         const filteredExistingRows = applyFilters(existingRows, viewState.columnFilters, config.columns, config.id);
         const filteredIds = new Set(filteredExistingRows.map((row: RowData) => String(row.id)));
         
-        updateVisibleRowIds(Array.from(filteredIds), viewState.columnFilters);
+        updateVisibleRowIds(Array.from(filteredIds) as string[], viewState.columnFilters);
         
         result = result.filter((row) => isTemporaryRow(row) || filteredIds.has(String(row.id)));
       } else {
