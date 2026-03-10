@@ -79,6 +79,7 @@ interface SheetStore {
   toggleColumnPin: (columnId: string) => void;
   resetViewState: () => void;
   loadViewStateForSheet: (sheetId: string) => void;
+  updateVisibleRowIds: (rowIds: string[], filters: Record<string, ColumnFilter>) => void;
 
   // Sync current state to active view
   syncStateToActiveView: () => void;
@@ -164,6 +165,8 @@ const defaultViewState: ViewState = {
   searchQuery: '',
   hiddenColumns: [],
   pinnedColumns: [],
+  visibleRowIds: new Set(),
+  filterSnapshot: {},
 };
 
 export const useSheetStore = create<SheetStore>((set, get) => ({
@@ -218,6 +221,8 @@ export const useSheetStore = create<SheetStore>((set, get) => ({
         viewState: {
           ...state.viewState,
           columnFilters: newFilters,
+          visibleRowIds: new Set(),
+          filterSnapshot: {},
         },
       };
     });
@@ -231,6 +236,8 @@ export const useSheetStore = create<SheetStore>((set, get) => ({
         viewState: {
           ...state.viewState,
           columnFilters: newFilters,
+          visibleRowIds: new Set(),
+          filterSnapshot: {},
         },
       };
     });
@@ -238,7 +245,12 @@ export const useSheetStore = create<SheetStore>((set, get) => ({
   },
   clearAllFilters: () => {
     set((state) => ({
-      viewState: { ...state.viewState, columnFilters: {} },
+      viewState: { 
+        ...state.viewState, 
+        columnFilters: {},
+        visibleRowIds: new Set(),
+        filterSnapshot: {},
+      },
     }));
     get().syncStateToActiveView();
   },
@@ -286,6 +298,15 @@ export const useSheetStore = create<SheetStore>((set, get) => ({
       viewState: {
         ...defaultViewState,
         searchQuery: state.viewState.searchQuery,
+      },
+    }));
+  },
+  updateVisibleRowIds: (rowIds, filters) => {
+    set((state) => ({
+      viewState: {
+        ...state.viewState,
+        visibleRowIds: new Set(rowIds),
+        filterSnapshot: JSON.parse(JSON.stringify(filters)),
       },
     }));
   },

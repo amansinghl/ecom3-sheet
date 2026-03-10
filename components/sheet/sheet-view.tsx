@@ -51,6 +51,7 @@ export function SheetView({ config, userRole }: SheetViewProps) {
     setActiveSheetId,
     pushToHistory,
     undo: undoFromStore,
+    updateVisibleRowIds,
     redo: redoFromStore,
     // Views management from store
     views,
@@ -155,10 +156,36 @@ export function SheetView({ config, userRole }: SheetViewProps) {
     if (Object.keys(viewState.columnFilters).length > 0) {
       const { applyFilters } = require('@/lib/utils/filter-data');
       const existingRows = result.filter((row) => !isTemporaryRow(row));
-      const filteredExistingRows = applyFilters(existingRows, viewState.columnFilters, config.columns, config.id);
-      const filteredIds = new Set(filteredExistingRows.map((row: RowData) => String(row.id)));
       
-      result = result.filter((row) => isTemporaryRow(row) || filteredIds.has(String(row.id)));
+      const filtersChanged = JSON.stringify(viewState.columnFilters) !== 
+                            JSON.stringify(viewState.filterSnapshot || {});
+      
+      if (filtersChanged) {
+        const filteredExistingRows = applyFilters(existingRows, viewState.columnFilters, config.columns, config.id);
+        const filteredIds = new Set(filteredExistingRows.map((row: RowData) => String(row.id)));
+        
+        updateVisibleRowIds(Array.from(filteredIds), viewState.columnFilters);
+        
+        result = result.filter((row) => isTemporaryRow(row) || filteredIds.has(String(row.id)));
+      } else {
+        const visibleRowIds = viewState.visibleRowIds || new Set();
+        const currentFilteredRows = applyFilters(existingRows, viewState.columnFilters, config.columns, config.id);
+        const currentFilteredIds = new Set(currentFilteredRows.map((row: RowData) => String(row.id)));
+        
+        const allVisibleIds = new Set([
+          ...Array.from(visibleRowIds),
+          ...Array.from(currentFilteredIds),
+        ]);
+        
+        result = result.filter((row) => {
+          const rowId = String(row.id);
+          return isTemporaryRow(row) || allVisibleIds.has(rowId);
+        });
+      }
+    } else {
+      if (viewState.visibleRowIds && viewState.visibleRowIds.size > 0) {
+        updateVisibleRowIds([], {});
+      }
     }
 
 

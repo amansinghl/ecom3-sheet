@@ -183,6 +183,8 @@ export interface ViewState {
   searchQuery: string;
   hiddenColumns: string[];
   pinnedColumns: string[]; // Columns pinned to the left
+  visibleRowIds?: Set<string>;
+  filterSnapshot?: Record<string, ColumnFilter>;
 }
 
 // API Response Types
