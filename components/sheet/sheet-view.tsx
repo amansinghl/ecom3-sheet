@@ -143,6 +143,9 @@ export function SheetView({ config, userRole }: SheetViewProps) {
     }
   }, [isError, error, config.id]);
 
+  // Compute filtered row IDs separately for useEffect
+  const filteredRowIdsRef = useRef<{ rowIds: string[]; filters: Record<string, ColumnFilter> } | null>(null);
+
   // Apply filters and add empty rows
   const filteredData = useMemo(() => {
     let result = data;
@@ -164,7 +167,11 @@ export function SheetView({ config, userRole }: SheetViewProps) {
         const filteredExistingRows = applyFilters(existingRows, viewState.columnFilters, config.columns, config.id);
         const filteredIds = new Set(filteredExistingRows.map((row: RowData) => String(row.id)));
         
-        updateVisibleRowIds(Array.from(filteredIds) as string[], viewState.columnFilters);
+        // Store filtered IDs for useEffect to update (after render)
+        filteredRowIdsRef.current = {
+          rowIds: Array.from(filteredIds) as string[],
+          filters: viewState.columnFilters,
+        };
         
         result = result.filter((row) => isTemporaryRow(row) || filteredIds.has(String(row.id)));
       } else {
@@ -183,8 +190,15 @@ export function SheetView({ config, userRole }: SheetViewProps) {
         });
       }
     } else {
+      // Store empty array for useEffect to update when filters are cleared
       if (viewState.visibleRowIds && viewState.visibleRowIds.size > 0) {
-        updateVisibleRowIds([], {});
+        filteredRowIdsRef.current = {
+          rowIds: [],
+          filters: {},
+        };
+      } else {
+        // Clear the ref if no update is needed
+        filteredRowIdsRef.current = null;
       }
     }
 
@@ -424,6 +438,15 @@ export function SheetView({ config, userRole }: SheetViewProps) {
 
     return [...result, ...emptyRows];
   }, [data, viewState.columnFilters, config.columns, config.id, globalSearch, activeViewId, activeView, viewState.sorts.length]);
+
+  // Update visible row IDs after render (not during render)
+  // This runs after the filteredData useMemo has computed the new filtered IDs
+  useEffect(() => {
+    if (filteredRowIdsRef.current) {
+      updateVisibleRowIds(filteredRowIdsRef.current.rowIds, filteredRowIdsRef.current.filters);
+      filteredRowIdsRef.current = null; // Clear after update
+    }
+  }, [data, viewState.columnFilters, updateVisibleRowIds]);
 
   const visibleRowCount = useMemo(() => {
     return filteredData.filter((row) => !String(row.id).startsWith('empty-')).length;
