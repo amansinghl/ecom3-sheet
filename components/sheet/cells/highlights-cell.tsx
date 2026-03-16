@@ -27,12 +27,13 @@ export function HighlightsCell({
   const textSizeClass = getCellTextSize(rowHeight);
   const paddingClass = getCellPadding(rowHeight);
 
-  // Extract the four highlight values with shorter labels
+  // Extract the highlight values with shorter labels
   const highlights = [
     { label: 'Calls', value: rowData?.count_of_calls },
     { label: 'NDR', value: rowData?.count_of_ndr },
     { label: 'OTP NDR', value: rowData?.otp_verified_ndr },
     { label: 'OTP Del', value: rowData?.otp_verified_delivery },
+    { label: 'Cancelled', value: rowData?.is_cancelled === 1 ? 'Y' : null },
   ];
 
   // Filter out null/undefined/empty string values
