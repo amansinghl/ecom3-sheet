@@ -673,6 +673,7 @@ export function SheetView({ config, userRole }: SheetViewProps) {
       'manual_case',
       'followup_remarks',
       'ops_remarks',
+      'vamaship_remarks',
       'source_of_complaint',
       'manual_ticket_status',
       'email_subject',

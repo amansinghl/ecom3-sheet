@@ -183,6 +183,14 @@ export const escalationSheetConfig: SheetConfig = {
       editable: true,
     },
     {
+      id: 'vamaship_remarks',
+      label: 'Vamaship Remarks',
+      type: 'text',
+      width: 200,
+      required: false,
+      editable: true,
+    },
+    {
       id: 'created_at',
       label: 'Created At',
       type: 'datetime',
