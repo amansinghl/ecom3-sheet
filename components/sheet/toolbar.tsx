@@ -787,6 +787,9 @@ export const Toolbar = forwardRef<ToolbarRef, ToolbarProps>(({ config, data, use
                     <p className="text-muted-foreground">
                       <span className="font-medium text-green-600 dark:text-green-400">Positive Closure:</span> Tracking &gt; <code className="px-1.5 py-0.5 rounded bg-background border text-xs">1900</code>
                     </p>
+                    <p className="text-muted-foreground">
+                      <span className="font-medium text-green-600 dark:text-green-400">Positive Closure:</span> Tracking = <code className="px-1.5 py-0.5 rounded bg-background border text-xs">1900</code>
+                    </p>
                   </div>
                 </div>
 
