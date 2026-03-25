@@ -276,6 +276,17 @@ export function SheetView({ config, userRole }: SheetViewProps) {
     // For escalations sheet: only when viewing open escalations (is_closed === 0)
     // For LSD sheet: always check for duplicates
     if (config.id === 'escalations') {
+      // Reset duplicate highlight flags before re-evaluating conditions.
+      // This prevents stale red highlights when filters/views/data change.
+      result.forEach((row) => {
+        if (row._isDuplicate) {
+          delete row._isDuplicate;
+        }
+        if (row.duplicate_awb === 'Duplicate Entry, will be deleted in 15 minutes') {
+          row.duplicate_awb = null;
+        }
+      });
+
       // Check if we're viewing open escalations (is_closed === 0)
       // This works for both system views and custom views
       const isOpenEscalationsView = 
@@ -345,17 +356,21 @@ export function SheetView({ config, userRole }: SheetViewProps) {
             }
           }
         });
-      } else {
-        // Clear duplicate flags when not in Open Escalations view
-        result.forEach((row) => {
-          if (row._isDuplicate) {
-            delete row._isDuplicate;
-            if (row.duplicate_awb === 'Duplicate Entry, will be deleted in 15 minutes') {
-              row.duplicate_awb = null;
-            }
-          }
-        });
       }
+
+      // Highlight COD Delay rows with zero COD value using the same red styling
+      // that is used for duplicate rows.
+      result.forEach((row) => {
+        const manualCase = String(row.manual_case ?? '').trim().toLowerCase();
+        const rawCodValue = String(row.cod_value ?? '').trim();
+        const parsedCodValue = rawCodValue === '' ? NaN : Number(rawCodValue);
+        const isCodDelayWithZeroCod = manualCase === 'cod delay' && !Number.isNaN(parsedCodValue) && parsedCodValue === 0;
+
+        if (isCodDelayWithZeroCod) {
+          row._isDuplicate = true;
+          row.duplicate_awb = 'COD Delay with Zero COD Value - Will be deleted in 15 minutes';
+        }
+      });
     } else if (config.id === 'lsd') {
       // For LSD sheet: always check for duplicates based on manual_case + shipment_no
       // Group rows by shipment_no + manual_case combination
