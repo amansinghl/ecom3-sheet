@@ -364,7 +364,7 @@ export function SheetView({ config, userRole }: SheetViewProps) {
         const manualCase = String(row.manual_case ?? '').trim().toLowerCase();
         const rawCodValue = String(row.cod_value ?? '').trim();
         const parsedCodValue = rawCodValue === '' ? NaN : Number(rawCodValue);
-        const isCodDelayWithZeroCod = manualCase === 'cod delay' && !Number.isNaN(parsedCodValue) && parsedCodValue === 0;
+        const isCodDelayWithZeroCod = (manualCase === 'cod delay' || manualCase === 'cod to prepaid change') && !Number.isNaN(parsedCodValue) && parsedCodValue === 0;
 
         if (isCodDelayWithZeroCod) {
           row._isDuplicate = true;
