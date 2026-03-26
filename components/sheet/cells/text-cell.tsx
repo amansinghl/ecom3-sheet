@@ -20,6 +20,58 @@ interface TextCellProps {
   onCancel: () => void;
 }
 
+function formatDisplayValue(value: any): string {
+  if (value == null) return '';
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') {
+    return String(value);
+  }
+
+  // Prevent React runtime errors by converting object/array cell values to text.
+  try {
+    const json = JSON.stringify(value);
+    return json ?? String(value);
+  } catch {
+    return String(value);
+  }
+}
+
+function extractEstimatedDeliveryDate(value: any): string {
+  if (value == null) return '';
+
+  let parsed: any = value;
+  if (typeof parsed === 'string') {
+    const trimmed = parsed.trim();
+    if (!trimmed) return '';
+    try {
+      parsed = JSON.parse(trimmed);
+    } catch {
+      return trimmed;
+    }
+  }
+
+  if (typeof parsed !== 'object') {
+    return String(parsed);
+  }
+
+  if (typeof parsed.estimated_delivery_date === 'string') {
+    return parsed.estimated_delivery_date;
+  }
+
+  // Handles payloads like: { "306301294": { "estimated_delivery_date": "..." } }
+  for (const nestedValue of Object.values(parsed)) {
+    if (
+      nestedValue &&
+      typeof nestedValue === 'object' &&
+      typeof (nestedValue as any).estimated_delivery_date === 'string'
+    ) {
+      return (nestedValue as any).estimated_delivery_date;
+    }
+  }
+
+  return formatDisplayValue(parsed);
+}
+
 export const TextCell = memo(function TextCell({
   value,
   columnConfig,
@@ -32,7 +84,7 @@ export const TextCell = memo(function TextCell({
   onSave,
   onCancel,
 }: TextCellProps) {
-  const [editValue, setEditValue] = useState(value || '');
+  const [editValue, setEditValue] = useState(formatDisplayValue(value));
   const inputRef = useRef<HTMLInputElement>(null);
   
   // Store the current typed value in a ref to persist across re-renders
@@ -46,7 +98,7 @@ export const TextCell = memo(function TextCell({
     // Only sync when transitioning from not editing to editing
     if (isEditing && !prevIsEditingRef.current) {
       // If initialValue is provided (user typed directly), use it instead of current value
-      const startValue = initialValue !== undefined ? initialValue : (value || '');
+      const startValue = initialValue !== undefined ? initialValue : formatDisplayValue(value);
       setEditValue(startValue);
       currentValueRef.current = startValue;
       if (inputRef.current) {
@@ -103,7 +155,10 @@ export const TextCell = memo(function TextCell({
   }
 
   // Format entry_month column as "January 2026" instead of "2026-01"
-  let displayValue = value || '';
+  let displayValue = formatDisplayValue(value);
+  if (columnConfig.id === 'edd') {
+    displayValue = extractEstimatedDeliveryDate(value);
+  }
   if (columnConfig.id === 'entry_month' && displayValue) {
     try {
       // Parse "2026-01" format
