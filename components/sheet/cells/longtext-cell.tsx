@@ -22,6 +22,21 @@ interface LongTextCellProps {
   onCancel: () => void;
 }
 
+function formatDisplayValue(value: any): string {
+  if (value == null) return '';
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') {
+    return String(value);
+  }
+
+  try {
+    const json = JSON.stringify(value);
+    return json ?? String(value);
+  } catch {
+    return String(value);
+  }
+}
+
 export function LongTextCell({
   value,
   columnConfig,
@@ -35,7 +50,7 @@ export function LongTextCell({
   onCancel,
 }: LongTextCellProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [editValue, setEditValue] = useState(value || '');
+  const [editValue, setEditValue] = useState(formatDisplayValue(value));
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const textSizeClass = getCellTextSize(rowHeight);
   const paddingClass = getCellPadding(rowHeight);
@@ -50,7 +65,7 @@ export function LongTextCell({
     // Only sync when transitioning from not editing to editing
     if (isEditing && !prevIsEditingRef.current) {
       // If initialValue is provided (user typed directly), use it instead of current value
-      const startValue = initialValue !== undefined ? initialValue : (value || '');
+      const startValue = initialValue !== undefined ? initialValue : formatDisplayValue(value);
       setEditValue(startValue);
       currentValueRef.current = startValue;
       if (textareaRef.current) {
@@ -91,7 +106,7 @@ export function LongTextCell({
     onSave(inputValue);
   };
 
-  const displayValue = value || '';
+  const displayValue = formatDisplayValue(value);
   const highlightedValue = !isEditing && globalSearch.trim() 
     ? highlightText(displayValue, globalSearch.trim())
     : displayValue;
