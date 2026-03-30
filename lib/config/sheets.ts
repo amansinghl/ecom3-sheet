@@ -1104,6 +1104,14 @@ export const leadManagerSheetConfig: SheetConfig = {
       editable: false,
     },
     {
+      id: 'first_shipment_date',
+      label: 'First Shipment',
+      type: 'datetime',
+      width: 160,
+      required: false,
+      editable: false,
+    },
+    {
       id: 'signup_date',
       label: 'Signup Date',
       type: 'datetime',
