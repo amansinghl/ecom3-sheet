@@ -20,6 +20,7 @@ export interface SheetData {
   tech?: RowData[];         // Tech sheet format
   lsd?: RowData[];          // LSD sheet format
   logs?: RowData[];         // N8N logs sheet format
+  leads?: RowData[];        // Lead Manager sheet format
   rows?: RowData[];         // Generic format
   [key: string]: any;       // Allow other sheet types
   total?: number;
@@ -60,6 +61,9 @@ function extractRowsFromResponse(data: SheetData): RowData[] {
   }
   if (Array.isArray(data.logs)) {
     return data.logs;
+  }
+  if (Array.isArray(data.leads)) {
+    return data.leads;
   }
   // Fallback: check for array properties
   for (const key in data) {
@@ -419,6 +423,57 @@ class SheetApiService {
       return response;
     } catch (error) {
       // Error is handled in the component with user-friendly toast messages
+      throw error;
+    }
+  }
+
+  /**
+   * Get lead manager sheet data
+   */
+  async getLeadSheet(): Promise<RowData[]> {
+    try {
+      const response = await apiClient.get<ApiResponse<SheetData>>(
+        '/sheets/leads'
+      );
+      return extractRowsFromResponse(response.data);
+    } catch (error) {
+      console.error('Failed to fetch lead sheet:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get sales employees for lead assignment dropdown
+   */
+  async getSalesEmployees(): Promise<{ id: number; email: string; name: string }[]> {
+    try {
+      const response = await apiClient.get<ApiResponse<any>>(
+        '/sheets/leads/sales-employees'
+      );
+      return response.data?.employees || [];
+    } catch (error) {
+      console.error('Failed to fetch sales employees:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Update lead manager sheet entries
+   */
+  async updateLeadEntries(
+    id: number | string,
+    payload: Record<string, any>
+  ): Promise<ApiResponse<any>> {
+    try {
+      const response = await apiClient.post<ApiResponse<any>>(
+        '/sheets/leads/update-entries',
+        {
+          id: Number(id),
+          ...payload,
+        }
+      );
+      return response;
+    } catch (error) {
       throw error;
     }
   }

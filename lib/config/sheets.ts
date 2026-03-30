@@ -977,8 +977,185 @@ export const n8nLogsSheetConfig: SheetConfig = {
   },
 };
 
+// Lead Manager Call Status Options
+const leadCallStatusOptions: StatusOption[] = [
+  { label: 'Not Contacted', value: 'not_contacted', color: '#6b7280' },
+  { label: 'Called', value: 'called', color: '#3b82f6' },
+  { label: 'Callback', value: 'callback', color: '#f59e0b' },
+  { label: 'No Answer', value: 'no_answer', color: '#ef4444' },
+  { label: 'Not Interested', value: 'not_interested', color: '#8b5cf6' },
+  { label: 'Converted', value: 'converted', color: '#10b981' },
+  { label: 'Wrong Number', value: 'wrong_number', color: '#f43f5e' },
+];
+
+// Lead Manager Sheet Configuration
+export const leadManagerSheetConfig: SheetConfig = {
+  id: 'leads',
+  name: 'Lead Manager',
+  icon: 'Users',
+  description: 'Track new user signups and manage sales outreach',
+  views: [
+    {
+      id: 'uncontacted',
+      name: 'Uncontacted Leads',
+      description: 'Leads that have not been contacted yet',
+      filters: [
+        {
+          columnId: 'lead_call_status',
+          operator: 'equals',
+          value: 'not_contacted',
+        },
+      ],
+      isDefault: false,
+    },
+    {
+      id: 'callbacks',
+      name: 'Pending Callbacks',
+      description: 'Leads scheduled for callback',
+      filters: [
+        {
+          columnId: 'lead_call_status',
+          operator: 'equals',
+          value: 'callback',
+        },
+      ],
+      isDefault: false,
+    },
+    {
+      id: 'all-leads',
+      name: 'All Leads',
+      description: 'View all leads',
+      filters: [],
+      isDefault: true,
+    },
+  ],
+  columns: [
+    {
+      id: 'user_name',
+      label: 'Name',
+      type: 'text',
+      width: 150,
+      required: false,
+      editable: false,
+    },
+    {
+      id: 'mobile',
+      label: 'Mobile',
+      type: 'phone',
+      width: 130,
+      required: false,
+      editable: false,
+    },
+    {
+      id: 'email',
+      label: 'Email',
+      type: 'email',
+      width: 200,
+      required: false,
+      editable: false,
+    },
+    {
+      id: 'lead_call_status',
+      label: 'Call Status',
+      type: 'status',
+      width: 160,
+      required: false,
+      editable: true,
+      options: leadCallStatusOptions,
+      backgroundColor: '#fffee0',
+    },
+    {
+      id: 'sales_person_id',
+      label: 'Assigned To',
+      type: 'dropdown',
+      width: 180,
+      required: false,
+      editable: true,
+      options: [],
+      backgroundColor: '#fffee0',
+    },
+    {
+      id: 'lead_call_remarks',
+      label: 'Remarks',
+      type: 'longtext',
+      width: 250,
+      required: false,
+      editable: true,
+      backgroundColor: '#fffee0',
+    },
+    {
+      id: 'kyc_status',
+      label: 'KYC',
+      type: 'status',
+      width: 120,
+      required: false,
+      editable: false,
+      options: [
+        { label: 'Complete', value: 'Complete', color: '#10b981' },
+        { label: 'Incomplete', value: 'Incomplete', color: '#ef4444' },
+      ],
+    },
+    {
+      id: 'utm_source',
+      label: 'UTM Source',
+      type: 'text',
+      width: 130,
+      required: false,
+      editable: false,
+    },
+    {
+      id: 'signup_date',
+      label: 'Signup Date',
+      type: 'datetime',
+      width: 160,
+      required: false,
+      editable: false,
+    },
+    {
+      id: 'entity_name',
+      label: 'Entity Name',
+      type: 'text',
+      width: 150,
+      required: false,
+      editable: false,
+    },
+    {
+      id: 'accounts_entity_id',
+      label: 'Entity ID',
+      type: 'number',
+      width: 100,
+      required: false,
+      editable: false,
+    },
+  ],
+  defaultSort: {
+    columnId: 'signup_date',
+    direction: 'desc',
+  },
+  permissions: {
+    admin: {
+      canView: true,
+      canEdit: true,
+      canDelete: false,
+      canExport: true,
+    },
+    editor: {
+      canView: true,
+      canEdit: true,
+      canDelete: false,
+      canExport: true,
+    },
+    viewer: {
+      canView: true,
+      canEdit: false,
+      canDelete: false,
+      canExport: false,
+    },
+  },
+};
+
 // All available sheets
-export const sheets: SheetConfig[] = [escalationSheetConfig, lsdSheetConfig, n8nLogsSheetConfig];
+export const sheets: SheetConfig[] = [escalationSheetConfig, lsdSheetConfig, n8nLogsSheetConfig, leadManagerSheetConfig];
 
 // Helper to get sheet by ID
 export const getSheetById = (id: string): SheetConfig | undefined => {
