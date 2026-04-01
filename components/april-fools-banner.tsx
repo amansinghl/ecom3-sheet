@@ -58,12 +58,12 @@ export function AprilFoolsBanner() {
               <p className="text-sm text-white/90 leading-relaxed">
                 After careful evaluation of productivity metrics and team collaboration scores, management has decided to
                 transition to <strong>full-time work from office</strong> starting Monday, April 7th. All employees must
-                report to the nearest Vamaship office by 9:00 AM sharp. WFH requests will require{' '}
-                <strong>VP-level approval</strong> with a valid medical certificate. Relocation assistance will not be
+                report to the nearest Vamaship office by 9:00 AM sharp. WFH requests will require
+                prior approval with a valid medical certificate. Relocation assistance will not be
                 provided. Attendance will be tracked via biometric scanning. Please plan your commute accordingly.
               </p>
               <p className="text-xs text-white/60 mt-1">
-                For queries, contact hr-policy@vamaship.com. This decision is final and not open for discussion.
+                For queries, contact april.fools@vamaship.com. This decision is final and not open for discussion.
               </p>
             </div>
             {canClose ? (
