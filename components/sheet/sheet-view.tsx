@@ -769,6 +769,7 @@ export function SheetView({ config, userRole }: SheetViewProps) {
       'conversion_stage',
       'loss_reason',
       'sales_person_id',
+      'potential_monthly_load',
     ];
 
     // Check if this is an updatable field
