@@ -1165,7 +1165,8 @@ export const leadManagerSheetConfig: SheetConfig = {
       type: 'number',
       width: 140,
       required: false,
-      editable: false,
+      editable: true,
+      backgroundColor: '#fffee0',
     },
     {
       id: 'kyc_status',
