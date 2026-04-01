@@ -761,8 +761,13 @@ export function SheetView({ config, userRole }: SheetViewProps) {
 
     // Fields that should trigger the update-entries API call for leads sheet
     const leadsUpdatableFields = [
-      'lead_call_status',
-      'lead_call_remarks',
+      'call_status',
+      'lead_stage',
+      'remarks',
+      'next_action',
+      'next_followup_date',
+      'conversion_stage',
+      'loss_reason',
       'sales_person_id',
     ];
 

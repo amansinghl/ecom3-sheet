@@ -977,15 +977,40 @@ export const n8nLogsSheetConfig: SheetConfig = {
   },
 };
 
-// Lead Manager Call Status Options
+// Lead Manager - Call Status Options
 const leadCallStatusOptions: StatusOption[] = [
-  { label: 'Not Contacted', value: 'not_contacted', color: '#6b7280' },
-  { label: 'Called', value: 'called', color: '#3b82f6' },
-  { label: 'Callback', value: 'callback', color: '#f59e0b' },
+  { label: 'Not Called', value: 'not_called', color: '#6b7280' },
   { label: 'No Answer', value: 'no_answer', color: '#ef4444' },
-  { label: 'Not Interested', value: 'not_interested', color: '#8b5cf6' },
-  { label: 'Converted', value: 'converted', color: '#10b981' },
+  { label: 'Callback', value: 'callback', color: '#f59e0b' },
   { label: 'Wrong Number', value: 'wrong_number', color: '#f43f5e' },
+  { label: 'Not Interested', value: 'not_interested', color: '#8b5cf6' },
+  { label: 'Connected', value: 'connected', color: '#3b82f6' },
+  { label: 'Demo Scheduled', value: 'demo_scheduled', color: '#06b6d4' },
+  { label: 'Demo Done', value: 'demo_done', color: '#10b981' },
+];
+
+// Lead Manager - Lead Stage Options
+const leadStageOptions: StatusOption[] = [
+  { label: 'New', value: 'new', color: '#6b7280' },
+  { label: 'Not Qualified', value: 'not_qualified', color: '#ef4444' },
+  { label: 'Prospect', value: 'prospect', color: '#f59e0b' },
+  { label: 'Lead', value: 'lead', color: '#3b82f6' },
+];
+
+// Lead Manager - Next Action Options
+const nextActionOptions: StatusOption[] = [
+  { label: 'Reconnect', value: 'reconnect', color: '#f59e0b' },
+  { label: 'Demo', value: 'demo', color: '#3b82f6' },
+  { label: 'Send Pricing', value: 'send_pricing', color: '#06b6d4' },
+  { label: 'KYC Assistance', value: 'kyc_assistance', color: '#8b5cf6' },
+  { label: 'No Action', value: 'no_action', color: '#6b7280' },
+];
+
+// Lead Manager - Conversion Stage Options
+const conversionStageOptions: StatusOption[] = [
+  { label: 'Not Started', value: 'not_started', color: '#6b7280' },
+  { label: 'Converted', value: 'converted', color: '#10b981' },
+  { label: 'Lost', value: 'lost', color: '#ef4444' },
 ];
 
 // Lead Manager Sheet Configuration
@@ -996,14 +1021,21 @@ export const leadManagerSheetConfig: SheetConfig = {
   description: 'Track new user signups and manage sales outreach',
   views: [
     {
-      id: 'uncontacted',
-      name: 'Uncontacted Leads',
-      description: 'Leads that have not been contacted yet',
+      id: 'all-leads',
+      name: 'All Leads',
+      description: 'View all leads',
+      filters: [],
+      isDefault: true,
+    },
+    {
+      id: 'not-called',
+      name: 'Not Called',
+      description: 'Leads that have not been called yet',
       filters: [
         {
-          columnId: 'lead_call_status',
+          columnId: 'call_status',
           operator: 'equals',
-          value: 'not_contacted',
+          value: 'not_called',
         },
       ],
       isDefault: false,
@@ -1014,22 +1046,16 @@ export const leadManagerSheetConfig: SheetConfig = {
       description: 'Leads scheduled for callback',
       filters: [
         {
-          columnId: 'lead_call_status',
+          columnId: 'call_status',
           operator: 'equals',
           value: 'callback',
         },
       ],
       isDefault: false,
     },
-    {
-      id: 'all-leads',
-      name: 'All Leads',
-      description: 'View all leads',
-      filters: [],
-      isDefault: true,
-    },
   ],
   columns: [
+    // --- Identity ---
     {
       id: 'user_name',
       label: 'Name',
@@ -1054,14 +1080,25 @@ export const leadManagerSheetConfig: SheetConfig = {
       required: false,
       editable: false,
     },
+    // --- Sales workflow (JSON fields + sales_person_id) ---
     {
-      id: 'lead_call_status',
+      id: 'call_status',
       label: 'Call Status',
       type: 'status',
-      width: 160,
+      width: 150,
       required: false,
       editable: true,
       options: leadCallStatusOptions,
+      backgroundColor: '#fffee0',
+    },
+    {
+      id: 'lead_stage',
+      label: 'Lead Stage',
+      type: 'status',
+      width: 140,
+      required: false,
+      editable: true,
+      options: leadStageOptions,
       backgroundColor: '#fffee0',
     },
     {
@@ -1075,13 +1112,60 @@ export const leadManagerSheetConfig: SheetConfig = {
       backgroundColor: '#fffee0',
     },
     {
-      id: 'lead_call_remarks',
+      id: 'remarks',
       label: 'Remarks',
       type: 'longtext',
-      width: 250,
+      width: 300,
       required: false,
       editable: true,
       backgroundColor: '#fffee0',
+    },
+    {
+      id: 'next_action',
+      label: 'Next Action',
+      type: 'status',
+      width: 150,
+      required: false,
+      editable: true,
+      options: nextActionOptions,
+      backgroundColor: '#fffee0',
+    },
+    {
+      id: 'next_followup_date',
+      label: 'Next Follow-up',
+      type: 'date',
+      width: 150,
+      required: false,
+      editable: true,
+      backgroundColor: '#fffee0',
+    },
+    {
+      id: 'conversion_stage',
+      label: 'Conversion',
+      type: 'status',
+      width: 140,
+      required: false,
+      editable: true,
+      options: conversionStageOptions,
+      backgroundColor: '#fffee0',
+    },
+    {
+      id: 'loss_reason',
+      label: 'Loss Reason',
+      type: 'longtext',
+      width: 200,
+      required: false,
+      editable: true,
+      backgroundColor: '#fffee0',
+    },
+    // --- Data from other tables (read-only) ---
+    {
+      id: 'potential_monthly_load',
+      label: 'Monthly Potential',
+      type: 'number',
+      width: 140,
+      required: false,
+      editable: false,
     },
     {
       id: 'kyc_status',
@@ -1096,18 +1180,18 @@ export const leadManagerSheetConfig: SheetConfig = {
       ],
     },
     {
-      id: 'utm_source',
-      label: 'UTM Source',
-      type: 'text',
-      width: 130,
-      required: false,
-      editable: false,
-    },
-    {
       id: 'first_shipment_date',
       label: 'First Shipment',
       type: 'datetime',
       width: 160,
+      required: false,
+      editable: false,
+    },
+    {
+      id: 'utm_source',
+      label: 'UTM Source',
+      type: 'text',
+      width: 130,
       required: false,
       editable: false,
     },
