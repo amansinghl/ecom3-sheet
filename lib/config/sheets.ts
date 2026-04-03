@@ -1016,7 +1016,7 @@ const conversionStageOptions: StatusOption[] = [
 // Lead Manager Sheet Configuration
 export const leadManagerSheetConfig: SheetConfig = {
   id: 'leads',
-  name: 'Lead Manager',
+  name: 'Sales Inbounds Sheet',
   icon: 'Users',
   description: 'Track new user signups and manage sales outreach',
   views: [
@@ -1055,7 +1055,6 @@ export const leadManagerSheetConfig: SheetConfig = {
     },
   ],
   columns: [
-    // --- Identity ---
     {
       id: 'user_name',
       label: 'Name',
@@ -1080,7 +1079,24 @@ export const leadManagerSheetConfig: SheetConfig = {
       required: false,
       editable: false,
     },
-    // --- Sales workflow (JSON fields + sales_person_id) ---
+    {
+      id: 'signup_date',
+      label: 'Signup Date',
+      type: 'datetime',
+      width: 160,
+      required: false,
+      editable: false,
+    },
+    {
+      id: 'sales_person_id',
+      label: 'Assigned To',
+      type: 'dropdown',
+      width: 180,
+      required: false,
+      editable: true,
+      options: [],
+      backgroundColor: '#fffee0',
+    },
     {
       id: 'call_status',
       label: 'Call Status',
@@ -1102,16 +1118,6 @@ export const leadManagerSheetConfig: SheetConfig = {
       backgroundColor: '#fffee0',
     },
     {
-      id: 'sales_person_id',
-      label: 'Assigned To',
-      type: 'dropdown',
-      width: 180,
-      required: false,
-      editable: true,
-      options: [],
-      backgroundColor: '#fffee0',
-    },
-    {
       id: 'remarks',
       label: 'Remarks',
       type: 'longtext',
@@ -1119,6 +1125,27 @@ export const leadManagerSheetConfig: SheetConfig = {
       required: false,
       editable: true,
       backgroundColor: '#fffee0',
+    },
+    {
+      id: 'potential_monthly_load',
+      label: 'Monthly Potential',
+      type: 'number',
+      width: 140,
+      required: false,
+      editable: true,
+      backgroundColor: '#fffee0',
+    },
+    {
+      id: 'kyc_status',
+      label: 'KYC Status',
+      type: 'status',
+      width: 120,
+      required: false,
+      editable: false,
+      options: [
+        { label: 'Complete', value: 'Complete', color: '#10b981' },
+        { label: 'Incomplete', value: 'Incomplete', color: '#ef4444' },
+      ],
     },
     {
       id: 'next_action',
@@ -1132,7 +1159,7 @@ export const leadManagerSheetConfig: SheetConfig = {
     },
     {
       id: 'next_followup_date',
-      label: 'Next Follow-up',
+      label: 'Next Follow-up Date',
       type: 'date',
       width: 150,
       required: false,
@@ -1158,28 +1185,6 @@ export const leadManagerSheetConfig: SheetConfig = {
       editable: true,
       backgroundColor: '#fffee0',
     },
-    // --- Data from other tables (read-only) ---
-    {
-      id: 'potential_monthly_load',
-      label: 'Monthly Potential',
-      type: 'number',
-      width: 140,
-      required: false,
-      editable: true,
-      backgroundColor: '#fffee0',
-    },
-    {
-      id: 'kyc_status',
-      label: 'KYC',
-      type: 'status',
-      width: 120,
-      required: false,
-      editable: false,
-      options: [
-        { label: 'Complete', value: 'Complete', color: '#10b981' },
-        { label: 'Incomplete', value: 'Incomplete', color: '#ef4444' },
-      ],
-    },
     {
       id: 'first_shipment_date',
       label: 'First Shipment',
@@ -1190,23 +1195,15 @@ export const leadManagerSheetConfig: SheetConfig = {
     },
     {
       id: 'utm_source',
-      label: 'UTM Source',
+      label: 'UTM',
       type: 'text',
       width: 130,
       required: false,
       editable: false,
     },
     {
-      id: 'signup_date',
-      label: 'Signup Date',
-      type: 'datetime',
-      width: 160,
-      required: false,
-      editable: false,
-    },
-    {
       id: 'entity_name',
-      label: 'Entity Name',
+      label: 'Entity',
       type: 'text',
       width: 150,
       required: false,
