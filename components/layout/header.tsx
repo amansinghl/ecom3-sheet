@@ -18,9 +18,11 @@ import { getRandomAvatar } from '@/lib/config/user-avatar';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTheme } from 'next-themes';
 import { Marquee } from '@/components/ui/marquee';
+import { useSessionContext } from '@/app/providers';
 
 export function Header() {
   const { data: session } = useSession();
+  const { isSessionExpired } = useSessionContext();
   const user = session?.user as any;
   const [isHovering, setIsHovering] = useState(false);
   const { theme, setTheme } = useTheme();
@@ -95,6 +97,14 @@ export function Header() {
 
         {/* User Section */}
         <div className="flex items-center gap-2">
+          <Badge
+            variant="outline"
+            className={isSessionExpired
+              ? 'border-destructive/40 bg-destructive/10 text-destructive text-[10px]'
+              : 'border-emerald-500/40 bg-emerald-500/10 text-emerald-700 text-[10px]'}
+          >
+            Session: {isSessionExpired ? 'Expired' : 'Active'}
+          </Badge>
           {user && (
             <>
               {/* User Menu */}
