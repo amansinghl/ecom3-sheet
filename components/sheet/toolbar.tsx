@@ -160,6 +160,7 @@ export const Toolbar = forwardRef<ToolbarRef, ToolbarProps>(({ config, data, use
     selectedRows, 
     clearSelection,
     clearAllFilters,
+    clearColumnFilter,
     rowHeight,
     setRowHeight,
     toggleColumnPin,
@@ -660,14 +661,26 @@ export const Toolbar = forwardRef<ToolbarRef, ToolbarProps>(({ config, data, use
           {activeFilterEntries.map(([columnId, filter]) => {
             const columnLabel = config.columns.find((column) => column.id === columnId)?.label || columnId;
             return (
-              <Badge
+              <div
                 key={columnId}
-                variant="outline"
-                className="h-7 max-w-[300px] shrink-0 rounded-full border-border/70 bg-background px-3 text-[11px] font-medium text-foreground shadow-[0_1px_0_rgba(0,0,0,0.03)]"
+                className="inline-flex h-7 max-w-[320px] shrink-0 items-center gap-0.5 rounded-full border border-border/70 bg-background pl-3 pr-0.5 text-[11px] font-medium text-foreground shadow-[0_1px_0_rgba(0,0,0,0.03)]"
                 title={`${columnLabel}: ${summarizeFilter(filter)}`}
               >
-                {columnLabel}: {summarizeFilter(filter)}
-              </Badge>
+                <span className="min-w-0 truncate">
+                  {columnLabel}: {summarizeFilter(filter)}
+                </span>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    clearColumnFilter(columnId);
+                  }}
+                  className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
+                  aria-label={`Remove filter on ${columnLabel}`}
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
             );
           })}
 
