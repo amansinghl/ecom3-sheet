@@ -606,7 +606,7 @@ export const Toolbar = forwardRef<ToolbarRef, ToolbarProps>(({ config, data, use
                   <h4 className="font-medium text-foreground">3. Delayed Pickup</h4>
                   <div className="space-y-1 pl-4">
                     <p className="text-muted-foreground">
-                      <span className="font-medium text-green-600 dark:text-green-400">Positive Closure:</span> Tracking ≥ <code className="px-1.5 py-0.5 rounded bg-background border text-xs">1200</code>
+                      <span className="font-medium text-green-600 dark:text-green-400">Positive Closure:</span> Tracking ≥ <code className="px-1.5 py-0.5 rounded bg-background border text-xs">1200 (not including 1333, 1880)</code>
                     </p>
                     <p className="text-muted-foreground">
                       <span className="font-medium text-orange-600 dark:text-orange-400">Negative Closure:</span> Tracking &lt; <code className="px-1.5 py-0.5 rounded bg-background border text-xs">1200</code> till 10 days of ticket creation
