@@ -3,11 +3,11 @@
 import { useState, useMemo } from 'react';
 import { UserView } from '@/types';
 import { Button } from '@/components/ui/button';
-import { 
-  ChevronLeft, 
-  ChevronRight, 
-  Plus, 
-  CircleDot, 
+import {
+  ChevronLeft,
+  ChevronRight,
+  Plus,
+  CircleDot,
   CheckCircle2,
   MoreHorizontal,
   Pencil,
@@ -27,7 +27,14 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
 import { cn } from '@/lib/utils';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 // Icon map for dynamic icon rendering
 const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -50,20 +57,25 @@ interface ViewsSidebarProps {
   onDuplicateView: (viewId: string) => void;
   onDeleteView: (viewId: string) => void;
   onSetDefaultView: (viewId: string) => void;
+  mobileOpen?: boolean;
+  onMobileOpenChange?: (open: boolean) => void;
 }
 
-export function ViewsSidebar({ 
-  views, 
-  activeViewId, 
+export function ViewsSidebar({
+  views,
+  activeViewId,
   defaultViewId,
-  onViewChange, 
+  onViewChange,
   onCreateView,
   onEditView,
   onDuplicateView,
   onDeleteView,
   onSetDefaultView,
+  mobileOpen = false,
+  onMobileOpenChange,
 }: ViewsSidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(true);
+  const isMobile = useIsMobile();
 
   // Separate system views from user views
   const { systemViews, userViews } = useMemo(() => {
@@ -168,6 +180,75 @@ export function ViewsSidebar({
     );
   };
 
+  const expandedContent = (
+    <>
+      {/* Header */}
+      <div className="flex items-center justify-between border-b px-3 py-2.5">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Views
+        </h3>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-6 w-6"
+          onClick={onCreateView}
+          title="Create new view"
+        >
+          <Plus className="h-4 w-4" />
+        </Button>
+      </div>
+
+      {/* Views List */}
+      <div className="flex-1 overflow-y-auto px-2 py-2">
+        {systemViews.length > 0 && (
+          <div className="mb-3">
+            <div className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+              System
+            </div>
+            <div className="space-y-0.5">
+              {systemViews.map((view) => renderViewItem(view, true))}
+            </div>
+          </div>
+        )}
+
+        {userViews.length > 0 && (
+          <div>
+            <div className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+              My Views
+            </div>
+            <div className="space-y-0.5">
+              {userViews.map((view) => renderViewItem(view))}
+            </div>
+          </div>
+        )}
+
+        {userViews.length === 0 && systemViews.length > 0 && (
+          <div className="mt-2 px-2">
+            <div className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+              My Views
+            </div>
+            <p className="text-xs text-muted-foreground/60 px-2 py-2">
+              No custom views yet. Click + to create one.
+            </p>
+          </div>
+        )}
+      </div>
+    </>
+  );
+
+  if (isMobile) {
+    return (
+      <Sheet open={mobileOpen} onOpenChange={onMobileOpenChange}>
+        <SheetContent side="left" className="w-72 p-0">
+          <SheetHeader className="sr-only">
+            <SheetTitle>Views</SheetTitle>
+          </SheetHeader>
+          <div className="flex h-full flex-col pt-2">{expandedContent}</div>
+        </SheetContent>
+      </Sheet>
+    );
+  }
+
   return (
     <div
       className={cn(
@@ -238,60 +319,7 @@ export function ViewsSidebar({
           isCollapsed ? 'hidden' : 'opacity-100'
         )}
       >
-        {/* Header */}
-        <div className="flex items-center justify-between border-b px-3 py-2.5">
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Views
-          </h3>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-6 w-6"
-            onClick={onCreateView}
-            title="Create new view"
-          >
-            <Plus className="h-4 w-4" />
-          </Button>
-        </div>
-
-        {/* Views List */}
-        <div className="flex-1 overflow-y-auto px-2 py-2">
-          {/* System Views Section */}
-          {systemViews.length > 0 && (
-            <div className="mb-3">
-              <div className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">
-                System
-              </div>
-              <div className="space-y-0.5">
-                {systemViews.map((view) => renderViewItem(view, true))}
-              </div>
-            </div>
-          )}
-
-          {/* User Views Section */}
-          {userViews.length > 0 && (
-            <div>
-              <div className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">
-                My Views
-              </div>
-              <div className="space-y-0.5">
-                {userViews.map((view) => renderViewItem(view))}
-              </div>
-            </div>
-          )}
-
-          {/* Empty state for user views */}
-          {userViews.length === 0 && systemViews.length > 0 && (
-            <div className="mt-2 px-2">
-              <div className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">
-                My Views
-              </div>
-              <p className="text-xs text-muted-foreground/60 px-2 py-2">
-                No custom views yet. Click + to create one.
-              </p>
-            </div>
-          )}
-        </div>
+        {expandedContent}
       </div>
     </div>
   );

@@ -36,6 +36,7 @@ export function SheetView({ config, userRole }: SheetViewProps) {
   const [data, setData] = useState<RowData[]>([]);
   const [globalSearch, setGlobalSearch] = useState('');
   const [localError, setLocalError] = useState<string | null>(null);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const { 
     viewState, 
     selectedRows, 
@@ -1952,12 +1953,17 @@ export function SheetView({ config, userRole }: SheetViewProps) {
           views={views}
           activeViewId={activeViewId || ''}
           defaultViewId={defaultViewId}
-          onViewChange={handleViewChange}
+          onViewChange={(id) => {
+            handleViewChange(id);
+            setMobileSidebarOpen(false);
+          }}
           onCreateView={handleCreateView}
           onEditView={handleEditView}
           onDuplicateView={handleDuplicateView}
           onDeleteView={handleDeleteView}
           onSetDefaultView={handleSetDefaultView}
+          mobileOpen={mobileSidebarOpen}
+          onMobileOpenChange={setMobileSidebarOpen}
         />
       )}
 
@@ -1987,6 +1993,8 @@ export function SheetView({ config, userRole }: SheetViewProps) {
           columnVisibility={columnVisibility}
           onColumnVisibilityChange={handleColumnVisibilityChange}
           onOpenCommandPalette={() => setShowCommandPalette(true)}
+          onToggleSidebar={() => setMobileSidebarOpen(true)}
+          showSidebarToggle={views.length > 0}
           {...({
             globalSearch,
             onGlobalSearchChange: setGlobalSearch,

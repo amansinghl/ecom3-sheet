@@ -9,7 +9,7 @@ export function HeroSection() {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.6 }}
-      className="flex flex-col items-center justify-center py-20 px-4 text-center bg-gradient-to-b from-background to-muted/20"
+      className="flex flex-col items-center justify-center py-10 sm:py-20 px-4 text-center bg-gradient-to-b from-background to-muted/20"
     >
       {/* Decorative Icons */}
       <motion.div
@@ -41,7 +41,7 @@ export function HeroSection() {
         transition={{ delay: 0.3 }}
         className="space-y-4 mb-6"
       >
-        <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold bg-gradient-to-r from-purple-600 via-blue-600 to-emerald-600 bg-clip-text text-transparent">
+        <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold bg-gradient-to-r from-purple-600 via-blue-600 to-emerald-600 bg-clip-text text-transparent">
           Portfolio
         </h1>
       </motion.div>
