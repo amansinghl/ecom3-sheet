@@ -18,7 +18,7 @@ import { useSheetData } from '@/hooks/use-sheet-data';
 import { toast } from 'sonner';
 import { sheetApiService } from '@/lib/api/sheets';
 import * as XLSX from 'xlsx';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 interface SheetViewProps {
   config: SheetConfig;
@@ -36,6 +36,7 @@ export function SheetView({ config, userRole }: SheetViewProps) {
   const [data, setData] = useState<RowData[]>([]);
   const [globalSearch, setGlobalSearch] = useState('');
   const [localError, setLocalError] = useState<string | null>(null);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const { 
     viewState, 
     selectedRows, 
@@ -76,22 +77,52 @@ export function SheetView({ config, userRole }: SheetViewProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
 
-  // Fetch sheet data from API based on sheet ID
-  // Disable auto-refetch while editing to prevent overwriting user's edits
-  const isEditing = !!editingCell;
-  const { 
-    data: apiData, 
-    isLoading, 
-    isError, 
+  // Pause auto-refetch while user is editing OR has rows selected.
+  // Why: poll mid-action swaps row refs/ids, which causes border flicker
+  // and silently breaks copy (selected ids vanish from new data array).
+  const pauseRefetch = !!editingCell || selectedRows.size > 0;
+  const {
+    data: apiData,
+    isLoading,
+    isError,
     error,
     refetch
   } = useSheetData(
     config.id === 'escalations' ? 'escalation' : config.id,
     {
       enabled: config.id !== 'portfolio', // Don't fetch for portfolio sheet
-      isEditing, // Pass editing state to disable refetch while editing
+      isEditing: pauseRefetch,
     }
   );
+
+  // Fetch sales employees for leads sheet assignment dropdown
+  const { data: salesEmployees } = useQuery({
+    queryKey: ['sales-employees'],
+    queryFn: () => sheetApiService.getSalesEmployees(),
+    enabled: config.id === 'leads',
+    staleTime: 10 * 60 * 1000,
+  });
+
+  // Enrich config with dynamic dropdown options (e.g. sales employees for leads)
+  const enrichedConfig = useMemo(() => {
+    if (config.id !== 'leads' || !salesEmployees?.length) return config;
+    return {
+      ...config,
+      columns: config.columns.map((col) => {
+        if (col.id === 'sales_person_id') {
+          return {
+            ...col,
+            options: salesEmployees.map((emp) => ({
+              label: emp.email,
+              value: String(emp.id),
+              color: '#3b82f6',
+            })),
+          };
+        }
+        return col;
+      }),
+    };
+  }, [config, salesEmployees]);
 
   // View management - use store values
   const activeViewId = storeActiveViewId;
@@ -118,6 +149,13 @@ export function SheetView({ config, userRole }: SheetViewProps) {
           return {
             ...row,
             escalation_id: row.id, // Map id to escalation_id for display
+          };
+        }
+        // Stringify sales_person_id for leads sheet so dropdown matching works
+        if (config.id === 'leads' && row.sales_person_id != null) {
+          return {
+            ...row,
+            sales_person_id: String(row.sales_person_id),
           };
         }
         return row;
@@ -790,10 +828,24 @@ export function SheetView({ config, userRole }: SheetViewProps) {
       'manual_case',
     ];
 
+    // Fields that should trigger the update-entries API call for leads sheet
+    const leadsUpdatableFields = [
+      'call_status',
+      'lead_stage',
+      'remarks',
+      'next_action',
+      'next_followup_date',
+      'conversion_stage',
+      'loss_reason',
+      'sales_person_id',
+      'potential_monthly_load',
+    ];
+
     // Check if this is an updatable field
-    const isUpdatableField = 
+    const isUpdatableField =
       (config.id === 'escalations' && escalationUpdatableFields.includes(columnId)) ||
-      (config.id === 'lsd' && lsdUpdatableFields.includes(columnId));
+      (config.id === 'lsd' && lsdUpdatableFields.includes(columnId)) ||
+      (config.id === 'leads' && leadsUpdatableFields.includes(columnId));
 
     // Check if this is an empty row being edited
     if (rowIdString.startsWith('empty-')) {
@@ -1110,7 +1162,7 @@ export function SheetView({ config, userRole }: SheetViewProps) {
       );
 
       // If this is an updatable field and we have a valid row ID (not a generated one)
-      if (isUpdatableField && actualRowId && typeof actualRowId === 'number') {
+      if (isUpdatableField && actualRowId && (typeof actualRowId === 'number' || !isNaN(Number(actualRowId)))) {
         try {
           const updatePayload: Record<string, any> = {};
           
@@ -1188,6 +1240,8 @@ export function SheetView({ config, userRole }: SheetViewProps) {
             }
           } else if (config.id === 'escalations') {
             await sheetApiService.updateEscalationEntries(actualRowId, updatePayload);
+          } else if (config.id === 'leads') {
+            await sheetApiService.updateLeadEntries(actualRowId, updatePayload);
           }
           
           // Show success message with row identifier
@@ -1967,12 +2021,17 @@ export function SheetView({ config, userRole }: SheetViewProps) {
           views={views}
           activeViewId={activeViewId || ''}
           defaultViewId={defaultViewId}
-          onViewChange={handleViewChange}
+          onViewChange={(id) => {
+            handleViewChange(id);
+            setMobileSidebarOpen(false);
+          }}
           onCreateView={handleCreateView}
           onEditView={handleEditView}
           onDuplicateView={handleDuplicateView}
           onDeleteView={handleDeleteView}
           onSetDefaultView={handleSetDefaultView}
+          mobileOpen={mobileSidebarOpen}
+          onMobileOpenChange={setMobileSidebarOpen}
         />
       )}
 
@@ -1992,7 +2051,7 @@ export function SheetView({ config, userRole }: SheetViewProps) {
       <div className="flex h-full flex-1 flex-col overflow-hidden">
         <Toolbar
           ref={toolbarRef}
-          config={config}
+          config={enrichedConfig}
           data={filteredData}
           userRole={userRole}
           onAddRow={handleAddRow}
@@ -2002,6 +2061,8 @@ export function SheetView({ config, userRole }: SheetViewProps) {
           columnVisibility={columnVisibility}
           onColumnVisibilityChange={handleColumnVisibilityChange}
           onOpenCommandPalette={() => setShowCommandPalette(true)}
+          onToggleSidebar={() => setMobileSidebarOpen(true)}
+          showSidebarToggle={views.length > 0}
           {...({
             globalSearch,
             onGlobalSearchChange: setGlobalSearch,
@@ -2036,7 +2097,7 @@ export function SheetView({ config, userRole }: SheetViewProps) {
               <TableSkeleton rows={15} columns={config.columns.length} />
             ) : (
               <DataGrid
-                config={config}
+                config={enrichedConfig}
                 data={filteredData}
                 userRole={userRole}
                 onCellUpdate={handleCellUpdate}

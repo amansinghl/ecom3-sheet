@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Plus_Jakarta_Sans, Lora, Roboto_Mono } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
@@ -21,6 +21,13 @@ const robotoMono = Roboto_Mono({
 export const metadata: Metadata = {
   title: "Sheet Manager - Internal Tool",
   description: "Internal sheet management application",
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({

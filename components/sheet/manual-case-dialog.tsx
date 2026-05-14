@@ -57,7 +57,7 @@ export function ManualCaseDialog({
         </DialogHeader>
         
         <div className="space-y-3 py-4">
-          <div className="grid grid-cols-2 gap-2 max-h-[300px] overflow-y-auto">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[300px] overflow-y-auto">
             {manualCaseOptions.map((option) => (
               <button
                 key={option.value}

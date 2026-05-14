@@ -19,7 +19,7 @@ export function SheetTabs() {
   const currentSheetId = pathname.split('/').pop();
 
   return (
-    <div className="flex items-center gap-1 border-b border-border bg-muted/30 px-4">
+    <div className="flex items-center gap-1 overflow-x-auto whitespace-nowrap border-b border-border bg-muted/30 px-2 sm:px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       {sheets.map((sheet) => {
         const Icon = sheet.icon ? iconMap[sheet.icon] : null;
         const isActive = currentSheetId === sheet.id;
@@ -29,13 +29,13 @@ export function SheetTabs() {
             key={sheet.id}
             onClick={() => router.push(`/sheets/${sheet.id}`)}
             className={cn(
-              'flex items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-medium transition-colors',
+              'flex shrink-0 items-center gap-2 border-b-2 px-3 py-2.5 text-sm font-medium transition-colors sm:px-4',
               isActive
                 ? 'border-primary text-foreground'
                 : 'border-transparent text-muted-foreground hover:border-muted-foreground/50 hover:text-foreground'
             )}
           >
-            {Icon && <Icon className="h-4 w-4" />}
+            {Icon && <Icon className="h-4 w-4 shrink-0" />}
             <span>{sheet.name}</span>
           </button>
         );

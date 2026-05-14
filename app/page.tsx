@@ -85,12 +85,12 @@ function LandingPage() {
         <ThemeToggle />
       </div>
       
-      <div className="relative z-10 max-w-4xl mx-auto text-center space-y-8">
-        <div className="space-y-4">
-          <h1 className="text-5xl md:text-6xl font-bold tracking-tight">
+      <div className="relative z-10 max-w-4xl mx-auto text-center space-y-6 sm:space-y-8">
+        <div className="space-y-3 sm:space-y-4">
+          <h1 className="text-3xl sm:text-5xl md:text-6xl font-bold tracking-tight">
             Welcome to Sheet Manager
           </h1>
-          <p className="text-xl md:text-2xl text-muted-foreground max-w-2xl mx-auto">
+          <p className="text-base sm:text-xl md:text-2xl text-muted-foreground max-w-2xl mx-auto">
             Your powerful tool for managing and organizing data sheets
           </p>
         </div>

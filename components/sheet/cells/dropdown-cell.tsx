@@ -373,7 +373,7 @@ export const DropdownCell = memo(function DropdownCell({
   return (
     <div
       className={cn(
-        'h-full w-full px-3 py-2 text-sm truncate text-gray-900 font-semibold',
+        'h-full w-full px-2 py-1 text-sm truncate text-gray-900 font-semibold flex items-center',
         canEdit ? 'cursor-pointer hover:bg-muted/50' : 'cursor-not-allowed'
       )}
       onClick={canEdit ? onEdit : undefined}
