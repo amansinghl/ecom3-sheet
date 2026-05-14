@@ -1380,6 +1380,8 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
                 const idx = virtualRow.index;
                 const isEmptyRow = row.original._isEmpty === true;
                 const isDuplicate = row.original._isDuplicate === true;
+                const isMultiManualCaseLatest =
+                  row.original._isMultiManualCaseLatest === true && !isDuplicate;
                 
                 return (
                   <tr
@@ -1400,9 +1402,22 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
                     className={cn(
                       'border-b border-border group/row',
                       isDuplicate && !isEmptyRow && 'bg-red-200 hover:bg-red-300',
-                      !isDuplicate && idx % 2 === 0 ? 'bg-white' : !isDuplicate ? 'bg-gray-50' : '',
-                      !isEmptyRow && !selectedRows.has(row.id) && !isDuplicate && idx % 2 === 0 && 'hover:bg-gray-100',
-                      !isEmptyRow && !selectedRows.has(row.id) && !isDuplicate && idx % 2 !== 0 && 'hover:bg-gray-100',
+                      isMultiManualCaseLatest && !isEmptyRow && 'bg-yellow-100 hover:bg-yellow-200',
+                      !isDuplicate &&
+                        !isMultiManualCaseLatest &&
+                        (idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'),
+                      !isEmptyRow &&
+                        !selectedRows.has(row.id) &&
+                        !isDuplicate &&
+                        !isMultiManualCaseLatest &&
+                        idx % 2 === 0 &&
+                        'hover:bg-gray-100',
+                      !isEmptyRow &&
+                        !selectedRows.has(row.id) &&
+                        !isDuplicate &&
+                        !isMultiManualCaseLatest &&
+                        idx % 2 !== 0 &&
+                        'hover:bg-gray-100',
                       isEmptyRow && 'bg-gray-50',
                       selectedRows.has(row.id) && !isEmptyRow && !isDuplicate && 'bg-blue-50 hover:bg-blue-100',
                       rowHeightClasses[rowHeight]
@@ -1448,10 +1463,17 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
                       // 7. Default (alternating rows)
                       const getBgColor = () => {
                         const isDuplicate = row.original._isDuplicate === true;
+                        const isMultiManual =
+                          row.original._isMultiManualCaseLatest === true && !isDuplicate;
                         
                         // Duplicate row styling takes highest precedence
                         if (isDuplicate && !isEmptyRow) {
                           return '#fecaca'; // red-200
+                        }
+
+                        // KB (escalations): same shipment, different manual cases — latest row
+                        if (isMultiManual && !isEmptyRow) {
+                          return '#fef9c3'; // yellow-100 (slightly darker than yellow-50)
                         }
                         
                         // Cell selection takes precedence
@@ -1474,13 +1496,15 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
                         }
                         
                         // Determine if CSS class will be applied (which has !important and overrides inline styles)
-                        const willHavePinkClass = isDataCell && !isDuplicate && (
-                          config.id === 'escalations'
+                        const willHavePinkClass =
+                          isDataCell &&
+                          !isDuplicate &&
+                          !row.original._isMultiManualCaseLatest &&
+                          (config.id === 'escalations'
                             ? isEditable // Escalations: editable gets pink class
                             : config.id === 'lsd'
                             ? false // LSD: no pink classes
-                            : !isEditable // Other sheets: non-editable gets pink class
-                        );
+                            : !isEditable); // Other sheets: non-editable gets pink class
                         
                         // Only set inline backgroundColor when CSS class is NOT applied
                         if (willHavePinkClass) {
@@ -1510,13 +1534,14 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
                           isInFillRange && isDataCell && 'fill-target',
                           // Column styling - sheet-specific, only apply if NOT a duplicate row
                           // Duplicate rows should show red background, not the column color
-                          isDataCell && !isDuplicate && (
-                            config.id === 'escalations'
-                              ? (isEditable && 'non-editable-column') // Escalations: editable gets pink
-                              : config.id === 'lsd'
-                              ? null // LSD: no pink classes
-                              : (!isEditable && 'non-editable-column') // Other sheets: non-editable gets pink
-                          )
+                          isDataCell &&
+                          !isDuplicate &&
+                          !row.original._isMultiManualCaseLatest &&
+                          (config.id === 'escalations'
+                            ? isEditable && 'non-editable-column' // Escalations: editable gets pink
+                            : config.id === 'lsd'
+                            ? null // LSD: no pink classes
+                            : !isEditable && 'non-editable-column') // Other sheets: non-editable gets pink
                         )}
                         style={{ 
                           width: `${cell.column.getSize()}px`, 
