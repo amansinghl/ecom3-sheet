@@ -320,7 +320,13 @@ export function SheetView({ config, userRole }: SheetViewProps) {
         if (row._isDuplicate) {
           delete row._isDuplicate;
         }
-        if (row.duplicate_awb === 'Duplicate Entry, will be deleted in 15 minutes') {
+        if (row._isMultiManualCaseLatest) {
+          delete row._isMultiManualCaseLatest;
+        }
+        if (
+          row.duplicate_awb === 'Duplicate Entry, will be deleted in 15 minutes' ||
+          row.duplicate_awb === 'duplicate awb entry'
+        ) {
           row.duplicate_awb = null;
         }
       });
@@ -409,6 +415,67 @@ export function SheetView({ config, userRole }: SheetViewProps) {
           row.duplicate_awb = 'COD Delay with Zero COD Value - Will be deleted in 15 minutes';
         }
       });
+
+      // Same shipment_no with multiple different manual_case values: highlight the latest row (KB / escalations)
+      if (isOpenEscalationsView) {
+        const compareRowIds = (idA: unknown, idB: unknown): number => {
+          const numA = typeof idA === 'number' ? idA : parseInt(String(idA), 10);
+          const numB = typeof idB === 'number' ? idB : parseInt(String(idB), 10);
+          if (!isNaN(numA) && !isNaN(numB)) {
+            return numA - numB;
+          }
+          return String(idA).localeCompare(String(idB));
+        };
+
+        const shipmentNoGroups = new Map<string, RowData[]>();
+        result.forEach((row) => {
+          const idString = String(row.id);
+          if (idString.startsWith('row-') || idString.startsWith('empty-')) return;
+          const shipmentNo = row.shipment_no;
+          if (shipmentNo === null || shipmentNo === undefined || String(shipmentNo).trim() === '') {
+            return;
+          }
+          const key = String(shipmentNo).trim();
+          if (!shipmentNoGroups.has(key)) {
+            shipmentNoGroups.set(key, []);
+          }
+          shipmentNoGroups.get(key)!.push(row);
+        });
+
+        shipmentNoGroups.forEach((rows) => {
+          if (rows.length < 2) return;
+          const distinctCases = new Set<string>();
+          rows.forEach((r) => {
+            const m = String(r.manual_case ?? '').trim().toLowerCase();
+            if (m !== '') distinctCases.add(m);
+          });
+          if (distinctCases.size < 2) return;
+
+          let latest = rows[0];
+          for (let i = 1; i < rows.length; i++) {
+            if (compareRowIds(rows[i].id, latest.id) > 0) {
+              latest = rows[i];
+            }
+          }
+
+          const manualCaseNorm = String(latest.manual_case ?? '').trim().toLowerCase();
+          const rawCodValue = String(latest.cod_value ?? '').trim();
+          const parsedCodValue = rawCodValue === '' ? NaN : Number(rawCodValue);
+          const isCodDelayWithZeroCod =
+            (manualCaseNorm === 'cod delay' || manualCaseNorm === 'cod to prepaid change') &&
+            !Number.isNaN(parsedCodValue) &&
+            parsedCodValue === 0;
+          if (isCodDelayWithZeroCod) {
+            return;
+          }
+
+          latest._isMultiManualCaseLatest = true;
+          latest.duplicate_awb = 'duplicate awb entry';
+          if (latest._isDuplicate) {
+            delete latest._isDuplicate;
+          }
+        });
+      }
     } else if (config.id === 'lsd') {
       // For LSD sheet: always check for duplicates based on manual_case + shipment_no
       // Group rows by shipment_no + manual_case combination
