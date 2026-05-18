@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface LoadingStateProps {
@@ -61,7 +60,15 @@ export function LoadingState({
         transition={{ duration: 0.3 }}
         className="mb-4"
       >
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/loading.gif"
+          alt="Loading"
+          className={cn(
+            'object-contain',
+            variant === 'fullscreen' ? 'h-24 w-24' : variant === 'minimal' ? 'h-10 w-10' : 'h-16 w-16'
+          )}
+        />
       </motion.div>
       <motion.p
         key={displayMessage}
