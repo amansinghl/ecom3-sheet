@@ -1471,7 +1471,7 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
                           return '#fecaca'; // red-200
                         }
 
-                        // KB (escalations): same shipment, different manual cases — latest row
+                        // KB (escalations): same AWB, different manual cases — all non-duplicate rows
                         if (isMultiManual && !isEmptyRow) {
                           return '#fef9c3'; // yellow-100 (slightly darker than yellow-50)
                         }
