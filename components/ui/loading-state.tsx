@@ -66,7 +66,7 @@ export function LoadingState({
           alt="Loading"
           className={cn(
             'object-contain',
-            variant === 'fullscreen' ? 'h-24 w-24' : variant === 'minimal' ? 'h-10 w-10' : 'h-16 w-16'
+            variant === 'fullscreen' ? 'h-48 w-48 sm:h-64 sm:w-64' : variant === 'minimal' ? 'h-16 w-16' : 'h-32 w-32'
           )}
         />
       </motion.div>
