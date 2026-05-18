@@ -76,19 +76,19 @@ export function Header() {
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/80 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60">
       
-      <div className="flex h-12 items-center justify-between px-4">
+      <div className="flex h-12 items-center justify-between px-3 sm:px-4">
         {/* Logo Section */}
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-2 group cursor-pointer">
-            <div className="relative">
+        <div className="flex min-w-0 items-center gap-2">
+          <div className="flex min-w-0 items-center gap-2 group cursor-pointer">
+            <div className="relative shrink-0">
               <div className="relative flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-primary via-primary to-purple-600 text-primary-foreground">
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
               </div>
             </div>
-            <div>
-              <h1 className="text-base font-semibold">
+            <div className="min-w-0">
+              <h1 className="truncate text-sm sm:text-base font-semibold">
                 Sheet Manager
               </h1>
             </div>
@@ -134,7 +134,7 @@ export function Header() {
                     </Button>
                   </DropdownMenuTrigger>
                   
-                  {/* Enlarged Avatar on Hover */}
+                  {/* Enlarged Avatar on Hover (desktop only) */}
                   <AnimatePresence>
                     {isHovering && (
                       <motion.div
@@ -142,7 +142,7 @@ export function Header() {
                         animate={{ opacity: 1, scale: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.8, y: 10 }}
                         transition={{ duration: 0.2, ease: 'easeOut' }}
-                        className="absolute right-0 top-12 z-[60]"
+                        className="absolute right-0 top-12 z-[60] hidden sm:block"
                       >
                         <div className="relative bg-background border-2 border-border rounded-lg shadow-2xl p-3">
                           <div className="absolute -top-2 right-4 w-4 h-4 bg-background border-l-2 border-t-2 border-border rotate-45"></div>

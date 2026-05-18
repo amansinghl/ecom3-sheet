@@ -17,7 +17,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Search, FileDown, Plus, Info, SplitSquareVertical, Eye, EyeOff, Download, FileSpreadsheet, RefreshCw, Sliders, ArrowUpNarrowWide, ArrowDownWideNarrow, Rows3, Upload, Pin, PinOff, X, GripVertical, Layers, Check, ChevronDown, ChevronUp, Minimize2, Maximize2 } from 'lucide-react';
+import { Search, FileDown, Plus, Info, SplitSquareVertical, Eye, EyeOff, Download, FileSpreadsheet, RefreshCw, Sliders, ArrowUpNarrowWide, ArrowDownWideNarrow, Rows3, Upload, Pin, PinOff, X, GripVertical, Layers, Check, ChevronDown, ChevronUp, Minimize2, Maximize2, Menu } from 'lucide-react';
 import { useSheetStore, RowHeight } from '@/lib/store/sheet-store';
 import { SheetConfig, RowData, UserRole, ColumnConfig, ColumnFilter } from '@/types';
 import { exportToCSV, exportToExcel } from '@/lib/utils/export';
@@ -332,6 +332,17 @@ export const Toolbar = forwardRef<ToolbarRef, ToolbarProps>(({ config, data, use
     <div className="border-b border-border bg-background px-2 sm:px-3 py-1.5 animate-in fade-in slide-in-from-top duration-300">
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-1.5 sm:gap-2">
       <div className="flex items-center gap-1.5 flex-1 overflow-x-auto">
+        {showSidebarToggle && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onToggleSidebar}
+            className="h-8 w-8 shrink-0 sm:hidden"
+            aria-label="Toggle views sidebar"
+          >
+            <Menu className="h-4 w-4" />
+          </Button>
+        )}
         <div className="relative w-full sm:max-w-xs">
           <Search className="absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -755,7 +766,7 @@ export const Toolbar = forwardRef<ToolbarRef, ToolbarProps>(({ config, data, use
                   <h4 className="font-medium text-foreground">3. Delayed Pickup</h4>
                   <div className="space-y-1 pl-4">
                     <p className="text-muted-foreground">
-                      <span className="font-medium text-green-600 dark:text-green-400">Positive Closure:</span> Tracking ≥ <code className="px-1.5 py-0.5 rounded bg-background border text-xs">1200</code>
+                      <span className="font-medium text-green-600 dark:text-green-400">Positive Closure:</span> Tracking ≥ <code className="px-1.5 py-0.5 rounded bg-background border text-xs">1200 (not including 1333, 1880)</code>
                     </p>
                     <p className="text-muted-foreground">
                       <span className="font-medium text-orange-600 dark:text-orange-400">Negative Closure:</span> Tracking &lt; <code className="px-1.5 py-0.5 rounded bg-background border text-xs">1200</code> till 10 days of ticket creation
