@@ -136,13 +136,15 @@ export interface ToolbarProps {
     value: any;
   } | null;
   onActiveCellUpdate?: (rowId: string, columnId: string, value: string) => void;
+  onToggleSidebar?: () => void;
+  showSidebarToggle?: boolean;
 }
 
 export interface ToolbarRef {
   focusSearch: () => void;
 }
 
-export const Toolbar = forwardRef<ToolbarRef, ToolbarProps>(({ config, data, userRole, onAddRow, onDeleteRows, onBulkUpload, onRefresh, columnVisibility = {}, onColumnVisibilityChange, onOpenCommandPalette, globalSearch = '', onGlobalSearchChange, visibleRowCount = 0, activeViewId, columnFilters = {}, activeCell = null, onActiveCellUpdate }, ref) => {
+export const Toolbar = forwardRef<ToolbarRef, ToolbarProps>(({ config, data, userRole, onAddRow, onDeleteRows, onBulkUpload, onRefresh, columnVisibility = {}, onColumnVisibilityChange, onOpenCommandPalette, globalSearch = '', onGlobalSearchChange, visibleRowCount = 0, activeViewId, columnFilters = {}, activeCell = null, onActiveCellUpdate, onToggleSidebar, showSidebarToggle = false }, ref) => {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [showInfoDialog, setShowInfoDialog] = useState(false);
   const [formulaValue, setFormulaValue] = useState('');
