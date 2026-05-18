@@ -3,7 +3,7 @@
 import { SessionProvider, useSession } from 'next-auth/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from 'next-themes';
-import { useState, useEffect, createContext, useContext } from 'react';
+import { useState, useEffect, createContext, useContext, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Toaster, toast } from 'sonner';
 import { signOut } from 'next-auth/react';
@@ -15,11 +15,13 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 interface SessionContextType {
   isSessionLoading: boolean;
   isAuthenticated: boolean;
+  isSessionExpired: boolean;
 }
 
 const SessionContext = createContext<SessionContextType>({
   isSessionLoading: true,
   isAuthenticated: false,
+  isSessionExpired: false,
 });
 
 export const useSessionContext = () => useContext(SessionContext);
@@ -28,35 +30,39 @@ export const useSessionContext = () => useContext(SessionContext);
 function ApiTokenInitializer({ children }: { children: React.ReactNode }) {
   const { data: session, status } = useSession();
   const router = useRouter();
-  const [tokenSet, setTokenSet] = useState(false);
+  const [isSessionExpired, setIsSessionExpired] = useState(false);
+  const hasHandledTokenExpiryRef = useRef(false);
 
-  useEffect(() => {
-    // Only set token when session is loaded (not loading)
-    if (status === 'authenticated' || status === 'unauthenticated') {
-      // Set the token on the API client when session is available
-      const token = (session as any)?.sheet_token || null;
-      apiClient.setToken(token);
-      setTokenSet(true);
-    }
-  }, [session, status]);
+  // Sync token synchronously during render so it's set before child useEffects fire.
+  // (useEffect on parent runs AFTER child effects — caused 401 -> forced signOut on refresh.)
+  if (status !== 'loading') {
+    const token = (session as { sheet_token?: string } | null)?.sheet_token ?? null;
+    apiClient.setToken(token);
+  }
 
   useEffect(() => {
     // Set up token expiration handler (only once)
     apiClient.setOnTokenExpired(() => {
+      if (hasHandledTokenExpiryRef.current) return;
+      hasHandledTokenExpiryRef.current = true;
+      setIsSessionExpired(true);
+
       toast.error('Your session has expired. Please log in again.', {
         duration: 5000,
       });
       
       // Sign out and redirect to landing page
-      signOut({ redirect: false }).then(() => {
-        router.push('/');
-        router.refresh();
-      });
+      setTimeout(() => {
+        signOut({ redirect: false }).then(() => {
+          router.push('/');
+          router.refresh();
+        });
+      }, 1200);
     });
   }, [router]);
 
-  // Don't render children until session is loaded AND token is set
-  if (status === 'loading' || !tokenSet) {
+  // Don't render children until session is loaded.
+  if (status === 'loading') {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <LoadingState 
@@ -72,8 +78,14 @@ function ApiTokenInitializer({ children }: { children: React.ReactNode }) {
       value={{
         isSessionLoading: false, // Status is never 'loading' at this point due to early return above
         isAuthenticated: status === 'authenticated',
+        isSessionExpired,
       }}
     >
+      {isSessionExpired && (
+        <div className="sticky top-0 z-[120] border-b border-destructive/30 bg-destructive/10 px-4 py-2 text-center text-sm font-medium text-destructive backdrop-blur-sm">
+          Session expired or timed out. Redirecting to login...
+        </div>
+      )}
       {children}
     </SessionContext.Provider>
   );

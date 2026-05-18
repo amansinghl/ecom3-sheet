@@ -1,6 +1,6 @@
 'use client';
 
-import { forwardRef, useImperativeHandle, useRef, useState } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -17,9 +17,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Search, FileDown, Plus, Info, SplitSquareVertical, Eye, EyeOff, Download, FileSpreadsheet, RefreshCw, Sliders, ArrowUpNarrowWide, ArrowDownWideNarrow, Rows3, Upload, Pin, PinOff, X, GripVertical, Layers, Check, ChevronDown, ChevronUp, Minimize2, Maximize2, Menu } from 'lucide-react';
+import { Search, FileDown, Plus, Info, SplitSquareVertical, Eye, EyeOff, Download, FileSpreadsheet, RefreshCw, ArrowUpNarrowWide, ArrowDownWideNarrow, Rows3, Upload, Pin, PinOff, X, GripVertical, Layers, Check, ChevronDown, ChevronUp, Minimize2, Maximize2, Menu, ListFilter, XCircle } from 'lucide-react';
 import { useSheetStore, RowHeight } from '@/lib/store/sheet-store';
-import { SheetConfig, RowData, UserRole, ColumnConfig } from '@/types';
+import { SheetConfig, RowData, UserRole, ColumnConfig, ColumnFilter } from '@/types';
 import { exportToCSV, exportToExcel } from '@/lib/utils/export';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -128,6 +128,14 @@ export interface ToolbarProps {
   onGlobalSearchChange?: (value: string) => void;
   visibleRowCount?: number;
   activeViewId?: string;
+  columnFilters?: Record<string, ColumnFilter>;
+  activeCell?: {
+    rowId: string;
+    columnId: string;
+    columnLabel: string;
+    value: any;
+  } | null;
+  onActiveCellUpdate?: (rowId: string, columnId: string, value: string) => void;
   onToggleSidebar?: () => void;
   showSidebarToggle?: boolean;
 }
@@ -136,9 +144,10 @@ export interface ToolbarRef {
   focusSearch: () => void;
 }
 
-export const Toolbar = forwardRef<ToolbarRef, ToolbarProps>(({ config, data, userRole, onAddRow, onDeleteRows, onBulkUpload, onRefresh, columnVisibility = {}, onColumnVisibilityChange, onOpenCommandPalette, globalSearch = '', onGlobalSearchChange, visibleRowCount = 0, activeViewId, onToggleSidebar, showSidebarToggle }, ref) => {
+export const Toolbar = forwardRef<ToolbarRef, ToolbarProps>(({ config, data, userRole, onAddRow, onDeleteRows, onBulkUpload, onRefresh, columnVisibility = {}, onColumnVisibilityChange, onOpenCommandPalette, globalSearch = '', onGlobalSearchChange, visibleRowCount = 0, activeViewId, columnFilters = {}, activeCell = null, onActiveCellUpdate, onToggleSidebar, showSidebarToggle = false }, ref) => {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [showInfoDialog, setShowInfoDialog] = useState(false);
+  const [formulaValue, setFormulaValue] = useState('');
   
   useImperativeHandle(ref, () => ({
     focusSearch: () => {
@@ -152,6 +161,8 @@ export const Toolbar = forwardRef<ToolbarRef, ToolbarProps>(({ config, data, use
     viewState, 
     selectedRows, 
     clearSelection,
+    clearAllFilters,
+    clearColumnFilter,
     rowHeight,
     setRowHeight,
     toggleColumnPin,
@@ -259,9 +270,72 @@ export const Toolbar = forwardRef<ToolbarRef, ToolbarProps>(({ config, data, use
 
   const visibleColumnsCount = config.columns.filter(col => columnVisibility[col.id] !== false).length;
   const selectedCount = selectedRows.size;
+  const activeFilterEntries = Object.entries(columnFilters);
+  const activeFilterCount = activeFilterEntries.length;
+
+  const filterOperatorLabels: Record<string, string> = {
+    equals: 'is',
+    notEquals: 'is not',
+    contains: 'contains',
+    notContains: 'does not contain',
+    startsWith: 'starts with',
+    endsWith: 'ends with',
+    greaterThan: 'is greater than',
+    lessThan: 'is less than',
+    isEmpty: 'is empty',
+    isNotEmpty: 'is not empty',
+    isAnyOf: 'is any of',
+  };
+
+  const summarizeFilter = (filter: ColumnFilter): { op: string; value: string } => {
+    if (filter.type === 'values' && filter.values) {
+      if (filter.values.length === 0) {
+        return { op: 'is', value: '(none)' };
+      }
+      const preview = filter.values
+        .slice(0, 2)
+        .map((value) => (value == null || value === '' ? 'Empty' : String(value)))
+        .join(', ');
+      const extra = filter.values.length - 2;
+      return { op: 'is', value: extra > 0 ? `${preview} +${extra}` : preview };
+    }
+
+    if (filter.type === 'condition' && filter.condition) {
+      const operator = filterOperatorLabels[filter.condition.operator] || filter.condition.operator;
+      if (filter.condition.operator === 'isEmpty' || filter.condition.operator === 'isNotEmpty') {
+        return { op: operator, value: '' };
+      }
+
+      if (Array.isArray(filter.condition.value)) {
+        return { op: operator, value: `${filter.condition.value.length} values` };
+      }
+
+      const value = filter.condition.value == null || filter.condition.value === ''
+        ? 'Empty'
+        : String(filter.condition.value);
+
+      return { op: operator, value };
+    }
+
+    return { op: '', value: 'Filter applied' };
+  };
+
+  useEffect(() => {
+    const nextValue = activeCell?.value;
+    setFormulaValue(nextValue == null ? '' : String(nextValue));
+  }, [activeCell?.rowId, activeCell?.columnId, activeCell?.value]);
+
+  const handleFormulaSubmit = () => {
+    if (!activeCell || !onActiveCellUpdate) return;
+    const activeColumn = config.columns.find((column) => column.id === activeCell.columnId);
+    const canEditActiveColumn = activeColumn ? (activeColumn.editable ?? true) : false;
+    if (!canEdit || !canEditActiveColumn) return;
+    onActiveCellUpdate(activeCell.rowId, activeCell.columnId, formulaValue);
+  };
 
   return (
-    <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-1.5 sm:gap-2 border-b border-border bg-background px-2 sm:px-3 py-1.5 animate-in fade-in slide-in-from-top duration-300">
+    <div className="border-b border-border bg-background px-2 sm:px-3 py-1.5 animate-in fade-in slide-in-from-top duration-300">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-1.5 sm:gap-2">
       <div className="flex items-center gap-1.5 flex-1 overflow-x-auto">
         {showSidebarToggle && (
           <Button
@@ -558,6 +632,99 @@ export const Toolbar = forwardRef<ToolbarRef, ToolbarProps>(({ config, data, use
           </Tooltip>
         )}
       </div>
+      </div>
+
+      {activeCell && (
+        <div className="mt-2 flex items-center gap-2 rounded-lg border border-border/70 bg-muted/20 px-2.5 py-2">
+          <Badge variant="outline" className="h-7 shrink-0 rounded-md px-2 text-[11px] font-semibold">
+            {activeCell.columnLabel}
+          </Badge>
+          <Input
+            value={formulaValue}
+            onChange={(e) => setFormulaValue(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                handleFormulaSubmit();
+              }
+            }}
+            placeholder={canEdit ? 'Cell value' : 'Read-only'}
+            className="h-7 text-xs"
+            disabled={!canEdit || (config.columns.find((column) => column.id === activeCell.columnId)?.editable === false)}
+            readOnly={!canEdit || (config.columns.find((column) => column.id === activeCell.columnId)?.editable === false)}
+          />
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 shrink-0 px-2 text-[11px]"
+            onClick={handleFormulaSubmit}
+            disabled={!canEdit || (config.columns.find((column) => column.id === activeCell.columnId)?.editable === false)}
+          >
+            Apply
+          </Button>
+        </div>
+      )}
+
+      {activeFilterCount > 0 && (
+        <div className="mt-2 flex items-center gap-2 overflow-x-auto rounded-xl border border-border/80 bg-gradient-to-r from-muted/40 via-background to-muted/20 px-3 py-2 shadow-sm">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground shrink-0">
+            <span className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-primary/20 bg-primary/10 text-primary">
+              <ListFilter className="h-3.5 w-3.5" strokeWidth={2.25} />
+            </span>
+            <span className="font-semibold tracking-tight text-foreground">
+              {activeFilterCount} filter{activeFilterCount === 1 ? '' : 's'}
+            </span>
+          </div>
+
+          <span className="h-5 w-px bg-border shrink-0" aria-hidden="true" />
+
+          {activeFilterEntries.map(([columnId, filter]) => {
+            const columnLabel = config.columns.find((column) => column.id === columnId)?.label || columnId;
+            const { op, value } = summarizeFilter(filter);
+            const titleText = value ? `${columnLabel} ${op} ${value}` : `${columnLabel} ${op}`;
+            return (
+              <div
+                key={columnId}
+                className="group inline-flex h-7 max-w-[340px] shrink-0 items-center gap-1.5 rounded-full border border-border bg-background pl-2.5 pr-1 text-xs shadow-sm transition-colors hover:border-primary/40 hover:bg-primary/5"
+                title={titleText}
+              >
+                <span className="font-semibold text-foreground truncate max-w-[110px]">
+                  {columnLabel}
+                </span>
+                <span className="text-muted-foreground/80 font-normal shrink-0">
+                  {op}
+                </span>
+                {value && (
+                  <span className="font-medium text-primary truncate max-w-[140px]">
+                    {value}
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    clearColumnFilter(columnId);
+                  }}
+                  className="ml-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  aria-label={`Remove filter on ${columnLabel}`}
+                >
+                  <X className="h-3.5 w-3.5" strokeWidth={2.5} />
+                </button>
+              </div>
+            );
+          })}
+
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 shrink-0 gap-1 rounded-full px-2.5 text-xs font-medium text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+            onClick={clearAllFilters}
+          >
+            <XCircle className="h-3.5 w-3.5" />
+            Clear all
+          </Button>
+        </div>
+      )}
 
       {/* Info Dialog */}
       <Dialog open={showInfoDialog} onOpenChange={setShowInfoDialog}>

@@ -42,6 +42,7 @@ export function SheetView({ config, userRole }: SheetViewProps) {
     selectedRows, 
     clearSelection, 
     setEditingCell, 
+    focusedCell,
     editingCell, // Get editing state to disable refetch while editing
     clearAllFilters,
     setColumnFilter,
@@ -67,6 +68,7 @@ export function SheetView({ config, userRole }: SheetViewProps) {
     setDefaultViewId,
     applyView,
     getCurrentViewState,
+    columnOrder,
   } = useSheetStore();
   const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [showBulkUploadModal, setShowBulkUploadModal] = useState(false);
@@ -1882,6 +1884,51 @@ export function SheetView({ config, userRole }: SheetViewProps) {
     clearAllFilters();
   };
 
+  const orderedVisibleColumns = useMemo(() => {
+    const pinnedIds = viewState.pinnedColumns || [];
+    const fixedColumns = config.columns.filter((col) => col.fixed && columnVisibility[col.id] !== false);
+    const nonFixedColumns = config.columns.filter((col) => !col.fixed);
+
+    const orderedNonFixed = (columnOrder.length > 0 ? columnOrder : nonFixedColumns.map((col) => col.id))
+      .map((id) => nonFixedColumns.find((col) => col.id === id))
+      .filter((col): col is typeof config.columns[number] => !!col && columnVisibility[col.id] !== false);
+
+    const orderedSet = new Set(orderedNonFixed.map((col) => col.id));
+    const newColumns = nonFixedColumns.filter((col) => !orderedSet.has(col.id) && columnVisibility[col.id] !== false);
+
+    const allNonFixedVisible = [...orderedNonFixed, ...newColumns];
+    const pinned = allNonFixedVisible.filter((col) => pinnedIds.includes(col.id));
+    const unpinned = allNonFixedVisible.filter((col) => !pinnedIds.includes(col.id));
+
+    return [...fixedColumns, ...pinned, ...unpinned];
+  }, [config.columns, viewState.pinnedColumns, columnOrder, columnVisibility]);
+
+  const activeCell = useMemo(() => {
+    if (!focusedCell) return null;
+
+    const row = filteredData[focusedCell.rowIndex];
+    const column = orderedVisibleColumns[focusedCell.colIndex];
+    if (!row || !column) return null;
+
+    return {
+      rowId: String(row.id),
+      columnId: column.id,
+      columnLabel: column.label,
+      value: row[column.id],
+    };
+  }, [focusedCell, filteredData, orderedVisibleColumns]);
+
+  const handleActiveCellUpdate = async (rowId: string, columnId: string, value: string) => {
+    const canEditSheet = config.permissions?.[userRole]?.canEdit ?? false;
+    const columnConfig = config.columns.find((column) => column.id === columnId);
+    const canEditColumn = columnConfig ? (columnConfig.editable ?? true) : false;
+    if (!canEditSheet || !canEditColumn) {
+      toast.error('You do not have permission to edit this cell');
+      return;
+    }
+    await handleCellUpdate(rowId, columnId, value);
+  };
+
   const handleViewChange = (viewId: string) => {
     const selectedView = views.find((v) => v.id === viewId);
     if (selectedView) {
@@ -2040,6 +2087,9 @@ export function SheetView({ config, userRole }: SheetViewProps) {
             onGlobalSearchChange: setGlobalSearch,
             visibleRowCount,
             activeViewId,
+            columnFilters: viewState.columnFilters,
+            activeCell,
+            onActiveCellUpdate: handleActiveCellUpdate,
           } as any)}
         />
         <CommandPalette

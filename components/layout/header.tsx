@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { signOut, useSession } from 'next-auth/react';
+import { LoadingState } from '@/components/ui/loading-state';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -18,12 +19,25 @@ import { getRandomAvatar } from '@/lib/config/user-avatar';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTheme } from 'next-themes';
 import { Marquee } from '@/components/ui/marquee';
+import { useSessionContext } from '@/app/providers';
 
 export function Header() {
   const { data: session } = useSession();
+  const { isSessionExpired } = useSessionContext();
   const user = session?.user as any;
   const [isHovering, setIsHovering] = useState(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
   const { theme, setTheme } = useTheme();
+
+  const handleSignOut = async () => {
+    setIsSigningOut(true);
+    try {
+      await signOut({ callbackUrl: '/' });
+    } catch (error) {
+      console.error('Sign out error:', error);
+      setIsSigningOut(false);
+    }
+  };
 
   const getRoleConfig = (role: string) => {
     switch (role) {
@@ -72,6 +86,12 @@ export function Header() {
   const daysSinceLaunch = getDaysSinceLaunch();
 
   return (
+    <>
+      {isSigningOut && (
+        <div className="fixed inset-0 z-[100] bg-background/95 backdrop-blur-sm">
+          <LoadingState message="Signing you out..." variant="fullscreen" />
+        </div>
+      )}
     <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/80 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60">
       
       <div className="flex h-12 items-center justify-between px-3 sm:px-4">
@@ -95,6 +115,14 @@ export function Header() {
 
         {/* User Section */}
         <div className="flex items-center gap-2">
+          <Badge
+            variant="outline"
+            className={isSessionExpired
+              ? 'border-destructive/40 bg-destructive/10 text-destructive text-[10px]'
+              : 'border-emerald-500/40 bg-emerald-500/10 text-emerald-700 text-[10px]'}
+          >
+            Session: {isSessionExpired ? 'Expired' : 'Active'}
+          </Badge>
           {user && (
             <>
               {/* User Menu */}
@@ -235,8 +263,8 @@ export function Header() {
                     <span className="font-medium">Settings</span>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator className="my-2" />
-                  <DropdownMenuItem 
-                    onClick={() => signOut({ callbackUrl: '/' })}
+                  <DropdownMenuItem
+                    onClick={handleSignOut}
                     className="cursor-pointer rounded-md py-2.5 text-destructive focus:text-destructive focus:bg-destructive/10"
                   >
                     <LogOut className="mr-2 h-4 w-4" />
@@ -250,5 +278,6 @@ export function Header() {
         </div>
       </div>
     </header>
+    </>
   );
 }
