@@ -145,8 +145,10 @@ class ApiClient {
           errorMessage.toLowerCase().includes('authentication required') ||
           response.status === 401;
 
-        if (isTokenExpired && this.onTokenExpired) {
-          // Call the token expiration handler
+        // Only fire token-expired handler if a token was actually present on the request.
+        // A 401 with no token usually means a race during mount (token not synced yet)
+        // and should NOT force a signOut.
+        if (isTokenExpired && this.token && this.onTokenExpired) {
           this.onTokenExpired();
         }
 

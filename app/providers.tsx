@@ -33,12 +33,12 @@ function ApiTokenInitializer({ children }: { children: React.ReactNode }) {
   const [isSessionExpired, setIsSessionExpired] = useState(false);
   const hasHandledTokenExpiryRef = useRef(false);
 
-  useEffect(() => {
-    // Keep API token in sync with current session state.
-    if (status === 'loading') return;
+  // Sync token synchronously during render so it's set before child useEffects fire.
+  // (useEffect on parent runs AFTER child effects — caused 401 -> forced signOut on refresh.)
+  if (status !== 'loading') {
     const token = (session as { sheet_token?: string } | null)?.sheet_token ?? null;
     apiClient.setToken(token);
-  }, [session, status]);
+  }
 
   useEffect(() => {
     // Set up token expiration handler (only once)
