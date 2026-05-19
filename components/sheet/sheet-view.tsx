@@ -418,33 +418,23 @@ export function SheetView({ config, userRole }: SheetViewProps) {
         }
       });
 
-      // Same shipment_no with multiple different manual_case values: highlight the latest row (KB / escalations)
+      // Same AWB (or shipment_no when AWB empty) with multiple different manual_case values:
+      // highlight all matching rows in yellow; skip rows already marked red (_isDuplicate)
       if (isOpenEscalationsView) {
-        const compareRowIds = (idA: unknown, idB: unknown): number => {
-          const numA = typeof idA === 'number' ? idA : parseInt(String(idA), 10);
-          const numB = typeof idB === 'number' ? idB : parseInt(String(idB), 10);
-          if (!isNaN(numA) && !isNaN(numB)) {
-            return numA - numB;
-          }
-          return String(idA).localeCompare(String(idB));
-        };
-
-        const shipmentNoGroups = new Map<string, RowData[]>();
+        const awbGroups = new Map<string, RowData[]>();
         result.forEach((row) => {
           const idString = String(row.id);
           if (idString.startsWith('row-') || idString.startsWith('empty-')) return;
-          const shipmentNo = row.shipment_no;
-          if (shipmentNo === null || shipmentNo === undefined || String(shipmentNo).trim() === '') {
-            return;
+          const awbKey =
+            String(row.awb_no ?? '').trim() || String(row.shipment_no ?? '').trim();
+          if (!awbKey) return;
+          if (!awbGroups.has(awbKey)) {
+            awbGroups.set(awbKey, []);
           }
-          const key = String(shipmentNo).trim();
-          if (!shipmentNoGroups.has(key)) {
-            shipmentNoGroups.set(key, []);
-          }
-          shipmentNoGroups.get(key)!.push(row);
+          awbGroups.get(awbKey)!.push(row);
         });
 
-        shipmentNoGroups.forEach((rows) => {
+        awbGroups.forEach((rows) => {
           if (rows.length < 2) return;
           const distinctCases = new Set<string>();
           rows.forEach((r) => {
@@ -453,29 +443,11 @@ export function SheetView({ config, userRole }: SheetViewProps) {
           });
           if (distinctCases.size < 2) return;
 
-          let latest = rows[0];
-          for (let i = 1; i < rows.length; i++) {
-            if (compareRowIds(rows[i].id, latest.id) > 0) {
-              latest = rows[i];
-            }
-          }
-
-          const manualCaseNorm = String(latest.manual_case ?? '').trim().toLowerCase();
-          const rawCodValue = String(latest.cod_value ?? '').trim();
-          const parsedCodValue = rawCodValue === '' ? NaN : Number(rawCodValue);
-          const isCodDelayWithZeroCod =
-            (manualCaseNorm === 'cod delay' || manualCaseNorm === 'cod to prepaid change') &&
-            !Number.isNaN(parsedCodValue) &&
-            parsedCodValue === 0;
-          if (isCodDelayWithZeroCod) {
-            return;
-          }
-
-          latest._isMultiManualCaseLatest = true;
-          latest.duplicate_awb = 'duplicate awb entry';
-          if (latest._isDuplicate) {
-            delete latest._isDuplicate;
-          }
+          rows.forEach((row) => {
+            if (row._isDuplicate) return;
+            row._isMultiManualCaseLatest = true;
+            row.duplicate_awb = 'duplicate awb entry';
+          });
         });
       }
     } else if (config.id === 'lsd') {
