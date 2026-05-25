@@ -161,7 +161,6 @@ export const Toolbar = forwardRef<ToolbarRef, ToolbarProps>(({ config, data, use
     viewState, 
     selectedRows, 
     clearSelection,
-    clearAllFilters,
     clearColumnFilter,
     rowHeight,
     setRowHeight,
@@ -270,7 +269,12 @@ export const Toolbar = forwardRef<ToolbarRef, ToolbarProps>(({ config, data, use
 
   const visibleColumnsCount = config.columns.filter(col => columnVisibility[col.id] !== false).length;
   const selectedCount = selectedRows.size;
-  const activeFilterEntries = Object.entries(columnFilters);
+  // Hide pills for filters that define the active view (e.g. is_closed=0 on "Open Escalations").
+  const activeView = config.views?.find((v) => v.id === activeViewId);
+  const viewFilterColumnIds = new Set((activeView?.filters ?? []).map((f) => f.columnId));
+  const activeFilterEntries = Object.entries(columnFilters).filter(
+    ([columnId]) => !viewFilterColumnIds.has(columnId)
+  );
   const activeFilterCount = activeFilterEntries.length;
 
   const filterOperatorLabels: Record<string, string> = {
@@ -718,7 +722,10 @@ export const Toolbar = forwardRef<ToolbarRef, ToolbarProps>(({ config, data, use
             variant="ghost"
             size="sm"
             className="h-7 shrink-0 gap-1 rounded-full px-2.5 text-xs font-medium text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-            onClick={clearAllFilters}
+            onClick={() => {
+              // Preserve view-defining filters (e.g. is_closed=0 on Open Escalations).
+              activeFilterEntries.forEach(([columnId]) => clearColumnFilter(columnId));
+            }}
           >
             <XCircle className="h-3.5 w-3.5" />
             Clear all
