@@ -144,7 +144,7 @@ export interface ToolbarRef {
   focusSearch: () => void;
 }
 
-export const Toolbar = forwardRef<ToolbarRef, ToolbarProps>(({ config, data, userRole, onAddRow, onDeleteRows, onBulkUpload, onRefresh, columnVisibility = {}, onColumnVisibilityChange, onOpenCommandPalette, globalSearch = '', onGlobalSearchChange, visibleRowCount = 0, activeViewId, columnFilters = {}, activeCell = null, onActiveCellUpdate, onToggleSidebar, showSidebarToggle = false }, ref) => {
+export const Toolbar = forwardRef<ToolbarRef, ToolbarProps>(({ config, data, userRole, onAddRow, onDeleteRows, onBulkUpload, onRefresh, columnVisibility = {}, onColumnVisibilityChange, onOpenCommandPalette, globalSearch = '', onGlobalSearchChange, visibleRowCount = 0, activeViewId, columnFilters = {}, activeCell = null, onToggleSidebar, showSidebarToggle = false }, ref) => {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [showInfoDialog, setShowInfoDialog] = useState(false);
   const [formulaValue, setFormulaValue] = useState('');
@@ -328,14 +328,6 @@ export const Toolbar = forwardRef<ToolbarRef, ToolbarProps>(({ config, data, use
     const nextValue = activeCell?.value;
     setFormulaValue(nextValue == null ? '' : String(nextValue));
   }, [activeCell?.rowId, activeCell?.columnId, activeCell?.value]);
-
-  const handleFormulaSubmit = () => {
-    if (!activeCell || !onActiveCellUpdate) return;
-    const activeColumn = config.columns.find((column) => column.id === activeCell.columnId);
-    const canEditActiveColumn = activeColumn ? (activeColumn.editable ?? true) : false;
-    if (!canEdit || !canEditActiveColumn) return;
-    onActiveCellUpdate(activeCell.rowId, activeCell.columnId, formulaValue);
-  };
 
   return (
     <div className="border-b border-border bg-background px-2 sm:px-3 py-1.5 animate-in fade-in slide-in-from-top duration-300">
@@ -645,27 +637,12 @@ export const Toolbar = forwardRef<ToolbarRef, ToolbarProps>(({ config, data, use
           </Badge>
           <Input
             value={formulaValue}
-            onChange={(e) => setFormulaValue(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault();
-                handleFormulaSubmit();
-              }
-            }}
-            placeholder={canEdit ? 'Cell value' : 'Read-only'}
-            className="h-7 text-xs"
-            disabled={!canEdit || (config.columns.find((column) => column.id === activeCell.columnId)?.editable === false)}
-            readOnly={!canEdit || (config.columns.find((column) => column.id === activeCell.columnId)?.editable === false)}
+            readOnly
+            tabIndex={-1}
+            placeholder="Cell value"
+            aria-label="Selected cell value (read-only)"
+            className="h-7 text-xs cursor-default bg-muted/40 focus-visible:ring-0 focus-visible:ring-offset-0"
           />
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-7 shrink-0 px-2 text-[11px]"
-            onClick={handleFormulaSubmit}
-            disabled={!canEdit || (config.columns.find((column) => column.id === activeCell.columnId)?.editable === false)}
-          >
-            Apply
-          </Button>
         </div>
       )}
 
