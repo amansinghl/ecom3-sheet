@@ -12,7 +12,7 @@ import {
   ColumnResizeMode,
 } from '@tanstack/react-table';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { SheetConfig, RowData, UserRole, ColumnFilter, GroupHeader } from '@/types';
+import { SheetConfig, RowData, UserRole, ColumnFilter, GroupHeader, ColumnConfig } from '@/types';
 import { useSheetStore, CellPosition, SelectionRange } from '@/lib/store/sheet-store';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -22,6 +22,7 @@ import { EmptyState } from './empty-state';
 import { ColumnFilterDropdown } from './column-filter-dropdown';
 import { cn } from '@/lib/utils';
 import { ChevronDown, ChevronUp, ChevronRight, Filter, Pin, PinOff } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface DataGridProps {
   config: SheetConfig;
@@ -879,7 +880,25 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
     // Parse clipboard data (tab-separated columns, newline-separated rows)
     // Always parse fresh from the clipboard text to avoid stale data
     const clipboardRows = clipboardText.split('\n').map(row => row.split('\t'));
-    
+
+    // For dropdown/status columns, only accept values that match an allowed option.
+    // Returns the canonical option value when matched, '' for an empty value (clears the cell),
+    // or null when the pasted value is not a valid option (so the paste is skipped for that cell).
+    const resolvePastedValue = (colConfig: ColumnConfig, value: string): string | null => {
+      if ((colConfig.type === 'status' || colConfig.type === 'dropdown') && colConfig.options) {
+        const search = String(value).toLowerCase().trim();
+        if (!search) return ''; // allow clearing the cell
+        const match = colConfig.options.find(opt =>
+          opt.value.toLowerCase() === search || opt.label.toLowerCase() === search
+        );
+        return match ? match.value : null; // reject values not in the dropdown
+      }
+      return value;
+    };
+
+    // Track columns where pasted values were rejected (not valid dropdown options)
+    const rejectedColumns = new Set<string>();
+
     if (currentSelectionRange) {
       // Paste into selection range
       const minRow = Math.min(currentSelectionRange.start.rowIndex, currentSelectionRange.end.rowIndex);
@@ -903,9 +922,14 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
           
           const clipboardColIndex = (c - minCol) % clipboardRow.length;
           const value = clipboardRow[clipboardColIndex];
-          
+
           if (value !== undefined) {
-            onCellUpdateRef.current(row.id, columnId, value);
+            const resolved = resolvePastedValue(colConfig, value);
+            if (resolved !== null) {
+              onCellUpdateRef.current(row.id, columnId, resolved);
+            } else {
+              rejectedColumns.add(colConfig.label);
+            }
           }
         }
       }
@@ -931,10 +955,21 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
           
           const value = clipboardRow[c];
           if (value !== undefined) {
-            onCellUpdateRef.current(row.id, columnId, value);
+            const resolved = resolvePastedValue(colConfig, value);
+            if (resolved !== null) {
+              onCellUpdateRef.current(row.id, columnId, resolved);
+            } else {
+              rejectedColumns.add(colConfig.label);
+            }
           }
         }
       }
+    }
+
+    // Notify the user if any pasted values were rejected for dropdown columns
+    if (rejectedColumns.size > 0) {
+      const cols = Array.from(rejectedColumns).join(', ');
+      toast.error(`Please paste only valid dropdown values for: ${cols}`);
     }
   }, [config.columns]); // Only depend on config.columns which doesn't change
 
