@@ -162,7 +162,23 @@ export function SheetView({ config, userRole }: SheetViewProps) {
         }
         return row;
       });
-      setData(processedData);
+
+      // Dedupe by id: the grid keys rows by id (getRowId / React keys),
+      // so duplicate ids from the API cause ghost/repeated rows on re-render
+      const seenIds = new Set<string>();
+      const dedupedData = processedData.filter((row: RowData) => {
+        const idKey = String(row.id);
+        if (seenIds.has(idKey)) return false;
+        seenIds.add(idKey);
+        return true;
+      });
+      if (dedupedData.length !== processedData.length) {
+        console.warn(
+          `[${config.id}] API returned ${processedData.length - dedupedData.length} row(s) with duplicate ids; keeping first occurrence of each.`
+        );
+      }
+
+      setData(dedupedData);
       setLocalError(null);
     }
   }, [apiData, config.id]);
