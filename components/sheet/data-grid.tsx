@@ -381,8 +381,8 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
             return 'PARTIALLY PAID';
           }
           
-          // If refund amount equals amount to customer (allowing for small floating point differences), return PAID
-          return Math.abs(amount1 - amount2) < 0.01 ? 'PAID' : 'UNPAID';
+          // If refund amount is greater than or equal to amount to customer, return PAID
+          return 'PAID';
         } : undefined,
         header: ({ column }) => {
           const isSorted = column.getIsSorted();
