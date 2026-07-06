@@ -804,7 +804,6 @@ export function SheetView({ config, userRole }: SheetViewProps) {
       'credit_note_no_utr_no',
       'credit_note_date_refund_date',
       'credit_note_refund_amount',
-      'ops_name',
       'investigation_status',
       'partner_debit_note_no_utr_no',
       'partner_debit_note_date_refund_date',

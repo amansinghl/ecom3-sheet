@@ -654,8 +654,7 @@ export const lsdSheetConfig: SheetConfig = {
       type: 'text',
       width: 120,
       required: false,
-      editable: true,
-      backgroundColor: '#fffee0', // Light yellow
+      editable: false,
     },
     {
       id: 'investigation_status',
