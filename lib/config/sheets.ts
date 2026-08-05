@@ -159,6 +159,14 @@ export const escalationSheetConfig: SheetConfig = {
       editable: false,
     },
     {
+      id: 'ops_name',
+      label: 'Ops Name',
+      type: 'text',
+      width: 120,
+      required: false,
+      editable: false,
+    },
+    {
       id: 'ops_remarks',
       label: 'OPS Remarks',
       type: 'text',
