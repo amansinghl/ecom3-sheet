@@ -26,7 +26,21 @@ export type CellType =
   | 'user'
   | 'user-avatar'
   | 'highlights'
-  | 'action-button';
+  | 'action-button'
+  | 'media';
+
+// Multimedia attachment stored on a row (escalation sheet "Attachments" column).
+// Matches the backend media item contract exactly.
+export interface MediaItem {
+  url: string;
+  key: string;
+  name: string;
+  mime: string;
+  kind: 'image' | 'audio' | 'video' | 'file';
+  size: number;
+  uploaded_by: string;
+  uploaded_at: string;
+}
 
 export interface DropdownOption {
   label: string;

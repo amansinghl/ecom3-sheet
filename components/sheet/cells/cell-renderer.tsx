@@ -17,6 +17,7 @@ import { UrlCell } from './url-cell';
 import { LongTextCell } from './longtext-cell';
 import { HighlightsCell } from './highlights-cell';
 import { EscalationButtonCell } from './escalation-button-cell';
+import { MediaCell } from './media-cell';
 
 interface CellRendererProps {
   value: any;
@@ -55,8 +56,14 @@ function arePropsEqual(prev: CellRendererProps, next: CellRendererProps): boolea
   // Column config changes rarely, check by id
   if (prev.columnConfig.id !== next.columnConfig.id) return false;
   
-  // For highlights and user-avatar cells, check rowData
-  if ((next.columnConfig.type === 'highlights' || next.columnConfig.type === 'user-avatar') && prev.rowData !== next.rowData) return false;
+  // For highlights, user-avatar and media cells, check rowData
+  if (
+    (next.columnConfig.type === 'highlights' ||
+      next.columnConfig.type === 'user-avatar' ||
+      next.columnConfig.type === 'media') &&
+    prev.rowData !== next.rowData
+  )
+    return false;
   
   // Don't check callback references - they're stable from parent
   return true;
@@ -119,6 +126,8 @@ export const CellRenderer = memo(function CellRenderer({
       return <HighlightsCell {...cellProps} rowData={rowData} />;
     case 'action-button':
       return <EscalationButtonCell {...cellProps} rowData={rowData} />;
+    case 'media':
+      return <MediaCell {...cellProps} rowData={rowData} />;
     default:
       return <TextCell {...cellProps} />;
   }

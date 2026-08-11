@@ -59,6 +59,17 @@ export function applyFilters(
       const value = computeStatusValue(row, columnId, sheetId);
       const column = columns.find((c) => c.id === columnId);
 
+      // Attachments (media) columns hold an array of media objects: string/number
+      // comparisons are meaningless, so only emptiness checks are supported.
+      if (column?.type === 'media') {
+        const attachmentCount = Array.isArray(value) ? value.length : 0;
+        if (columnFilter.type === 'condition' && columnFilter.condition) {
+          if (columnFilter.condition.operator === 'isEmpty') return attachmentCount === 0;
+          if (columnFilter.condition.operator === 'isNotEmpty') return attachmentCount > 0;
+        }
+        return true;
+      }
+
       // Handle value-based filtering (show only selected values)
       if (columnFilter.type === 'values' && columnFilter.values) {
         if (value === null || value === undefined) {

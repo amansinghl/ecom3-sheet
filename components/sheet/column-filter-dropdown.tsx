@@ -8,7 +8,7 @@ import { Separator } from '@/components/ui/separator';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { ArrowUpAZ, ArrowDownAZ, Trash2, Search } from 'lucide-react';
+import { ArrowUpAZ, ArrowDownAZ, Trash2, Search, Paperclip, Ban } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface ColumnFilterDropdownProps {
@@ -33,6 +33,8 @@ const operatorsByType: Record<string, FilterOperator[]> = {
   status: ['equals', 'notEquals', 'isAnyOf', 'isEmpty', 'isNotEmpty'],
   checkbox: ['equals'],
   user: ['equals', 'notEquals', 'isEmpty', 'isNotEmpty'],
+  // Attachments hold arrays of media objects - only emptiness checks make sense
+  media: ['isEmpty', 'isNotEmpty'],
 };
 
 const operatorLabels: Record<FilterOperator, string> = {
@@ -236,6 +238,55 @@ export function ColumnFilterDropdown({
 
   const needsConditionValue = !['isEmpty', 'isNotEmpty'].includes(conditionOperator);
   const operators = operatorsByType[column.type] || [];
+
+  // Attachments column: the cell value is an array of media objects, so neither
+  // text conditions nor a value list would render/compare sensibly. Offer just
+  // the two emptiness checks (and no sorting - it is disabled for this column).
+  if (column.type === 'media') {
+    const activeOperator =
+      currentFilter?.type === 'condition' ? currentFilter.condition?.operator : undefined;
+
+    return (
+      <div className="w-56 p-2 space-y-1">
+        <Button
+          variant={activeOperator === 'isNotEmpty' ? 'default' : 'ghost'}
+          size="sm"
+          className="w-full justify-start text-xs"
+          onClick={() =>
+            onFilterChange({ type: 'condition', condition: { operator: 'isNotEmpty', value: null } })
+          }
+        >
+          <Paperclip className="mr-2 h-3.5 w-3.5" />
+          Has attachments
+        </Button>
+        <Button
+          variant={activeOperator === 'isEmpty' ? 'default' : 'ghost'}
+          size="sm"
+          className="w-full justify-start text-xs"
+          onClick={() =>
+            onFilterChange({ type: 'condition', condition: { operator: 'isEmpty', value: null } })
+          }
+        >
+          <Ban className="mr-2 h-3.5 w-3.5" />
+          No attachments
+        </Button>
+        {currentFilter && (
+          <>
+            <Separator className="my-2" />
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full justify-start text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
+              onClick={() => onFilterChange(null)}
+            >
+              <Trash2 className="mr-2 h-3.5 w-3.5" />
+              Clear filter
+            </Button>
+          </>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="w-72 p-2">

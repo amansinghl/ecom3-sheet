@@ -118,6 +118,17 @@ export const escalationSheetConfig: SheetConfig = {
       editable: true,
     },
     {
+      // Multimedia attachments (audio/image/video/any file).
+      // Not editable through the normal cell-edit path - managed by the
+      // attachments dialog, which talks to /sheets/escalation/media/*.
+      id: 'media',
+      label: 'Attachments',
+      type: 'media',
+      width: 120,
+      required: false,
+      editable: false,
+    },
+    {
       id: 'highlights',
       label: 'Highlights',
       type: 'highlights',

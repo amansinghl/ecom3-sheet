@@ -749,7 +749,24 @@ export function SheetView({ config, userRole }: SheetViewProps) {
 
     // Convert rowId to string to handle cases where it might be a number from API
     const rowIdString = String(rowId);
-    
+
+    // Attachments (media) columns are not edited through the normal cell path:
+    // the attachments dialog already called the media API and hands us the
+    // server's authoritative list, so just apply it to the row locally.
+    // No update-entries call, no refetch, and no undo history (an undo could not
+    // restore a deleted file on the backend).
+    const mediaColumn = config.columns.find((col) => col.id === columnId && col.type === 'media');
+    if (mediaColumn) {
+      setData((prev) =>
+        prev.map((row) =>
+          String(row.id) === rowIdString
+            ? { ...row, [columnId]: value, updatedAt: new Date() }
+            : row
+        )
+      );
+      return;
+    }
+
     // Get the old value for undo/redo history
     const currentRow = data.find((row) => String(row.id) === rowIdString);
     const oldValue = currentRow?.[columnId];

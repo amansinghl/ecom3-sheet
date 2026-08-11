@@ -8,8 +8,8 @@
  * - { data: { rows: [...] } }          - Generic format
  */
 
-import { apiClient, ApiResponse } from './client';
-import { RowData } from '@/types';
+import { apiClient, ApiError, ApiResponse } from './client';
+import { MediaItem, RowData } from '@/types';
 
 /**
  * Backend response format for sheet data
@@ -35,6 +35,18 @@ export interface UpdateSheetPayload {
 export interface EscalationResponse {
   escalation: RowData;
 }
+
+/**
+ * Response payload of the escalation media upload/delete endpoints.
+ * Both return the row's full, post-operation attachment list.
+ */
+export interface EscalationMediaResponse {
+  media: MediaItem[];
+}
+
+/** Backend limits for escalation attachments - mirrored here for client-side guards */
+export const MEDIA_MAX_FILES_PER_UPLOAD = 10;
+export const MEDIA_MAX_FILE_SIZE_BYTES = 100 * 1024 * 1024; // 100 MB
 
 export interface LSDResponse {
   lsd?: RowData;
@@ -196,9 +208,105 @@ class SheetApiService {
   }
 
   /**
+   * Upload attachments to an escalation row
+   *
+   * Bypasses the JSON api client on purpose: the request is multipart, so only
+   * the Authorization header is set and the browser generates the boundary.
+   * Uses XHR (not fetch) so upload progress can be reported.
+   *
+   * @param id The ID of the escalation record
+   * @param files Files to upload (max 10, max 100 MB each - enforced by backend too)
+   * @param onProgress Optional callback receiving upload progress as 0-100
+   * @returns The row's full attachment list after the upload
+   * @throws ApiError if the request fails
+   */
+  async uploadEscalationMedia(
+    id: number | string,
+    files: File[],
+    onProgress?: (percent: number) => void
+  ): Promise<MediaItem[]> {
+    const formData = new FormData();
+    files.forEach((file) => formData.append('files[]', file));
+
+    const token = apiClient.getToken();
+    const url = `${apiClient.getBaseUrl()}/sheets/escalation/media/upload/${id}`;
+
+    return new Promise<MediaItem[]>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', url);
+
+      // Authorization only - setting Content-Type here would break the boundary
+      if (token) {
+        xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+      }
+
+      xhr.upload.onprogress = (event) => {
+        if (onProgress && event.lengthComputable && event.total > 0) {
+          onProgress(Math.round((event.loaded / event.total) * 100));
+        }
+      };
+
+      xhr.onload = () => {
+        let payload: {
+          data?: { media?: MediaItem[] };
+          message?: string;
+          error?: string;
+          errors?: { msg?: string; message?: string };
+        } = {};
+        try {
+          payload = JSON.parse(xhr.responseText);
+        } catch {
+          payload = {};
+        }
+
+        if (xhr.status >= 200 && xhr.status < 300) {
+          resolve(payload?.data?.media ?? []);
+          return;
+        }
+
+        const error: ApiError = {
+          message:
+            payload?.errors?.msg ||
+            payload?.errors?.message ||
+            payload?.message ||
+            payload?.error ||
+            xhr.statusText ||
+            'Failed to upload attachments',
+          status: xhr.status,
+        };
+        reject(error);
+      };
+
+      xhr.onerror = () => {
+        const error: ApiError = { message: 'Network request failed', status: 0 };
+        reject(error);
+      };
+
+      xhr.send(formData);
+    });
+  }
+
+  /**
+   * Delete a single attachment from an escalation row
+   *
+   * @param id The ID of the escalation record
+   * @param key Storage key of the attachment to remove
+   * @returns The row's full attachment list after the delete
+   * @throws Error if API request fails
+   */
+  async deleteEscalationMedia(id: number | string, key: string): Promise<MediaItem[]> {
+    const response = await apiClient.post<ApiResponse<EscalationMediaResponse>>(
+      `/sheets/escalation/media/delete/${id}`,
+      { key }
+    );
+
+    return response.data?.media ?? [];
+  }
+
+  /**
    * Get tech sheet data
    * Fetches tech sheet records from backend
-   * 
+   *
    * @returns Array of tech sheet rows
    * @throws Error if API request fails
    */

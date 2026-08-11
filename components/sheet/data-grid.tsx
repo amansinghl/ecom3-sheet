@@ -484,9 +484,14 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
           
           // shipment_no should only be editable for new rows (not existing ones)
           const isEditable = colConfig.editable ?? true;
-          const canEditThisCell = isShipmentNoColumn 
-            ? (canEdit && isEditable && !isExistingRow)
-            : (canEdit && isEditable);
+          // Media columns are deliberately non-editable through the cell-edit path,
+          // but their dialog still needs the sheet-level edit permission to decide
+          // whether upload/delete are allowed.
+          const canEditThisCell = colConfig.type === 'media'
+            ? canEdit
+            : isShipmentNoColumn
+              ? (canEdit && isEditable && !isExistingRow)
+              : (canEdit && isEditable);
 
           return (
             <CellRenderer
@@ -510,7 +515,9 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
         size: columnWidths[colConfig.id] || colConfig.width || 150,
         minSize: 60,
         maxSize: 800,
-        enableSorting: true,
+        // Media columns hold arrays of attachment objects - there is nothing
+        // meaningful to sort them by, so sorting is disabled for them.
+        enableSorting: colConfig.type !== 'media',
         enableResizing: true,
       });
     });

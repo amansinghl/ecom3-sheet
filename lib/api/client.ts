@@ -49,6 +49,23 @@ class ApiClient {
   }
 
   /**
+   * Current auth token.
+   * Needed by callers that must bypass this JSON client - e.g. multipart
+   * uploads, where the browser has to set the Content-Type boundary itself.
+   */
+  getToken(): string | null {
+    return this.token;
+  }
+
+  /**
+   * Base URL every request is prefixed with.
+   * Exposed so bypass callers (see getToken) hit the same backend.
+   */
+  getBaseUrl(): string {
+    return this.baseUrl;
+  }
+
+  /**
    * Make a GET request
    */
   async get<T>(endpoint: string, options?: RequestInit): Promise<T> {
