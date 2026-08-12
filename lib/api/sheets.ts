@@ -264,12 +264,20 @@ class SheetApiService {
           return;
         }
 
+        // nginx rejects an oversized body itself, before PHP runs, and answers
+        // with an HTML error page - so there is no JSON message to surface.
+        const serverBodyLimit =
+          xhr.status === 413
+            ? 'File is too large for the server to accept (nginx client_max_body_size)'
+            : '';
+
         const error: ApiError = {
           message:
             payload?.errors?.msg ||
             payload?.errors?.message ||
             payload?.message ||
             payload?.error ||
+            serverBodyLimit ||
             xhr.statusText ||
             'Failed to upload attachments',
           status: xhr.status,
