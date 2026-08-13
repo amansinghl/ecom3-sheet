@@ -17,6 +17,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import {
+  MEDIA_MAX_BATCH_SIZE_BYTES,
   MEDIA_MAX_FILES_PER_UPLOAD,
   MEDIA_MAX_FILE_SIZE_BYTES,
   sheetApiService,
@@ -181,6 +182,15 @@ function MediaDialog({
     const tooLarge = files.find((file) => file.size > MEDIA_MAX_FILE_SIZE_BYTES);
     if (tooLarge) {
       toast.error(`"${tooLarge.name}" is larger than ${formatFileSize(MEDIA_MAX_FILE_SIZE_BYTES)}`);
+      return;
+    }
+
+    const batchSize = files.reduce((total, file) => total + file.size, 0);
+    if (batchSize > MEDIA_MAX_BATCH_SIZE_BYTES) {
+      toast.error(
+        `Selected files total ${formatFileSize(batchSize)}; upload at most ` +
+          `${formatFileSize(MEDIA_MAX_BATCH_SIZE_BYTES)} at a time`
+      );
       return;
     }
 

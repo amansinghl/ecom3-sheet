@@ -47,6 +47,9 @@ export interface EscalationMediaResponse {
 /** Backend limits for escalation attachments - mirrored here for client-side guards */
 export const MEDIA_MAX_FILES_PER_UPLOAD = 10;
 export const MEDIA_MAX_FILE_SIZE_BYTES = 100 * 1024 * 1024; // 100 MB
+// The whole multipart body has to fit under the server's post_max_size /
+// client_max_body_size (250M), which the per-file cap alone does not guarantee.
+export const MEDIA_MAX_BATCH_SIZE_BYTES = 240 * 1024 * 1024; // 240 MB
 
 export interface LSDResponse {
   lsd?: RowData;
