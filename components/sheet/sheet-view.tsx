@@ -97,6 +97,35 @@ export function SheetView({ config, userRole }: SheetViewProps) {
     }
   );
 
+  // N8N sheet only: pull the escalation sheet as well, so rows whose shipment
+  // already has an OPEN escalation can be highlighted in yellow.
+  // Shares the ['sheet', 'escalation'] cache with the escalation sheet itself.
+  const { data: escalationApiData } = useSheetData('escalation', {
+    enabled: config.id === 'n8n-logs',
+    isEditing: pauseRefetch,
+  });
+
+  // Reference numbers (shipment_no + awb_no) of every open escalation.
+  // N8N rows carry either an AWB or a shipment number in reference_number,
+  // so both are collected into one lookup set.
+  const openEscalationRefs = useMemo(() => {
+    const refs = new Set<string>();
+    if (config.id !== 'n8n-logs' || !escalationApiData) return refs;
+
+    escalationApiData.forEach((row: RowData) => {
+      // is_closed can arrive as 0 or '0' depending on the backend driver
+      const isOpen = Number(row.is_closed) === 0;
+      if (!isOpen) return;
+
+      [row.shipment_no, row.awb_no].forEach((ref) => {
+        const key = String(ref ?? '').trim().toLowerCase();
+        if (key) refs.add(key);
+      });
+    });
+
+    return refs;
+  }, [config.id, escalationApiData]);
+
   // Fetch sales employees for leads sheet assignment dropdown
   const { data: salesEmployees } = useQuery({
     queryKey: ['sales-employees'],
@@ -466,6 +495,26 @@ export function SheetView({ config, userRole }: SheetViewProps) {
           });
         });
       }
+    } else if (config.id === 'n8n-logs') {
+      // Highlight (yellow) every N8N row whose shipment/AWB already has an open
+      // escalation in the escalation sheet - regardless of the manual case.
+      result.forEach((row) => {
+        if (row._isOpenEscalationMatch) {
+          delete row._isOpenEscalationMatch;
+        }
+
+        const idString = String(row.id);
+        if (idString.startsWith('row-') || idString.startsWith('empty-')) return;
+
+        const hasOpenEscalation = [row.reference_number, row.primary_reference].some((ref) => {
+          const key = String(ref ?? '').trim().toLowerCase();
+          return key !== '' && openEscalationRefs.has(key);
+        });
+
+        if (hasOpenEscalation) {
+          row._isOpenEscalationMatch = true;
+        }
+      });
     } else if (config.id === 'lsd') {
       // For LSD sheet: always check for duplicates based on manual_case + shipment_no
       // Group rows by shipment_no + manual_case combination
@@ -547,7 +596,7 @@ export function SheetView({ config, userRole }: SheetViewProps) {
     }
 
     return [...result, ...emptyRows];
-  }, [data, viewState.columnFilters, config.columns, config.id, globalSearch, activeViewId, activeView, viewState.sorts.length]);
+  }, [data, viewState.columnFilters, config.columns, config.id, globalSearch, activeViewId, activeView, viewState.sorts.length, openEscalationRefs]);
 
   // Update visible row IDs after render (not during render)
   // This runs after the filteredData useMemo has computed the new filtered IDs

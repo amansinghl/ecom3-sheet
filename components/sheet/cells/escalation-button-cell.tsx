@@ -84,6 +84,9 @@ export const EscalationButtonCell = memo(function EscalationButtonCell({
 
       // Invalidate n8n-logs query cache to refresh the data with updated is_added_in_escalations flag
       await queryClient.invalidateQueries({ queryKey: ['sheet', 'n8n-logs'] });
+      // Refresh escalations too, so the new open escalation immediately
+      // highlights every matching N8N row in yellow
+      await queryClient.invalidateQueries({ queryKey: ['sheet', 'escalation'] });
       
       // Save the 'Added' state to persist it
       onSave('Added');
