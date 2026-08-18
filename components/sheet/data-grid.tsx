@@ -1422,9 +1422,12 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
                 const idx = virtualRow.index;
                 const isEmptyRow = row.original._isEmpty === true;
                 const isDuplicate = row.original._isDuplicate === true;
+                // Yellow rows: escalations (same AWB, different manual cases) and
+                // N8N rows whose shipment already has an open escalation
                 const isMultiManualCaseLatest =
-                  row.original._isMultiManualCaseLatest === true && !isDuplicate;
-                
+                  (row.original._isMultiManualCaseLatest === true ||
+                    row.original._isOpenEscalationMatch === true) && !isDuplicate;
+
                 return (
                   <tr
                     key={row.id}
@@ -1506,7 +1509,8 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
                       const getBgColor = () => {
                         const isDuplicate = row.original._isDuplicate === true;
                         const isMultiManual =
-                          row.original._isMultiManualCaseLatest === true && !isDuplicate;
+                          (row.original._isMultiManualCaseLatest === true ||
+                            row.original._isOpenEscalationMatch === true) && !isDuplicate;
                         
                         // Duplicate row styling takes highest precedence
                         if (isDuplicate && !isEmptyRow) {
@@ -1541,7 +1545,7 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
                         const willHavePinkClass =
                           isDataCell &&
                           !isDuplicate &&
-                          !row.original._isMultiManualCaseLatest &&
+                          !isMultiManual &&
                           (config.id === 'escalations'
                             ? isEditable // Escalations: editable gets pink class
                             : config.id === 'lsd'
@@ -1578,7 +1582,7 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
                           // Duplicate rows should show red background, not the column color
                           isDataCell &&
                           !isDuplicate &&
-                          !row.original._isMultiManualCaseLatest &&
+                          !isMultiManualCaseLatest &&
                           (config.id === 'escalations'
                             ? isEditable && 'non-editable-column' // Escalations: editable gets pink
                             : config.id === 'lsd'
