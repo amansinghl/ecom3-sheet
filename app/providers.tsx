@@ -1,5 +1,6 @@
 'use client';
 
+import type { Session } from 'next-auth';
 import { SessionProvider, useSession } from 'next-auth/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from 'next-themes';
@@ -91,7 +92,13 @@ function ApiTokenInitializer({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function Providers({ children }: { children: React.ReactNode }) {
+export function Providers({
+  children,
+  session,
+}: {
+  children: React.ReactNode;
+  session: Session | null;
+}) {
   const [queryClient] = useState(
     () =>
       new QueryClient({
@@ -105,7 +112,19 @@ export function Providers({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <SessionProvider>
+    <SessionProvider
+      // Seeded from the server (see app/layout.tsx) so the provider never has
+      // to fetch /api/auth/session just to know the user is signed in.
+      session={session}
+      // next-auth re-fetches the session on every visibilitychange, and its
+      // fetch helper returns null for ANY failure - aborted request included.
+      // Safari kills in-flight requests when a tab is hidden again, so tab
+      // switching produced session = null and an apparent logout every few
+      // minutes. The session cookie is a 30-day JWT that already carries the
+      // ERP token, so there is nothing worth re-deriving on focus.
+      refetchOnWindowFocus={false}
+      refetchWhenOffline={false}
+    >
       <QueryClientProvider client={queryClient}>
         <ThemeProvider
           attribute="class"

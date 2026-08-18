@@ -29,6 +29,11 @@ class ApiClient {
   private baseUrl: string;
   private token: string | null = null;
   private onTokenExpired?: () => void;
+  // A bare 401 with no explanatory message can also come from a blip (proxy
+  // restart, aborted request replayed) - signing out on the first one is how a
+  // transient failure turned into "I got logged out". Explicit expiry messages
+  // still act immediately; unexplained 401s have to repeat.
+  private unexplainedAuthFailures = 0;
 
   constructor(baseUrl: string = API_BASE_URL) {
     this.baseUrl = baseUrl;
@@ -152,20 +157,29 @@ class ApiClient {
 
         // Check for token expiration error
         const errorMessage = errorData.errors?.msg || errorData.errors?.message || errorData.message || errorData.error || response.statusText;
-        const isTokenExpired = 
+        // The API names the reason when a token really is dead - see
+        // TokenBlacklistedException / TokenNotFoundException in ecom3-api.
+        const saysTokenIsDead =
           errorMessage.toLowerCase().includes('blacklisted') ||
           errorMessage.toLowerCase().includes('re-login') ||
           errorMessage.toLowerCase().includes('token expired') ||
           errorMessage.toLowerCase().includes('token has been') ||
           errorMessage.toLowerCase().includes('token not found') ||
           errorMessage.toLowerCase().includes('api token not found') ||
-          errorMessage.toLowerCase().includes('authentication required') ||
-          response.status === 401;
+          errorMessage.toLowerCase().includes('authentication required');
+        const isTokenExpired = saysTokenIsDead || response.status === 401;
+
+        if (saysTokenIsDead) {
+          this.unexplainedAuthFailures = 0;
+        } else if (response.status === 401) {
+          this.unexplainedAuthFailures += 1;
+        }
 
         // Only fire token-expired handler if a token was actually present on the request.
         // A 401 with no token usually means a race during mount (token not synced yet)
         // and should NOT force a signOut.
-        if (isTokenExpired && this.token && this.onTokenExpired) {
+        const shouldSignOut = saysTokenIsDead || this.unexplainedAuthFailures >= 2;
+        if (isTokenExpired && shouldSignOut && this.token && this.onTokenExpired) {
           this.onTokenExpired();
         }
 
@@ -184,6 +198,7 @@ class ApiClient {
       }
 
       // Parse and return response
+      this.unexplainedAuthFailures = 0;
       const data = await response.json();
       return data as T;
     } catch (error) {
