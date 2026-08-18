@@ -134,7 +134,27 @@ export interface Filter {
 }
 
 // Per-Column Filter Types (for Google Sheets-style filtering)
-export type ColumnFilterType = 'condition' | 'values';
+export type ColumnFilterType = 'condition' | 'values' | 'highlights';
+
+// Comparison operators used by the Highlights column's numeric sub-filters
+export type NumericFilterOperator = '=' | '!=' | '>' | '>=' | '<' | '<=';
+
+export interface HighlightsNumberCondition {
+  operator: NumericFilterOperator;
+  value: number;
+}
+
+// The Highlights column is rendered from five underlying row fields, so it is
+// filtered on those fields individually: counts by numeric comparison and the
+// verification/cancellation flags by true/false. Every sub-condition that is
+// set must match (AND logic).
+export interface HighlightsFilterValue {
+  count_of_calls?: HighlightsNumberCondition;
+  count_of_ndr?: HighlightsNumberCondition;
+  otp_verified_ndr?: boolean;
+  otp_verified_delivery?: boolean;
+  is_cancelled?: boolean;
+}
 
 export interface ColumnFilter {
   type: ColumnFilterType;
@@ -145,6 +165,8 @@ export interface ColumnFilter {
   };
   // For value-based filtering (selected values to show)
   values?: any[];
+  // For the Highlights column (type: 'highlights')
+  highlights?: HighlightsFilterValue;
 }
 
 // Sort Type

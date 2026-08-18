@@ -20,6 +20,7 @@ import {
 import { Search, FileDown, Plus, Info, SplitSquareVertical, Eye, EyeOff, Download, FileSpreadsheet, RefreshCw, ArrowUpNarrowWide, ArrowDownWideNarrow, Rows3, Upload, Pin, PinOff, X, GripVertical, Layers, Check, ChevronDown, ChevronUp, Minimize2, Maximize2, Menu, ListFilter, XCircle } from 'lucide-react';
 import { useSheetStore, RowHeight } from '@/lib/store/sheet-store';
 import { SheetConfig, RowData, UserRole, ColumnConfig, ColumnFilter } from '@/types';
+import { summarizeHighlightsFilter } from '@/lib/utils/highlights';
 import { exportToCSV, exportToExcel } from '@/lib/utils/export';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -302,6 +303,13 @@ export const Toolbar = forwardRef<ToolbarRef, ToolbarProps>(({ config, data, use
         .join(', ');
       const extra = filter.values.length - 2;
       return { op: 'is', value: extra > 0 ? `${preview} +${extra}` : preview };
+    }
+
+    // The Highlights column filters five row fields at once, so summarise them
+    // as a single readable list instead of an operator/value pair.
+    if (filter.type === 'highlights') {
+      const summary = summarizeHighlightsFilter(filter.highlights);
+      return { op: '', value: summary || 'Filter applied' };
     }
 
     if (filter.type === 'condition' && filter.condition) {

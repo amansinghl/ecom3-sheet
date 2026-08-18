@@ -1,7 +1,14 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { ColumnConfig, RowData, ColumnFilter, FilterOperator } from '@/types';
+import {
+  ColumnConfig,
+  RowData,
+  ColumnFilter,
+  FilterOperator,
+  HighlightsFilterValue,
+  NumericFilterOperator,
+} from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
@@ -10,6 +17,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { ArrowUpAZ, ArrowDownAZ, Trash2, Search, Paperclip, Ban } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import {
+  HIGHLIGHT_BOOLEAN_FIELDS,
+  HIGHLIGHT_NUMBER_FIELDS,
+  NUMERIC_FILTER_OPERATORS,
+  isHighlightsFilterEmpty,
+} from '@/lib/utils/highlights';
 
 interface ColumnFilterDropdownProps {
   column: ColumnConfig;
@@ -102,7 +115,7 @@ export function ColumnFilterDropdown({
   sheetId,
 }: ColumnFilterDropdownProps) {
   const [filterMode, setFilterMode] = useState<'values' | 'condition'>(
-    currentFilter?.type || 'values'
+    currentFilter?.type === 'condition' ? 'condition' : 'values'
   );
   const [conditionOperator, setConditionOperator] = useState<FilterOperator>(
     currentFilter?.type === 'condition' && currentFilter.condition
@@ -238,6 +251,18 @@ export function ColumnFilterDropdown({
 
   const needsConditionValue = !['isEmpty', 'isNotEmpty'].includes(conditionOperator);
   const operators = operatorsByType[column.type] || [];
+
+  // Highlights column: the cell is composed of five row fields, so there is no
+  // single value to list or compare. Filter each field on its own instead -
+  // counts numerically, verification/cancellation flags by true/false.
+  if (column.type === 'highlights') {
+    return (
+      <HighlightsFilterPanel
+        currentFilter={currentFilter}
+        onFilterChange={onFilterChange}
+      />
+    );
+  }
 
   // Attachments column: the cell value is an array of media objects, so neither
   // text conditions nor a value list would render/compare sensibly. Offer just
@@ -487,6 +512,195 @@ export function ColumnFilterDropdown({
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+interface HighlightsFilterPanelProps {
+  currentFilter?: ColumnFilter;
+  onFilterChange: (filter: ColumnFilter | null) => void;
+}
+
+// Draft state for a numeric sub-filter. 'any' means the field is not filtered.
+type NumberDraft = { operator: NumericFilterOperator | 'any'; value: string };
+type BooleanDraft = 'any' | 'true' | 'false';
+
+function HighlightsFilterPanel({ currentFilter, onFilterChange }: HighlightsFilterPanelProps) {
+  const applied =
+    currentFilter?.type === 'highlights' ? currentFilter.highlights : undefined;
+
+  const [numberDrafts, setNumberDrafts] = useState<Record<string, NumberDraft>>(() => {
+    const drafts: Record<string, NumberDraft> = {};
+    HIGHLIGHT_NUMBER_FIELDS.forEach((field) => {
+      const condition = applied?.[field.id];
+      drafts[field.id] = condition
+        ? { operator: condition.operator, value: String(condition.value) }
+        : { operator: 'any', value: '' };
+    });
+    return drafts;
+  });
+
+  const [booleanDrafts, setBooleanDrafts] = useState<Record<string, BooleanDraft>>(() => {
+    const drafts: Record<string, BooleanDraft> = {};
+    HIGHLIGHT_BOOLEAN_FIELDS.forEach((field) => {
+      const expected = applied?.[field.id];
+      drafts[field.id] = expected === undefined ? 'any' : expected ? 'true' : 'false';
+    });
+    return drafts;
+  });
+
+  const handleApply = () => {
+    const filter: HighlightsFilterValue = {};
+
+    HIGHLIGHT_NUMBER_FIELDS.forEach((field) => {
+      const draft = numberDrafts[field.id];
+      if (!draft || draft.operator === 'any' || draft.value.trim() === '') return;
+      const numericValue = Number(draft.value);
+      if (!Number.isFinite(numericValue)) return;
+      filter[field.id] = { operator: draft.operator, value: numericValue };
+    });
+
+    HIGHLIGHT_BOOLEAN_FIELDS.forEach((field) => {
+      const draft = booleanDrafts[field.id];
+      if (draft === 'any') return;
+      filter[field.id] = draft === 'true';
+    });
+
+    // Nothing selected means no filter at all
+    if (isHighlightsFilterEmpty(filter)) {
+      onFilterChange(null);
+      return;
+    }
+
+    onFilterChange({ type: 'highlights', highlights: filter });
+  };
+
+  const handleClear = () => {
+    const numbers: Record<string, NumberDraft> = {};
+    HIGHLIGHT_NUMBER_FIELDS.forEach((field) => {
+      numbers[field.id] = { operator: 'any', value: '' };
+    });
+    const booleans: Record<string, BooleanDraft> = {};
+    HIGHLIGHT_BOOLEAN_FIELDS.forEach((field) => {
+      booleans[field.id] = 'any';
+    });
+    setNumberDrafts(numbers);
+    setBooleanDrafts(booleans);
+    onFilterChange(null);
+  };
+
+  return (
+    <div className="w-72 max-w-[calc(100vw-2rem)] p-3">
+      <div className="text-xs font-semibold text-foreground">Filter highlights</div>
+
+      {/* Counts - numeric comparison */}
+      <div className="mt-3 space-y-1.5">
+        <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">
+          Counts
+        </div>
+        {HIGHLIGHT_NUMBER_FIELDS.map((field) => {
+          const draft = numberDrafts[field.id];
+          return (
+            <div key={field.id} className="flex items-center gap-1.5">
+              <span className="w-12 shrink-0 truncate text-xs text-muted-foreground">
+                {field.label}
+              </span>
+              <Select
+                value={draft.operator}
+                onValueChange={(val) =>
+                  setNumberDrafts((prev) => ({
+                    ...prev,
+                    [field.id]: {
+                      operator: val as NumericFilterOperator | 'any',
+                      value: val === 'any' ? '' : prev[field.id].value,
+                    },
+                  }))
+                }
+              >
+                <SelectTrigger className="h-7 w-[72px] shrink-0 px-2 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="any">Any</SelectItem>
+                  {NUMERIC_FILTER_OPERATORS.map((op) => (
+                    <SelectItem key={op.value} value={op.value}>
+                      {op.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Input
+                type="number"
+                value={draft.value}
+                disabled={draft.operator === 'any'}
+                placeholder="Value"
+                className="h-7 min-w-0 flex-1 text-xs"
+                onChange={(e) =>
+                  setNumberDrafts((prev) => ({
+                    ...prev,
+                    [field.id]: { ...prev[field.id], value: e.target.value },
+                  }))
+                }
+              />
+            </div>
+          );
+        })}
+      </div>
+
+      <Separator className="my-3" />
+
+      {/* Flags - true / false */}
+      <div className="space-y-1.5">
+        <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">
+          Flags
+        </div>
+        {HIGHLIGHT_BOOLEAN_FIELDS.map((field) => {
+          const draft = booleanDrafts[field.id];
+          return (
+            <div key={field.id} className="flex items-center gap-1.5">
+              <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
+                {field.label}
+              </span>
+              {/* Segmented toggle keeps all three states on one row */}
+              <div className="inline-flex shrink-0 rounded-md border border-border bg-muted/40 p-0.5">
+                {(['any', 'true', 'false'] as BooleanDraft[]).map((option) => (
+                  <button
+                    key={option}
+                    type="button"
+                    className={cn(
+                      'h-5 rounded-[4px] px-2 text-[11px] font-medium capitalize transition-colors',
+                      draft === option
+                        ? 'bg-primary text-primary-foreground shadow-sm'
+                        : 'text-muted-foreground hover:text-foreground'
+                    )}
+                    onClick={() =>
+                      setBooleanDrafts((prev) => ({ ...prev, [field.id]: option }))
+                    }
+                  >
+                    {option}
+                  </button>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Apply / Clear */}
+      <div className="mt-3 flex gap-2">
+        <Button size="sm" className="h-7 flex-1 text-xs" onClick={handleApply}>
+          Apply
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-7 shrink-0 px-2 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive"
+          onClick={handleClear}
+        >
+          <Trash2 className="mr-1 h-3 w-3" />
+          Clear
+        </Button>
+      </div>
     </div>
   );
 }
