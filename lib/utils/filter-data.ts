@@ -1,4 +1,5 @@
 import { ColumnFilter, RowData, ColumnConfig } from '@/types';
+import { matchesHighlightsFilter } from './highlights';
 
 // Helper function to compute status value for LSD sheet status column
 function computeStatusValue(row: RowData, columnId: string, sheetId?: string): any {
@@ -58,6 +59,16 @@ export function applyFilters(
       // Use helper function to get computed value for status column
       const value = computeStatusValue(row, columnId, sheetId);
       const column = columns.find((c) => c.id === columnId);
+
+      // The Highlights column has no value of its own - it is composed of five
+      // row fields, each filtered on its own (counts numerically, flags by
+      // true/false).
+      if (column?.type === 'highlights') {
+        if (columnFilter.type === 'highlights' && columnFilter.highlights) {
+          return matchesHighlightsFilter(row, columnFilter.highlights);
+        }
+        return true;
+      }
 
       // Attachments (media) columns hold an array of media objects: string/number
       // comparisons are meaningless, so only emptiness checks are supported.

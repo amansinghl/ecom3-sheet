@@ -446,7 +446,7 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
                   </button>
                 </PopoverTrigger>
                 <PopoverContent
-                  className="p-0"
+                  className="w-auto p-0"
                   align="start"
                   side="bottom"
                   onOpenAutoFocus={(e) => e.preventDefault()}
