@@ -33,7 +33,7 @@ export function BulkUploadModal({ isOpen, onClose, onUpload }: BulkUploadModalPr
       'application/vnd.oasis.opendocument.spreadsheet', // .ods
     ];
     
-    const validExtensions = ['.xlsx', '.xls', '.csv', '.ods'];
+    const validExtensions = ['.xlsx', '.xls', '.csv', '.ods', '.xlsm'];
     const fileExtension = selectedFile.name.toLowerCase().substring(selectedFile.name.lastIndexOf('.'));
 
     if (
@@ -94,8 +94,8 @@ export function BulkUploadModal({ isOpen, onClose, onUpload }: BulkUploadModalPr
   const handleDownloadSample = useCallback(() => {
     // Download sample file from public folder
     const link = document.createElement('a');
-    link.href = '/Kalesh-Upload-22_Dec.xlsx';
-    link.download = 'Kalesh-Upload-22_Dec.xlsx';
+    link.href = '/Kalesh-Upload-19-Aug-26.xlsm';
+    link.download = 'Kalesh-Upload-19-Aug-26.xlsm';
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
