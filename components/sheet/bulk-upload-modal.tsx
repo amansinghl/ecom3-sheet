@@ -33,7 +33,7 @@ export function BulkUploadModal({ isOpen, onClose, onUpload }: BulkUploadModalPr
       'application/vnd.oasis.opendocument.spreadsheet', // .ods
     ];
     
-    const validExtensions = ['.xlsx', '.xls', '.csv', '.ods'];
+    const validExtensions = ['.xlsx', '.xls', '.csv', '.ods', '.xlsm'];
     const fileExtension = selectedFile.name.toLowerCase().substring(selectedFile.name.lastIndexOf('.'));
 
     if (

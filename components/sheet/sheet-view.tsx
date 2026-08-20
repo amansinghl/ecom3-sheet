@@ -1883,6 +1883,17 @@ export function SheetView({ config, userRole }: SheetViewProps) {
         throw new Error('Missing shipment_no column');
       }
 
+      // Manual Case must match one of the configured options exactly - a typo or
+      // a stale value would otherwise be created on the backend as-is.
+      const manualCaseColumn = config.columns.find((col) => col.id === 'manual_case');
+      const allowedManualCases = new Set(
+        (manualCaseColumn?.options || []).map((opt) => opt.value)
+      );
+
+      // Collected across the whole file: if anything is invalid the upload is
+      // rejected entirely, so no entry is created.
+      const invalidManualCases: Array<{ row: number; value: string }> = [];
+
       // Convert rows to the required format
       const uploadData: Array<{
         shipment_no: string | number;
@@ -1904,7 +1915,14 @@ export function SheetView({ config, userRole }: SheetViewProps) {
         };
 
         if (manualCaseIndex !== -1 && row[manualCaseIndex]) {
-          record.manual_case = String(row[manualCaseIndex]).trim() || null;
+          const manualCase = String(row[manualCaseIndex]).trim();
+
+          if (manualCase && allowedManualCases.size > 0 && !allowedManualCases.has(manualCase)) {
+            // +1 because jsonData[0] is the header row (spreadsheet row 1)
+            invalidManualCases.push({ row: i + 1, value: manualCase });
+          }
+
+          record.manual_case = manualCase || null;
         }
 
         if (notesIndex !== -1 && row[notesIndex]) {
@@ -1916,6 +1934,34 @@ export function SheetView({ config, userRole }: SheetViewProps) {
         }
 
         uploadData.push(record);
+      }
+
+      // Reject the whole file so a partially valid upload never half-applies
+      if (invalidManualCases.length > 0) {
+        const preview = invalidManualCases.slice(0, 5);
+        const remaining = invalidManualCases.length - preview.length;
+
+        toast.error(
+          `Invalid Manual Case in ${invalidManualCases.length} row${invalidManualCases.length === 1 ? '' : 's'} - nothing was uploaded`,
+          {
+            id: 'bulk-upload',
+            duration: 12000,
+            description: (
+              <div className="mt-1 space-y-0.5 text-xs">
+                {preview.map((entry) => (
+                  <div key={entry.row}>
+                    Row {entry.row}: &quot;{entry.value}&quot;
+                  </div>
+                ))}
+                {remaining > 0 && <div>+{remaining} more</div>}
+                <div className="pt-1">
+                  Manual Case must match a value from the dropdown exactly.
+                </div>
+              </div>
+            ),
+          }
+        );
+        throw new Error('Invalid manual case values');
       }
 
       if (uploadData.length === 0) {
@@ -1937,7 +1983,7 @@ export function SheetView({ config, userRole }: SheetViewProps) {
 
     } catch (error: any) {
       console.error('Bulk upload error:', error);
-      if (!error.message || error.message === 'Invalid file format' || error.message === 'Missing shipment_no column' || error.message === 'No valid data') {
+      if (!error.message || error.message === 'Invalid file format' || error.message === 'Missing shipment_no column' || error.message === 'No valid data' || error.message === 'Invalid manual case values') {
         // Error already shown in toast
         throw error;
       }
