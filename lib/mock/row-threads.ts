@@ -182,11 +182,6 @@ export function buildSeedThread(row: RowData): ThreadMessage[] {
   return messages;
 }
 
-/** Cheap enough to call per visible row for the grid badge. */
-export function seedThreadCount(row: RowData): number {
-  return buildSeedThread(row).length;
-}
-
 /**
  * Whether a never-opened row shows the unread dot. Every seeded thread has
  * recent messages, so a plain recency test would light up the whole grid and

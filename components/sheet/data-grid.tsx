@@ -21,14 +21,14 @@ import { RowContextMenu } from './row-context-menu';
 import { EmptyState } from './empty-state';
 import { ColumnFilterDropdown } from './column-filter-dropdown';
 import { cn } from '@/lib/utils';
-import { ChevronDown, ChevronUp, ChevronRight, Filter, Maximize2, MessageSquare, Pin, PinOff } from 'lucide-react';
+import { ChevronDown, ChevronUp, ChevronRight, Filter, MessageSquare, Pin, PinOff } from 'lucide-react';
 import { toast } from 'sonner';
 import { RowThreadDialog } from './row-thread-dialog';
-import { useThreadCount, useThreadUnread } from '@/lib/store/thread-store';
+import { useThreadUnread } from '@/lib/store/thread-store';
 
 // Wide enough for the row number, the select checkbox and the thread button.
 // stickyPositions below offsets pinned columns by the same value.
-const SELECT_COLUMN_WIDTH = 92;
+const SELECT_COLUMN_WIDTH = 78;
 
 interface DataGridProps {
   config: SheetConfig;
@@ -1718,41 +1718,34 @@ interface RowThreadButtonProps {
 }
 
 /**
- * Thread affordance in the row-number column. Stays visible once a row has
- * messages, so activity is findable without hovering every row.
+ * Thread affordance in the row-number column. The icon only appears on row
+ * hover; an unread row keeps a dot visible so activity is findable without
+ * hovering every row. Everything stays inside the row box - a count badge or a
+ * negatively offset dot spills into the rows above and below at compact height.
  */
 function RowThreadButton({ row, onOpen }: RowThreadButtonProps) {
-  const count = useThreadCount(row);
   const isUnread = useThreadUnread(row);
-  const hasMessages = count > 0;
 
   return (
     <button
       type="button"
-      title={hasMessages ? `${count} note${count === 1 ? '' : 's'}` : 'Open notes'}
-      aria-label={hasMessages ? `Open notes, ${count} messages` : 'Open notes'}
+      title="Open notes"
+      aria-label={isUnread ? 'Open notes, unread' : 'Open notes'}
       onClick={(event) => {
         // The cell also drives row selection and cell focus.
         event.stopPropagation();
         onOpen();
       }}
       onMouseDown={(event) => event.stopPropagation()}
-      className={cn(
-        'relative flex h-6 shrink-0 items-center gap-0.5 rounded px-1 text-muted-foreground transition-opacity hover:bg-black/5 hover:text-foreground',
-        hasMessages ? 'opacity-100' : 'opacity-0 group-hover/row:opacity-100'
-      )}
+      className="flex h-5 shrink-0 items-center gap-1 rounded px-1 text-muted-foreground hover:bg-black/5 hover:text-foreground"
     >
-      {hasMessages ? (
-        <>
-          <MessageSquare className="h-3.5 w-3.5" />
-          <span className="text-[11px] leading-none tabular-nums">{count}</span>
-          {isUnread && (
-            <span className="absolute -top-0.5 right-0 h-1.5 w-1.5 rounded-full bg-blue-500" />
-          )}
-        </>
-      ) : (
-        <Maximize2 className="h-3.5 w-3.5" />
-      )}
+      <MessageSquare className="h-3.5 w-3.5 opacity-0 transition-opacity group-hover/row:opacity-100" />
+      <span
+        className={cn(
+          'h-1.5 w-1.5 shrink-0 rounded-full bg-blue-500 transition-opacity',
+          isUnread ? 'opacity-100' : 'opacity-0'
+        )}
+      />
     </button>
   );
 }

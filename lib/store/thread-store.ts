@@ -8,7 +8,7 @@
 
 import { create } from 'zustand';
 import { RowData, ThreadMessage } from '@/types';
-import { buildSeedThread, seedThreadCount, seedThreadIsUnread } from '@/lib/mock/row-threads';
+import { buildSeedThread, seedThreadIsUnread } from '@/lib/mock/row-threads';
 
 const STORAGE_KEY = 'sheet-row-threads-mock-v1';
 const READ_STORAGE_KEY = 'sheet-row-threads-read-mock-v1';
@@ -86,16 +86,6 @@ export const useThreadStore = create<ThreadStore>((set, get) => ({
 
   getMessages: (row) => get().threads[row.id] || buildSeedThread(row),
 }));
-
-/**
- * Message count for the grid badge. Falls back to the seed so an unopened row
- * still shows that a conversation is waiting, without materialising it.
- */
-export function useThreadCount(row: RowData | undefined): number {
-  const stored = useThreadStore((state) => (row ? state.threads[row.id] : undefined));
-  if (!row) return 0;
-  return stored ? stored.length : seedThreadCount(row);
-}
 
 /** True while the row has messages newer than the last time it was opened. */
 export function useThreadUnread(row: RowData | undefined): boolean {
