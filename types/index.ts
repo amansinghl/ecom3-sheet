@@ -236,3 +236,28 @@ export interface PaginatedResponse<T> {
   page: number;
   pageSize: number;
 }
+
+// ============================================
+// Row Discussion Threads (mock)
+// ============================================
+// Per-row chat so follow-ups stop living in Slack. Nothing here talks to the
+// API yet - threads are generated and stored client side by
+// lib/mock/row-threads.ts and lib/store/thread-store.ts.
+
+export type ThreadMessageKind = 'message' | 'event';
+
+// Whether a note is team-only or something the shipper would be shown. The
+// distinction is cosmetic while this is a mock, but it is baked in now because
+// retrofitting visibility onto an existing note history is painful.
+export type ThreadVisibility = 'internal' | 'shipper';
+
+export interface ThreadMessage {
+  id: string;
+  rowId: string;
+  authorEmail: string;
+  authorName: string;
+  body: string;
+  createdAt: string; // ISO string, so the thread survives a JSON round trip
+  kind: ThreadMessageKind;
+  visibility: ThreadVisibility;
+}

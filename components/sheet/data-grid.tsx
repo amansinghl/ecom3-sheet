@@ -21,8 +21,14 @@ import { RowContextMenu } from './row-context-menu';
 import { EmptyState } from './empty-state';
 import { ColumnFilterDropdown } from './column-filter-dropdown';
 import { cn } from '@/lib/utils';
-import { ChevronDown, ChevronUp, ChevronRight, Filter, Pin, PinOff } from 'lucide-react';
+import { ChevronDown, ChevronUp, ChevronRight, Filter, Maximize2, MessageSquare, Pin, PinOff } from 'lucide-react';
 import { toast } from 'sonner';
+import { RowThreadDialog } from './row-thread-dialog';
+import { useThreadCount, useThreadUnread } from '@/lib/store/thread-store';
+
+// Wide enough for the row number, the select checkbox and the thread button.
+// stickyPositions below offsets pinned columns by the same value.
+const SELECT_COLUMN_WIDTH = 92;
 
 interface DataGridProps {
   config: SheetConfig;
@@ -80,9 +86,11 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
   } = useSheetStore();
   const [sorting, setSorting] = useState<SortingState>([]);
   const columnResizeMode = useState<ColumnResizeMode>('onChange')[0];
-  const [hoveredRow, setHoveredRow] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; rowId: string } | null>(null);
   const [openFilterPopover, setOpenFilterPopover] = useState<string | null>(null);
+  // Row whose discussion thread is open. Held here rather than in the row cell
+  // so the dialog is not unmounted when the row scrolls out of the virtualiser.
+  const [threadRowId, setThreadRowId] = useState<string | null>(null);
 
   // Memoized selection state for fast O(1) lookups - prevents lag
   const selectionState = useMemo(() => {
@@ -294,47 +302,59 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
       {
         id: 'select',
         header: ({ table }) => (
-          <div className="flex items-center justify-center px-2 group">
-            <Checkbox
-              checked={table.getIsAllRowsSelected()}
-              onCheckedChange={(value) => table.toggleAllRowsSelected(!!value)}
-              aria-label="Select all"
-            />
+          <div className="flex items-center gap-0.5 pl-2 pr-1 group">
+            <div className="flex h-5 w-5 shrink-0 items-center justify-center">
+              <Checkbox
+                checked={table.getIsAllRowsSelected()}
+                onCheckedChange={(value) => table.toggleAllRowsSelected(!!value)}
+                aria-label="Select all"
+              />
+            </div>
           </div>
         ),
         cell: ({ row }) => {
           const rowIndex = row.index + 1;
-          const isHovered = hoveredRow === row.id;
           const isSelected = row.getIsSelected();
-          const showCheckbox = isHovered || isSelected;
           const isEmptyRow = row.original._isEmpty === true;
-          
+
+          // Hover is driven by the row's group/row class rather than the
+          // hoveredRow state, which this memoised column definition does not
+          // see updates to.
           return (
-            <div className="flex items-center justify-center px-2 group relative">
-              <span className={cn(
-                "text-sm text-muted-foreground transition-opacity",
-                showCheckbox && !isEmptyRow && "opacity-0"
-              )}>
-                {!isEmptyRow ? rowIndex : ''}
-              </span>
-              {!isEmptyRow && (
-                <div className={cn(
-                  "absolute inset-0 flex items-center justify-center transition-opacity",
-                  showCheckbox ? "opacity-100" : "opacity-0"
+            <div className="flex items-center gap-0.5 pl-2 pr-1 group">
+              <div className="relative flex h-5 w-5 shrink-0 items-center justify-center">
+                <span className={cn(
+                  "text-sm text-muted-foreground transition-opacity",
+                  !isEmptyRow && "group-hover/row:opacity-0",
+                  isSelected && !isEmptyRow && "opacity-0"
                 )}>
-                  <Checkbox
-                    checked={isSelected}
-                    onCheckedChange={(value) => row.toggleSelected(!!value)}
-                    aria-label="Select row"
-                  />
-                </div>
+                  {!isEmptyRow ? rowIndex : ''}
+                </span>
+                {!isEmptyRow && (
+                  <div className={cn(
+                    "absolute inset-0 flex items-center justify-center opacity-0 transition-opacity group-hover/row:opacity-100",
+                    isSelected && "opacity-100"
+                  )}>
+                    <Checkbox
+                      checked={isSelected}
+                      onCheckedChange={(value) => row.toggleSelected(!!value)}
+                      aria-label="Select row"
+                    />
+                  </div>
+                )}
+              </div>
+              {!isEmptyRow && (
+                <RowThreadButton
+                  row={row.original}
+                  onOpen={() => setThreadRowId(row.original.id)}
+                />
               )}
             </div>
           );
         },
-        size: 60,
-        minSize: 60,
-        maxSize: 60,
+        size: SELECT_COLUMN_WIDTH,
+        minSize: SELECT_COLUMN_WIDTH,
+        maxSize: SELECT_COLUMN_WIDTH,
         enableSorting: false,
         enableResizing: false,
       },
@@ -531,6 +551,13 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
     return groupedData.filter((item): item is RowData => !isGroupHeader(item));
   }, [groupedData]);
 
+  // Looked up from the live data rather than captured at click time, so the
+  // dialog's detail rail keeps showing current values while it is open.
+  const threadRow = useMemo(
+    () => (threadRowId ? data.find((row) => row.id === threadRowId) || null : null),
+    [threadRowId, data]
+  );
+
   const table = useReactTable({
     data: tableData,
     columns,
@@ -587,7 +614,7 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
   // Calculate sticky positions for pinned columns (only visible ones)
   const stickyPositions = useMemo(() => {
     const positions: Record<string, number> = {};
-    let currentLeft = 60; // Start after select column
+    let currentLeft = SELECT_COLUMN_WIDTH; // Start after select column
     
     // Only calculate positions for visible pinned columns in order
     orderedColumns
@@ -1432,8 +1459,6 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
                   <tr
                     key={row.id}
                     data-index={virtualRow.index}
-                    onMouseEnter={() => setHoveredRow(row.id)}
-                    onMouseLeave={() => setHoveredRow(null)}
                     onContextMenu={(e) => {
                       if (!isEmptyRow) {
                         e.preventDefault();
@@ -1674,6 +1699,60 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
           onClose={() => setContextMenu(null)}
         />
       )}
+
+      <RowThreadDialog
+        open={threadRowId !== null}
+        onOpenChange={(open) => {
+          if (!open) setThreadRowId(null);
+        }}
+        row={threadRow}
+        config={config}
+      />
     </div>
+  );
+}
+
+interface RowThreadButtonProps {
+  row: RowData;
+  onOpen: () => void;
+}
+
+/**
+ * Thread affordance in the row-number column. Stays visible once a row has
+ * messages, so activity is findable without hovering every row.
+ */
+function RowThreadButton({ row, onOpen }: RowThreadButtonProps) {
+  const count = useThreadCount(row);
+  const isUnread = useThreadUnread(row);
+  const hasMessages = count > 0;
+
+  return (
+    <button
+      type="button"
+      title={hasMessages ? `${count} note${count === 1 ? '' : 's'}` : 'Open notes'}
+      aria-label={hasMessages ? `Open notes, ${count} messages` : 'Open notes'}
+      onClick={(event) => {
+        // The cell also drives row selection and cell focus.
+        event.stopPropagation();
+        onOpen();
+      }}
+      onMouseDown={(event) => event.stopPropagation()}
+      className={cn(
+        'relative flex h-6 shrink-0 items-center gap-0.5 rounded px-1 text-muted-foreground transition-opacity hover:bg-black/5 hover:text-foreground',
+        hasMessages ? 'opacity-100' : 'opacity-0 group-hover/row:opacity-100'
+      )}
+    >
+      {hasMessages ? (
+        <>
+          <MessageSquare className="h-3.5 w-3.5" />
+          <span className="text-[11px] leading-none tabular-nums">{count}</span>
+          {isUnread && (
+            <span className="absolute -top-0.5 right-0 h-1.5 w-1.5 rounded-full bg-blue-500" />
+          )}
+        </>
+      ) : (
+        <Maximize2 className="h-3.5 w-3.5" />
+      )}
+    </button>
   );
 }
