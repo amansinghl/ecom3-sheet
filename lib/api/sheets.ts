@@ -58,6 +58,20 @@ export interface LSDResponse {
 }
 
 /**
+ * Outcome of a bulk escalation upload. `errors` is keyed by the 1-based index of
+ * the data row that failed (add one for the header to get the Excel row number),
+ * each holding the reasons that row was skipped.
+ */
+export interface BulkUploadResult {
+  status?: boolean;
+  message?: string;
+  success_count?: number;
+  total_count?: number;
+  error_count?: number;
+  errors?: Record<string, string[]>;
+}
+
+/**
  * Helper function to extract rows from different response formats
  * Provides flexibility for different backend response structures
  */
@@ -163,9 +177,13 @@ class SheetApiService {
   /**
    * Bulk upload escalation entries
    * Uploads multiple escalation records from Excel file
-   * 
+   *
+   * Rows are validated independently server-side: unresolvable shipment numbers
+   * and AWBs are reported in `errors` while the rest still go through, so the
+   * caller has to read `success_count` rather than assume everything landed.
+   *
    * @param data Array of escalation records to upload
-   * @returns API response with operation result
+   * @returns API response with per-row outcome
    * @throws Error if API request fails
    */
   async bulkUploadEscalations(
@@ -175,9 +193,9 @@ class SheetApiService {
       followup_remarks?: string | null;
       [key: string]: any;
     }>
-  ): Promise<ApiResponse<any>> {
+  ): Promise<ApiResponse<BulkUploadResult>> {
     try {
-      const response = await apiClient.post<ApiResponse<any>>(
+      const response = await apiClient.post<ApiResponse<BulkUploadResult>>(
         '/sheets/escalation/bulk-upload-escalations',
         data
       );
