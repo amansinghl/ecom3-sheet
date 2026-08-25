@@ -1865,8 +1865,11 @@ export function SheetView({ config, userRole }: SheetViewProps) {
       const headers = jsonData[0].map((h: any) => String(h || '').toLowerCase().trim());
       
       // Find column indices
+      // The downloadable sample labels this column "AWB No OR VSID", so accept
+      // that alongside the older shipment_no headers.
       const shipmentNoIndex = headers.findIndex((h: string) => 
-        h === 'shipment_no' || h === 'shipment no' || h === 'shipmentno'
+        h === 'shipment_no' || h === 'shipment no' || h === 'shipmentno' ||
+        h === 'awb no or vsid' || h === 'awb_no_or_vsid'
       );
       const manualCaseIndex = headers.findIndex((h: string) => 
         h === 'manual_case' || h === 'manual case' || h === 'manualcase'
@@ -1885,9 +1888,11 @@ export function SheetView({ config, userRole }: SheetViewProps) {
 
       // Manual Case must match one of the configured options exactly - a typo or
       // a stale value would otherwise be created on the backend as-is.
+      // Matched case-insensitively and normalised back to the configured value,
+      // so a sample sheet whose casing drifts from the config still uploads.
       const manualCaseColumn = config.columns.find((col) => col.id === 'manual_case');
-      const allowedManualCases = new Set(
-        (manualCaseColumn?.options || []).map((opt) => opt.value)
+      const allowedManualCases = new Map<string, string>(
+        (manualCaseColumn?.options || []).map((opt) => [opt.value.toLowerCase(), opt.value])
       );
 
       // Collected across the whole file: if anything is invalid the upload is
@@ -1917,12 +1922,14 @@ export function SheetView({ config, userRole }: SheetViewProps) {
         if (manualCaseIndex !== -1 && row[manualCaseIndex]) {
           const manualCase = String(row[manualCaseIndex]).trim();
 
-          if (manualCase && allowedManualCases.size > 0 && !allowedManualCases.has(manualCase)) {
+          const canonicalManualCase = allowedManualCases.get(manualCase.toLowerCase());
+
+          if (manualCase && allowedManualCases.size > 0 && !canonicalManualCase) {
             // +1 because jsonData[0] is the header row (spreadsheet row 1)
             invalidManualCases.push({ row: i + 1, value: manualCase });
           }
 
-          record.manual_case = manualCase || null;
+          record.manual_case = canonicalManualCase || manualCase || null;
         }
 
         if (notesIndex !== -1 && row[notesIndex]) {
@@ -1972,9 +1979,49 @@ export function SheetView({ config, userRole }: SheetViewProps) {
       toast.loading(`Uploading ${uploadData.length} records...`, { id: 'bulk-upload' });
 
       // Call the bulk upload API
-      await sheetApiService.bulkUploadEscalations(uploadData);
+      const response = await sheetApiService.bulkUploadEscalations(uploadData);
 
-      toast.success(`Successfully uploaded ${uploadData.length} records!`, { id: 'bulk-upload' });
+      // Rows are validated independently server-side, so a 200 does not mean
+      // every row landed - report what the API actually created rather than
+      // what was sent, and name the rows it rejected.
+      const result = response?.data || {};
+      const createdCount = typeof result.success_count === 'number'
+        ? result.success_count
+        : uploadData.length;
+      // Keys are 1-based data rows; +1 for the header gives the Excel row number.
+      const rejectedRows = Object.entries(result.errors || {}).map(([row, reasons]) => ({
+        row: Number(row) + 1,
+        reason: Array.isArray(reasons) ? reasons.join(', ') : String(reasons),
+      }));
+
+      if (rejectedRows.length > 0) {
+        const preview = rejectedRows.slice(0, 5);
+        const remaining = rejectedRows.length - preview.length;
+        const description = (
+          <div className="mt-1 space-y-0.5 text-xs">
+            {preview.map((entry) => (
+              <div key={entry.row}>
+                Row {entry.row}: {entry.reason}
+              </div>
+            ))}
+            {remaining > 0 && <div>+{remaining} more</div>}
+          </div>
+        );
+
+        if (createdCount > 0) {
+          toast.warning(
+            `Uploaded ${createdCount} of ${uploadData.length} records - ${rejectedRows.length} skipped`,
+            { id: 'bulk-upload', duration: 12000, description }
+          );
+        } else {
+          toast.error(
+            `No records were uploaded - all ${rejectedRows.length} rows were rejected`,
+            { id: 'bulk-upload', duration: 12000, description }
+          );
+        }
+      } else {
+        toast.success(`Successfully uploaded ${createdCount} records!`, { id: 'bulk-upload' });
+      }
 
       // Refresh the data after successful upload
       if (refetch) {
