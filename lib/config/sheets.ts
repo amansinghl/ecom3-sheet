@@ -1220,6 +1220,22 @@ export const leadManagerSheetConfig: SheetConfig = {
       editable: false,
     },
     {
+      id: 'utm_campaign',
+      label: 'UTM Campaign',
+      type: 'text',
+      width: 160,
+      required: false,
+      editable: false,
+    },
+    {
+      id: 'acquisition_source',
+      label: 'Acquisition Source',
+      type: 'text',
+      width: 170,
+      required: false,
+      editable: false,
+    },
+    {
       id: 'entity_name',
       label: 'Entity',
       type: 'text',
@@ -1230,6 +1246,14 @@ export const leadManagerSheetConfig: SheetConfig = {
     {
       id: 'accounts_entity_id',
       label: 'Entity ID',
+      type: 'number',
+      width: 100,
+      required: false,
+      editable: false,
+    },
+    {
+      id: 'accounts_user_id',
+      label: 'User ID',
       type: 'number',
       width: 100,
       required: false,
