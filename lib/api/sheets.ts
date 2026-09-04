@@ -208,6 +208,29 @@ class SheetApiService {
   }
 
   /**
+   * Bulk update existing escalation tickets from Excel.
+   */
+  async bulkUpdateEscalations(
+    data: Array<{
+      shipment_no: number;
+      email_subject?: string | null;
+      ops_remarks?: string | null;
+    }>
+  ): Promise<ApiResponse<BulkUploadResult>> {
+    try {
+      const response = await apiClient.post<ApiResponse<BulkUploadResult>>(
+        '/sheets/escalation/bulk-update-escalations',
+        data
+      );
+
+      return response;
+    } catch (error) {
+      console.error('Failed to bulk update escalations:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Delete escalation by id and shipment number
    * 
    * @param id The ID of the escalation record
