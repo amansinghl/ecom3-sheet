@@ -1968,7 +1968,7 @@ export function SheetView({ config, userRole }: SheetViewProps) {
             ),
           }
         );
-        throw new Error('Invalid manual case values ');
+        throw new Error('Invalid manual case values');
       }
 
       if (uploadData.length === 0) {
