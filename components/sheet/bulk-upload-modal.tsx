@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -9,20 +9,55 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Upload, Download, X } from 'lucide-react';
+import { Upload, Download } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import * as XLSX from 'xlsx';
+
+export type BulkUploadMode = 'create' | 'update';
 
 interface BulkUploadModalProps {
   isOpen: boolean;
   onClose: () => void;
   onUpload: (file: File) => Promise<void>;
+  mode?: BulkUploadMode;
 }
 
-export function BulkUploadModal({ isOpen, onClose, onUpload }: BulkUploadModalProps) {
+const MODE_COPY: Record<BulkUploadMode, {
+  title: string;
+  sampleName: string;
+  hint: string;
+  action: string;
+  actionLoading: string;
+}> = {
+  create: {
+    title: 'Bulk Upload Escalations',
+    sampleName: 'KB_Bulk_Upload_sheet.xlsx',
+    hint: 'Columns: AWB No OR VSID, Manual Case, Notes, Source of Complaint.',
+    action: 'Upload & Process',
+    actionLoading: 'Uploading...',
+  },
+  update: {
+    title: 'Bulk Update Tickets',
+    sampleName: 'KB_Bulk_Update_sheet.xlsx',
+    hint: 'Columns: VSID, Email Subject (replaces existing), OPS Remarks (appended with timestamp). Lookup is by VSID only.',
+    action: 'Update & Process',
+    actionLoading: 'Updating...',
+  },
+};
+
+export function BulkUploadModal({ isOpen, onClose, onUpload, mode = 'create' }: BulkUploadModalProps) {
   const [file, setFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const copy = MODE_COPY[mode];
+
+  useEffect(() => {
+    if (!isOpen) {
+      setFile(null);
+      setIsDragging(false);
+    }
+  }, [isOpen, mode]);
 
   const handleFileSelect = useCallback((selectedFile: File) => {
     // Validate file type
@@ -92,14 +127,24 @@ export function BulkUploadModal({ isOpen, onClose, onUpload }: BulkUploadModalPr
   }, [file, onUpload, onClose]);
 
   const handleDownloadSample = useCallback(() => {
-    // Download sample file from public folder
+    if (mode === 'update') {
+      const worksheet = XLSX.utils.aoa_to_sheet([
+        ['VSID', 'Email Subject', 'OPS Remarks'],
+      ]);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Bulk Update');
+      XLSX.writeFile(workbook, copy.sampleName);
+      return;
+    }
+
+    // Create sample stays the static file already used by OPS
     const link = document.createElement('a');
     link.href = '/KB_Bulk_Upload_sheet.xlsx';
-    link.download = 'KB_Bulk_Upload_sheet.xlsx';
+    link.download = copy.sampleName;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-  }, []);
+  }, [mode, copy.sampleName]);
 
   const handleClose = useCallback(() => {
     if (!isUploading) {
@@ -112,7 +157,7 @@ export function BulkUploadModal({ isOpen, onClose, onUpload }: BulkUploadModalPr
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Bulk Upload Escalations</DialogTitle>
+          <DialogTitle>{copy.title}</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4 py-4">
@@ -178,11 +223,12 @@ export function BulkUploadModal({ isOpen, onClose, onUpload }: BulkUploadModalPr
           </div>
 
           {/* Supported Formats */}
-          <div className="rounded-md bg-muted p-3">
+          <div className="rounded-md bg-muted p-3 space-y-1">
             <p className="text-xs text-muted-foreground">
               <span className="font-medium">Supported formats:</span>{' '}
               CSV, Excel (.xlsx, .xls, .xlsb), OpenDocument (.ods)
             </p>
+            <p className="text-xs text-muted-foreground">{copy.hint}</p>
           </div>
         </div>
 
@@ -194,11 +240,10 @@ export function BulkUploadModal({ isOpen, onClose, onUpload }: BulkUploadModalPr
             className="w-full"
           >
             <Upload className="h-4 w-4 mr-2" />
-            {isUploading ? 'Uploading...' : 'Upload & Process'}
+            {isUploading ? copy.actionLoading : copy.action}
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
   );
 }
-

@@ -180,7 +180,7 @@ export const escalationSheetConfig: SheetConfig = {
     {
       id: 'ops_remarks',
       label: 'OPS Remarks',
-      type: 'text',
+      type: 'longtext',
       width: 200,
       required: false,
       editable: true,

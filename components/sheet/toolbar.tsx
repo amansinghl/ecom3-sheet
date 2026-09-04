@@ -17,7 +17,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Search, FileDown, Plus, Info, SplitSquareVertical, Eye, EyeOff, Download, FileSpreadsheet, RefreshCw, ArrowUpNarrowWide, ArrowDownWideNarrow, Rows3, Upload, Pin, PinOff, X, GripVertical, Layers, Check, ChevronDown, ChevronUp, Minimize2, Maximize2, Menu, ListFilter, XCircle } from 'lucide-react';
+import { Search, FileDown, Plus, Info, SplitSquareVertical, Eye, EyeOff, Download, FileSpreadsheet, RefreshCw, ArrowUpNarrowWide, ArrowDownWideNarrow, Rows3, Upload, FilePenLine, Pin, PinOff, X, GripVertical, Layers, Check, ChevronDown, ChevronUp, Minimize2, Maximize2, Menu, ListFilter, XCircle } from 'lucide-react';
 import { useSheetStore, RowHeight } from '@/lib/store/sheet-store';
 import { SheetConfig, RowData, UserRole, ColumnConfig, ColumnFilter } from '@/types';
 import { summarizeHighlightsFilter } from '@/lib/utils/highlights';
@@ -121,6 +121,7 @@ export interface ToolbarProps {
   onAddRow?: () => void;
   onDeleteRows?: () => void;
   onBulkUpload?: () => void;
+  onBulkUpdate?: () => void;
   onRefresh?: () => void;
   columnVisibility?: Record<string, boolean>;
   onColumnVisibilityChange?: (visibility: Record<string, boolean>) => void;
@@ -145,7 +146,7 @@ export interface ToolbarRef {
   focusSearch: () => void;
 }
 
-export const Toolbar = forwardRef<ToolbarRef, ToolbarProps>(({ config, data, userRole, onAddRow, onDeleteRows, onBulkUpload, onRefresh, columnVisibility = {}, onColumnVisibilityChange, onOpenCommandPalette, globalSearch = '', onGlobalSearchChange, visibleRowCount = 0, activeViewId, columnFilters = {}, activeCell = null, onToggleSidebar, showSidebarToggle = false }, ref) => {
+export const Toolbar = forwardRef<ToolbarRef, ToolbarProps>(({ config, data, userRole, onAddRow, onDeleteRows, onBulkUpload, onBulkUpdate, onRefresh, columnVisibility = {}, onColumnVisibilityChange, onOpenCommandPalette, globalSearch = '', onGlobalSearchChange, visibleRowCount = 0, activeViewId, columnFilters = {}, activeCell = null, onToggleSidebar, showSidebarToggle = false }, ref) => {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [showInfoDialog, setShowInfoDialog] = useState(false);
   const [formulaValue, setFormulaValue] = useState('');
@@ -589,6 +590,22 @@ export const Toolbar = forwardRef<ToolbarRef, ToolbarProps>(({ config, data, use
               </Button>
             </TooltipTrigger>
             <TooltipContent>Bulk upload</TooltipContent>
+          </Tooltip>
+        )}
+
+        {canEdit && onBulkUpdate && config.id === 'escalations' && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={onBulkUpdate}
+                className="h-7 shrink-0 text-xs px-2"
+              >
+                <FilePenLine className="h-3.5 w-3.5 sm:mr-1.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Bulk update tickets</TooltipContent>
           </Tooltip>
         )}
 
