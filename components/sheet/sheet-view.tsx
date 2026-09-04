@@ -25,6 +25,36 @@ interface SheetViewProps {
   userRole: UserRole;
 }
 
+/** VSID is shipment_no. Reject AWB strings and non-integers from Excel cells. */
+function normalizeExcelVsid(value: unknown): number | null {
+  if (value === null || value === undefined || value === '') {
+    return null;
+  }
+
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value) || value <= 0) {
+      return null;
+    }
+    const asInt = Math.trunc(value);
+    if (Math.abs(value - asInt) > 0.0001) {
+      return null;
+    }
+    return asInt;
+  }
+
+  const raw = String(value).trim().replace(/,/g, '');
+  if (!/^\d+(\.0+)?$/.test(raw)) {
+    return null;
+  }
+
+  const asInt = Number(raw);
+  if (!Number.isSafeInteger(asInt) || asInt <= 0) {
+    return null;
+  }
+
+  return asInt;
+}
+
 export function SheetView({ config, userRole }: SheetViewProps) {
   // Get user session for personalized views
   const { data: session } = useSession();
@@ -72,6 +102,7 @@ export function SheetView({ config, userRole }: SheetViewProps) {
   } = useSheetStore();
   const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [showBulkUploadModal, setShowBulkUploadModal] = useState(false);
+  const [bulkUploadMode, setBulkUploadMode] = useState<'create' | 'update'>('create');
   const [showViewDialog, setShowViewDialog] = useState(false);
   const [editingView, setEditingView] = useState<UserView | null>(null);
   const [viewDialogMode, setViewDialogMode] = useState<'create' | 'edit'>('create');
@@ -1748,6 +1779,12 @@ export function SheetView({ config, userRole }: SheetViewProps) {
   };
 
   const handleBulkUpload = () => {
+    setBulkUploadMode('create');
+    setShowBulkUploadModal(true);
+  };
+
+  const handleBulkUpdate = () => {
+    setBulkUploadMode('update');
     setShowBulkUploadModal(true);
   };
 
@@ -2039,6 +2076,146 @@ export function SheetView({ config, userRole }: SheetViewProps) {
     }
   };
 
+  const processBulkUpdateFile = async (file: File) => {
+    try {
+      toast.loading('Reading Excel file...', { id: 'bulk-update' });
+
+      const arrayBuffer = await file.arrayBuffer();
+      const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+      const firstSheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[firstSheetName];
+      const jsonData = XLSX.utils.sheet_to_json(worksheet, {
+        header: 1,
+        defval: null,
+        raw: false,
+      }) as any[][];
+
+      if (jsonData.length < 2) {
+        toast.error('Excel file must have at least a header row and one data row', { id: 'bulk-update' });
+        throw new Error('Invalid file format');
+      }
+
+      const headers = jsonData[0].map((h: any) => String(h || '').toLowerCase().trim());
+
+      const vsidIndex = headers.findIndex((h: string) =>
+        h === 'vsid' ||
+        h === 'shipment_no' || h === 'shipment no' || h === 'shipmentno'
+      );
+      const emailSubjectIndex = headers.findIndex((h: string) =>
+        h === 'email_subject' || h === 'email subject' || h === 'emailsubject'
+      );
+      const opsRemarksIndex = headers.findIndex((h: string) =>
+        h === 'ops_remarks' || h === 'ops remarks' || h === 'ops remark' || h === 'opsremarks'
+      );
+
+      if (vsidIndex === -1) {
+        toast.error('Excel file must have a "VSID" column', { id: 'bulk-update' });
+        throw new Error('Missing identifier column');
+      }
+
+      if (emailSubjectIndex === -1 && opsRemarksIndex === -1) {
+        toast.error('Excel file must have an "Email Subject" or "OPS Remarks" column', { id: 'bulk-update' });
+        throw new Error('Missing update columns');
+      }
+
+      const uploadData: Array<{
+        shipment_no: number;
+        email_subject?: string | null;
+        ops_remarks?: string | null;
+      }> = [];
+
+      for (let i = 1; i < jsonData.length; i++) {
+        const row = jsonData[i];
+        const vsid = normalizeExcelVsid(row[vsidIndex]);
+
+        if (vsid === null) continue;
+
+        const record: {
+          shipment_no: number;
+          email_subject?: string | null;
+          ops_remarks?: string | null;
+        } = {
+          shipment_no: vsid,
+        };
+
+        if (emailSubjectIndex !== -1 && row[emailSubjectIndex]) {
+          record.email_subject = String(row[emailSubjectIndex]).trim() || null;
+        }
+
+        if (opsRemarksIndex !== -1 && row[opsRemarksIndex]) {
+          record.ops_remarks = String(row[opsRemarksIndex]).trim() || null;
+        }
+
+        if (!record.email_subject && !record.ops_remarks) continue;
+
+        uploadData.push(record);
+      }
+
+      if (uploadData.length === 0) {
+        toast.error('No valid data rows found in Excel file', { id: 'bulk-update' });
+        throw new Error('No valid data');
+      }
+
+      toast.loading(`Updating ${uploadData.length} tickets...`, { id: 'bulk-update' });
+
+      const response = await sheetApiService.bulkUpdateEscalations(uploadData);
+
+      const result = response?.data || {};
+      const updatedCount = typeof result.success_count === 'number'
+        ? result.success_count
+        : uploadData.length;
+      const rejectedRows = Object.entries(result.errors || {}).map(([row, reasons]) => ({
+        row: Number(row) + 1,
+        reason: Array.isArray(reasons) ? reasons.join(', ') : String(reasons),
+      }));
+
+      if (rejectedRows.length > 0) {
+        const preview = rejectedRows.slice(0, 5);
+        const remaining = rejectedRows.length - preview.length;
+        const description = (
+          <div className="mt-1 space-y-0.5 text-xs">
+            {preview.map((entry) => (
+              <div key={entry.row}>
+                Row {entry.row}: {entry.reason}
+              </div>
+            ))}
+            {remaining > 0 && <div>+{remaining} more</div>}
+          </div>
+        );
+
+        if (updatedCount > 0) {
+          toast.warning(
+            `Updated ${updatedCount} of ${uploadData.length} tickets - ${rejectedRows.length} skipped`,
+            { id: 'bulk-update', duration: 12000, description }
+          );
+        } else {
+          toast.error(
+            `No tickets were updated - all ${rejectedRows.length} rows were rejected`,
+            { id: 'bulk-update', duration: 12000, description }
+          );
+        }
+      } else {
+        toast.success(`Successfully updated ${updatedCount} tickets!`, { id: 'bulk-update' });
+      }
+
+      if (refetch) {
+        await refetch();
+      }
+
+    } catch (error: any) {
+      console.error('Bulk update error:', error);
+      const known =
+        error.message === 'Invalid file format' ||
+        error.message === 'Missing identifier column' ||
+        error.message === 'Missing update columns' ||
+        error.message === 'No valid data';
+      if (!known) {
+        toast.error(error.message || 'Failed to update tickets from Excel', { id: 'bulk-update' });
+      }
+      throw error;
+    }
+  };
+
   // Initialize column visibility (empty on server, loaded on client)
   const [columnVisibility, setColumnVisibility] = useState<Record<string, boolean>>({});
 
@@ -2250,6 +2427,7 @@ export function SheetView({ config, userRole }: SheetViewProps) {
           onAddRow={handleAddRow}
           onDeleteRows={handleDeleteRows}
           onBulkUpload={handleBulkUpload}
+          onBulkUpdate={handleBulkUpdate}
           onRefresh={handleRefresh}
           columnVisibility={columnVisibility}
           onColumnVisibilityChange={handleColumnVisibilityChange}
@@ -2276,7 +2454,8 @@ export function SheetView({ config, userRole }: SheetViewProps) {
         <BulkUploadModal
           isOpen={showBulkUploadModal}
           onClose={() => setShowBulkUploadModal(false)}
-          onUpload={processBulkUploadFile}
+          onUpload={bulkUploadMode === 'update' ? processBulkUpdateFile : processBulkUploadFile}
+          mode={bulkUploadMode}
         />
         
         <div className="flex-1 overflow-hidden animate-in fade-in duration-300">

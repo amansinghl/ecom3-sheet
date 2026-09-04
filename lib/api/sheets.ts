@@ -58,9 +58,9 @@ export interface LSDResponse {
 }
 
 /**
- * Outcome of a bulk escalation upload. `errors` is keyed by the 1-based index of
- * the data row that failed (add one for the header to get the Excel row number),
- * each holding the reasons that row was skipped.
+ * Outcome of a bulk escalation upload/update. `errors` is keyed by the 1-based
+ * index of the data row that failed (add one for the header to get the Excel
+ * row number), each holding the reasons that row was skipped.
  */
 export interface BulkUploadResult {
   status?: boolean;
@@ -203,6 +203,32 @@ class SheetApiService {
       return response;
     } catch (error) {
       console.error('Failed to bulk upload escalations:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Bulk update existing escalation tickets from Excel.
+   *
+   * Rows are identified by VSID (shipment_no) only. Email subject replaces
+   * the current value; OPS remarks are appended with a timestamp.
+   */
+  async bulkUpdateEscalations(
+    data: Array<{
+      shipment_no: number;
+      email_subject?: string | null;
+      ops_remarks?: string | null;
+    }>
+  ): Promise<ApiResponse<BulkUploadResult>> {
+    try {
+      const response = await apiClient.post<ApiResponse<BulkUploadResult>>(
+        '/sheets/escalation/bulk-update-escalations',
+        data
+      );
+
+      return response;
+    } catch (error) {
+      console.error('Failed to bulk update escalations:', error);
       throw error;
     }
   }
