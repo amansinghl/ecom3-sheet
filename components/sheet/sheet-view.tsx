@@ -2012,6 +2012,12 @@ export function SheetView({ config, userRole }: SheetViewProps) {
       const createdCount = typeof result.success_count === 'number'
         ? result.success_count
         : uploadData.length;
+      // Rows matching an existing shipment and subject request are updated in
+      // place rather than raised again, so name both outcomes.
+      const updatedCount = typeof result.updated_count === 'number' ? result.updated_count : 0;
+      const outcome = updatedCount > 0
+        ? `${createdCount - updatedCount} raised, ${updatedCount} updated`
+        : `${createdCount} raised`;
       // Keys are 1-based data rows; +1 for the header gives the Excel row number.
       const rejectedRows = Object.entries(result.errors || {}).map(([row, reasons]) => ({
         row: Number(row) + 1,
@@ -2034,7 +2040,7 @@ export function SheetView({ config, userRole }: SheetViewProps) {
 
         if (createdCount > 0) {
           toast.warning(
-            `Uploaded ${createdCount} of ${uploadData.length} records - ${rejectedRows.length} skipped`,
+            `Processed ${createdCount} of ${uploadData.length} records (${outcome}) - ${rejectedRows.length} skipped`,
             { id: 'bulk-upload', duration: 12000, description }
           );
         } else {
@@ -2044,7 +2050,7 @@ export function SheetView({ config, userRole }: SheetViewProps) {
           );
         }
       } else {
-        toast.success(`Successfully uploaded ${createdCount} records!`, { id: 'bulk-upload' });
+        toast.success(`Successfully processed ${createdCount} records (${outcome})`, { id: 'bulk-upload' });
       }
 
       // Refresh the data after successful upload
