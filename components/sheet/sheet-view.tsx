@@ -1861,8 +1861,15 @@ export function SheetView({ config, userRole }: SheetViewProps) {
         throw new Error('Invalid file format');
       }
 
-      // Get headers from first row
-      const headers = jsonData[0].map((h: any) => String(h || '').toLowerCase().trim());
+      // Get headers from first row. The sample sheet spells out behaviour in
+      // brackets ("OPS Remarks (Appended with timestamp)"), so match on the
+      // header with any bracketed note stripped.
+      const headers = jsonData[0].map((h: any) =>
+        String(h || '')
+          .toLowerCase()
+          .replace(/\([^)]*\)/g, '')
+          .trim()
+      );
       
       // Find column indices
       // The downloadable sample labels this column "AWB No OR VSID", so accept
@@ -1880,6 +1887,12 @@ export function SheetView({ config, userRole }: SheetViewProps) {
       const sourceOfComplaintIndex = headers.findIndex((h: string) => 
         h === 'source_of_complaint' || h === 'source of complaint' || h === 'Source of Complaint'
       )
+      const emailSubjectIndex = headers.findIndex((h: string) =>
+        h === 'email_subject' || h === 'email subject' || h === 'emailsubject'
+      );
+      const opsRemarksIndex = headers.findIndex((h: string) =>
+        h === 'ops_remarks' || h === 'ops remarks' || h === 'opsremarks'
+      );
 
       if (shipmentNoIndex === -1) {
         toast.error('Excel file must have a "shipment_no" column', { id: 'bulk-upload' });
@@ -1905,6 +1918,8 @@ export function SheetView({ config, userRole }: SheetViewProps) {
         manual_case?: string | null;
         notes?: string | null;
         source_of_complaint?: string | null;
+        email_subject?: string | null;
+        ops_remarks?: string | null;
       }> = [];
 
       // Process data rows (skip header row)
@@ -1938,6 +1953,15 @@ export function SheetView({ config, userRole }: SheetViewProps) {
 
         if (sourceOfComplaintIndex !== -1 && row[sourceOfComplaintIndex]) {
           record.source_of_complaint = String(row[sourceOfComplaintIndex]).trim() || null;
+        }
+
+        if (emailSubjectIndex !== -1 && row[emailSubjectIndex]) {
+          record.email_subject = String(row[emailSubjectIndex]).trim() || null;
+        }
+
+        // Timestamped and appended server side, so send the raw text.
+        if (opsRemarksIndex !== -1 && row[opsRemarksIndex]) {
+          record.ops_remarks = String(row[opsRemarksIndex]).trim() || null;
         }
 
         uploadData.push(record);
