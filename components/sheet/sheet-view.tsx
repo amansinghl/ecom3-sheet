@@ -10,49 +10,32 @@ import { TableSkeleton } from './table-skeleton';
 import { ViewsSidebar } from './views-sidebar';
 import { ViewCreateDialog } from './view-create-dialog';
 import { HeroSection } from './hero-section';
-import { BulkUploadModal } from './bulk-upload-modal';
+import { BulkUploadModal, BulkUploadMode } from './bulk-upload-modal';
+import { notifyBulkOutcome, RejectedRowList } from './bulk-outcome';
 import { useSheetStore } from '@/lib/store/sheet-store';
 import { useKeyboardShortcuts } from '@/hooks/use-keyboard-shortcuts';
 import { loadColumnVisibility, saveColumnVisibility } from '@/lib/utils/storage';
-import { useSheetData } from '@/hooks/use-sheet-data';
+import { useSheetData, sheetQueryKey as buildSheetQueryKey } from '@/hooks/use-sheet-data';
 import { toast } from 'sonner';
-import { sheetApiService } from '@/lib/api/sheets';
-import * as XLSX from 'xlsx';
+import { sheetApiService, BulkUploadRow, BulkUpdateRow, BulkUpdatedTicket } from '@/lib/api/sheets';
+import {
+  BulkFileError,
+  KB_SHEET_COLUMNS,
+  cellIdentifier,
+  cellText,
+  findColumnIndex,
+  headerlessColumnIndexes,
+  normalizeHeader,
+  readFirstSheet,
+  toRejectedRows,
+  type RejectedRow,
+} from '@/lib/utils/bulk-excel';
+import { latestOpsRemarkEntry } from '@/lib/utils/ops-remarks';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 interface SheetViewProps {
   config: SheetConfig;
   userRole: UserRole;
-}
-
-/** VSID is shipment_no. Reject AWB strings and non-integers from Excel cells. */
-function normalizeExcelVsid(value: unknown): number | null {
-  if (value === null || value === undefined || value === '') {
-    return null;
-  }
-
-  if (typeof value === 'number') {
-    if (!Number.isFinite(value) || value <= 0) {
-      return null;
-    }
-    const asInt = Math.trunc(value);
-    if (Math.abs(value - asInt) > 0.0001) {
-      return null;
-    }
-    return asInt;
-  }
-
-  const raw = String(value).trim().replace(/,/g, '');
-  if (!/^\d+(\.0+)?$/.test(raw)) {
-    return null;
-  }
-
-  const asInt = Number(raw);
-  if (!Number.isSafeInteger(asInt) || asInt <= 0) {
-    return null;
-  }
-
-  return asInt;
 }
 
 export function SheetView({ config, userRole }: SheetViewProps) {
@@ -102,13 +85,16 @@ export function SheetView({ config, userRole }: SheetViewProps) {
   } = useSheetStore();
   const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [showBulkUploadModal, setShowBulkUploadModal] = useState(false);
-  const [bulkUploadMode, setBulkUploadMode] = useState<'create' | 'update'>('create');
+  const [bulkUploadMode, setBulkUploadMode] = useState<BulkUploadMode>('create');
   const [showViewDialog, setShowViewDialog] = useState(false);
   const [editingView, setEditingView] = useState<UserView | null>(null);
   const [viewDialogMode, setViewDialogMode] = useState<'create' | 'edit'>('create');
   const toolbarRef = useRef<ToolbarRef>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
+  // The escalation sheet is served under the API's name, not the config id.
+  const sheetName = config.id === 'escalations' ? 'escalation' : config.id;
+  const sheetQueryKey = buildSheetQueryKey(sheetName);
 
   // Pause auto-refetch while user is editing OR has rows selected.
   // Why: poll mid-action swaps row refs/ids, which causes border flicker
@@ -120,13 +106,10 @@ export function SheetView({ config, userRole }: SheetViewProps) {
     isError,
     error,
     refetch
-  } = useSheetData(
-    config.id === 'escalations' ? 'escalation' : config.id,
-    {
-      enabled: config.id !== 'portfolio', // Don't fetch for portfolio sheet
-      isEditing: pauseRefetch,
-    }
-  );
+  } = useSheetData(sheetName, {
+    enabled: config.id !== 'portfolio', // Don't fetch for portfolio sheet
+    isEditing: pauseRefetch,
+  });
 
   // N8N sheet only: pull the escalation sheet as well, so rows whose shipment
   // already has an OPEN escalation can be highlighted in yellow.
@@ -1325,7 +1308,15 @@ export function SheetView({ config, userRole }: SheetViewProps) {
               }
             }
           } else if (config.id === 'escalations') {
-            await sheetApiService.updateEscalationEntries(actualRowId, updatePayload);
+            const result = await sheetApiService.updateEscalationEntries(actualRowId, updatePayload);
+            const stampedRemarks = result?.data?.ops_remarks;
+            if (columnId === 'ops_remarks' && typeof stampedRemarks === 'string') {
+              setData((prev) =>
+                prev.map((row) =>
+                  String(row.id) === rowIdString ? { ...row, ops_remarks: stampedRemarks } : row
+                )
+              );
+            }
           } else if (config.id === 'leads') {
             await sheetApiService.updateLeadEntries(actualRowId, updatePayload);
           }
@@ -1796,11 +1787,7 @@ export function SheetView({ config, userRole }: SheetViewProps) {
     const sheetDisplayName = config.id === 'escalations' ? 'escalation' : config.id === 'lsd' ? 'LSD' : 'sheet';
     toast.loading(`Refreshing ${sheetDisplayName} sheet...`, { id: 'refresh' });
     
-    // Invalidate query cache to force fresh fetch
-    const sheetName = config.id === 'escalations' ? 'escalation' : config.id;
-    await queryClient.invalidateQueries({ queryKey: ['sheet', sheetName] });
-    
-    // Refresh the data
+    // refetch() always hits the API, regardless of staleness
     if (refetch) {
       try {
         await refetch();
@@ -1873,346 +1860,266 @@ export function SheetView({ config, userRole }: SheetViewProps) {
     toast.success(`Redo: Restored ${columnLabel}`, { duration: 2000 });
   };
 
+  /**
+   * Parse a bulk sheet down to the header row and the non-empty data rows.
+   * Shared by upload and update; the toast id decides which flow is talking.
+   */
+  const readBulkSheet = async (file: File, toastId: string) => {
+    toast.loading('Reading Excel file...', { id: toastId });
+
+    const rows = await readFirstSheet(file);
+    if (rows.length < 2) {
+      toast.error('Excel file must have at least a header row and one data row', { id: toastId });
+      throw new BulkFileError('Invalid file format');
+    }
+
+    return {
+      headers: rows[0].map(normalizeHeader),
+      // Pair each data row with its Excel row number (header is row 1) so the
+      // API's positional errors can be reported against the sheet the user sees.
+      dataRows: rows.slice(1).map((cells, index) => ({ cells, excelRow: index + 2 })),
+    };
+  };
+
+  /** Toast for anything that was not already reported, then let the modal know. */
+  const failBulkFlow = (error: any, toastId: string, fallback: string): never => {
+    console.error(`[${toastId}]`, error);
+    if (!(error instanceof BulkFileError)) {
+      toast.error(error?.message || error?.error || fallback, { id: toastId });
+    }
+    throw error;
+  };
+
+  /**
+   * KB bulk upload: creates escalations from "AWB No OR VSID", "Manual Case",
+   * "Notes" and "Source of Complaint". "Email Subject" / "OPS Remarks" are
+   * optional so one file can seed a ticket and its first remark together.
+   */
   const processBulkUploadFile = async (file: File) => {
+    const toastId = 'bulk-upload';
+
     try {
-      toast.loading('Reading Excel file...', { id: 'bulk-upload' });
+      const { headers, dataRows } = await readBulkSheet(file, toastId);
 
-      // Read the file as array buffer
-      const arrayBuffer = await file.arrayBuffer();
-      
-      // Parse the Excel file
-      const workbook = XLSX.read(arrayBuffer, { type: 'array' });
-      
-      // Get the first sheet
-      const firstSheetName = workbook.SheetNames[0];
-      const worksheet = workbook.Sheets[firstSheetName];
-      
-      // Convert sheet to JSON
-      const jsonData = XLSX.utils.sheet_to_json(worksheet, { 
-        header: 1, // Use array format to preserve column order
-        defval: null // Use null for empty cells
-      }) as any[][];
-
-      if (jsonData.length < 2) {
-        toast.error('Excel file must have at least a header row and one data row', { id: 'bulk-upload' });
-        throw new Error('Invalid file format');
+      const identifierIndex = findColumnIndex(headers, KB_SHEET_COLUMNS.identifier);
+      if (identifierIndex === -1) {
+        toast.error('Excel file must have an "AWB No OR VSID" column', { id: toastId });
+        throw new BulkFileError('Missing identifier column');
       }
+      const manualCaseIndex = findColumnIndex(headers, KB_SHEET_COLUMNS.manualCase);
 
-      // Get headers from first row
-      const headers = jsonData[0].map((h: any) => String(h || '').toLowerCase().trim());
-      
-      // Find column indices
-      // The downloadable sample labels this column "AWB No OR VSID", so accept
-      // that alongside the older shipment_no headers.
-      const shipmentNoIndex = headers.findIndex((h: string) => 
-        h === 'shipment_no' || h === 'shipment no' || h === 'shipmentno' ||
-        h === 'awb no or vsid' || h === 'awb_no_or_vsid'
-      );
-      const manualCaseIndex = headers.findIndex((h: string) => 
-        h === 'manual_case' || h === 'manual case' || h === 'manualcase'
-      );
-      const notesIndex = headers.findIndex((h: string) => 
-        h === 'notes' || h === 'Notes'
-      );
-      const sourceOfComplaintIndex = headers.findIndex((h: string) => 
-        h === 'source_of_complaint' || h === 'source of complaint' || h === 'Source of Complaint'
-      )
-
-      if (shipmentNoIndex === -1) {
-        toast.error('Excel file must have a "shipment_no" column', { id: 'bulk-upload' });
-        throw new Error('Missing shipment_no column');
-      }
-
-      // Manual Case must match one of the configured options exactly - a typo or
-      // a stale value would otherwise be created on the backend as-is.
-      // Matched case-insensitively and normalised back to the configured value,
-      // so a sample sheet whose casing drifts from the config still uploads.
+      // Manual Case must match one of the configured options - a typo or a
+      // stale value would otherwise be created on the backend as-is. Matched
+      // case-insensitively and normalised back to the configured spelling.
       const manualCaseColumn = config.columns.find((col) => col.id === 'manual_case');
-      const allowedManualCases = new Map<string, string>(
-        (manualCaseColumn?.options || []).map((opt) => [opt.value.toLowerCase(), opt.value])
+      const allowedManualCases = new Map(
+        (manualCaseColumn?.options ?? []).map((opt) => [opt.value.toLowerCase(), opt.value])
       );
 
+      // Free-text columns copied through as-is when present. A missing column
+      // has index -1, which reads as an empty cell.
+      const textColumns: Array<[keyof BulkUploadRow, number]> = [
+        ['notes', findColumnIndex(headers, KB_SHEET_COLUMNS.notes)],
+        ['source_of_complaint', findColumnIndex(headers, KB_SHEET_COLUMNS.sourceOfComplaint)],
+        ['email_subject', findColumnIndex(headers, KB_SHEET_COLUMNS.emailSubject)],
+        ['ops_remarks', findColumnIndex(headers, KB_SHEET_COLUMNS.opsRemarks)],
+      ];
+
+      const uploadData: BulkUploadRow[] = [];
+      const excelRows: number[] = [];
       // Collected across the whole file: if anything is invalid the upload is
       // rejected entirely, so no entry is created.
-      const invalidManualCases: Array<{ row: number; value: string }> = [];
+      const invalidManualCases: RejectedRow[] = [];
 
-      // Convert rows to the required format
-      const uploadData: Array<{
-        shipment_no: string | number;
-        manual_case?: string | null;
-        notes?: string | null;
-        source_of_complaint?: string | null;
-      }> = [];
+      for (const { cells, excelRow } of dataRows) {
+        const identifier = cellIdentifier(cells[identifierIndex]);
+        if (identifier === null) continue;
 
-      // Process data rows (skip header row)
-      for (let i = 1; i < jsonData.length; i++) {
-        const row = jsonData[i];
-        const shipmentNo = row[shipmentNoIndex];
-        
-        // Skip empty rows
-        if (!shipmentNo) continue;
+        const record: BulkUploadRow = { shipment_no: identifier };
 
-        const record: any = {
-          shipment_no: shipmentNo,
-        };
-
-        if (manualCaseIndex !== -1 && row[manualCaseIndex]) {
-          const manualCase = String(row[manualCaseIndex]).trim();
-
-          const canonicalManualCase = allowedManualCases.get(manualCase.toLowerCase());
-
-          if (manualCase && allowedManualCases.size > 0 && !canonicalManualCase) {
-            // +1 because jsonData[0] is the header row (spreadsheet row 1)
-            invalidManualCases.push({ row: i + 1, value: manualCase });
+        const manualCase = cellText(cells[manualCaseIndex]);
+        if (manualCase) {
+          const canonical = allowedManualCases.get(manualCase.toLowerCase());
+          if (!canonical && allowedManualCases.size > 0) {
+            invalidManualCases.push({ row: excelRow, reason: `"${manualCase}"` });
           }
-
-          record.manual_case = canonicalManualCase || manualCase || null;
+          record.manual_case = canonical ?? manualCase;
         }
 
-        if (notesIndex !== -1 && row[notesIndex]) {
-          record.notes = String(row[notesIndex]).trim() || null;
-        }
-
-        if (sourceOfComplaintIndex !== -1 && row[sourceOfComplaintIndex]) {
-          record.source_of_complaint = String(row[sourceOfComplaintIndex]).trim() || null;
+        for (const [field, index] of textColumns) {
+          const text = cellText(cells[index]);
+          if (text) record[field] = text;
         }
 
         uploadData.push(record);
+        excelRows.push(excelRow);
       }
 
-      // Reject the whole file so a partially valid upload never half-applies
       if (invalidManualCases.length > 0) {
-        const preview = invalidManualCases.slice(0, 5);
-        const remaining = invalidManualCases.length - preview.length;
-
         toast.error(
           `Invalid Manual Case in ${invalidManualCases.length} row${invalidManualCases.length === 1 ? '' : 's'} - nothing was uploaded`,
           {
-            id: 'bulk-upload',
+            id: toastId,
             duration: 12000,
             description: (
-              <div className="mt-1 space-y-0.5 text-xs">
-                {preview.map((entry) => (
-                  <div key={entry.row}>
-                    Row {entry.row}: &quot;{entry.value}&quot;
-                  </div>
-                ))}
-                {remaining > 0 && <div>+{remaining} more</div>}
-                <div className="pt-1">
-                  Manual Case must match a value from the dropdown exactly.
-                </div>
-              </div>
+              <RejectedRowList
+                rows={invalidManualCases}
+                footer="Manual Case must match a value from the dropdown exactly."
+              />
             ),
           }
         );
-        throw new Error('Invalid manual case values');
+        throw new BulkFileError('Invalid manual case values');
       }
 
       if (uploadData.length === 0) {
-        toast.error('No valid data rows found in Excel file', { id: 'bulk-upload' });
-        throw new Error('No valid data');
+        toast.error('No valid data rows found in Excel file', { id: toastId });
+        throw new BulkFileError('No valid data');
       }
 
-      toast.loading(`Uploading ${uploadData.length} records...`, { id: 'bulk-upload' });
+      toast.loading(`Uploading ${uploadData.length} records...`, { id: toastId });
 
-      // Call the bulk upload API
-      const response = await sheetApiService.bulkUploadEscalations(uploadData);
+      const result = (await sheetApiService.bulkUploadEscalations(uploadData)).data ?? {};
+      const createdCount = result.success_count ?? uploadData.length;
 
-      // Rows are validated independently server-side, so a 200 does not mean
-      // every row landed - report what the API actually created rather than
-      // what was sent, and name the rows it rejected.
-      const result = response?.data || {};
-      const createdCount = typeof result.success_count === 'number'
-        ? result.success_count
-        : uploadData.length;
-      // Keys are 1-based data rows; +1 for the header gives the Excel row number.
-      const rejectedRows = Object.entries(result.errors || {}).map(([row, reasons]) => ({
-        row: Number(row) + 1,
-        reason: Array.isArray(reasons) ? reasons.join(', ') : String(reasons),
-      }));
+      notifyBulkOutcome({
+        toastId,
+        sent: uploadData.length,
+        succeeded: createdCount,
+        rejected: toRejectedRows(result.errors, excelRows),
+        verb: 'Uploaded',
+        noun: 'records',
+        success: { title: `Successfully uploaded ${createdCount} records!` },
+      });
 
-      if (rejectedRows.length > 0) {
-        const preview = rejectedRows.slice(0, 5);
-        const remaining = rejectedRows.length - preview.length;
-        const description = (
-          <div className="mt-1 space-y-0.5 text-xs">
-            {preview.map((entry) => (
-              <div key={entry.row}>
-                Row {entry.row}: {entry.reason}
-              </div>
-            ))}
-            {remaining > 0 && <div>+{remaining} more</div>}
-          </div>
-        );
-
-        if (createdCount > 0) {
-          toast.warning(
-            `Uploaded ${createdCount} of ${uploadData.length} records - ${rejectedRows.length} skipped`,
-            { id: 'bulk-upload', duration: 12000, description }
-          );
-        } else {
-          toast.error(
-            `No records were uploaded - all ${rejectedRows.length} rows were rejected`,
-            { id: 'bulk-upload', duration: 12000, description }
-          );
-        }
-      } else {
-        toast.success(`Successfully uploaded ${createdCount} records!`, { id: 'bulk-upload' });
-      }
-
-      // Refresh the data after successful upload
-      if (refetch) {
-        await refetch();
-      }
-
-    } catch (error: any) {
-      console.error('Bulk upload error:', error);
-      if (!error.message || error.message === 'Invalid file format' || error.message === 'Missing shipment_no column' || error.message === 'No valid data' || error.message === 'Invalid manual case values') {
-        // Error already shown in toast
-        throw error;
-      }
-      toast.error(error.message || 'Failed to upload Excel file', { id: 'bulk-upload' });
-      throw error;
+      await queryClient.invalidateQueries({ queryKey: sheetQueryKey });
+    } catch (error) {
+      failBulkFlow(error, toastId, 'Failed to upload Excel file');
     }
   };
 
+  /**
+   * Overlay the values the API just wrote onto the cached sheet; the grid picks
+   * them up through the apiData effect. Keyed by ticket id: several tickets
+   * can share a shipment, each with its own remarks.
+   */
+  const patchCachedTickets = (updated: BulkUpdatedTicket[]) => {
+    if (updated.length === 0) return;
+
+    const byId = new Map(updated.map((ticket) => [String(ticket.id), ticket]));
+    queryClient.setQueryData<RowData[]>(sheetQueryKey, (rows) =>
+      rows?.map((row) => {
+        const ticket = byId.get(String(row.id));
+        return ticket
+          ? {
+              ...row,
+              ops_remarks: ticket.ops_remarks ?? row.ops_remarks,
+              email_subject: ticket.email_subject ?? row.email_subject,
+            }
+          : row;
+      })
+    );
+  };
+
+  /**
+   * KB bulk update: "AWB OR VSID", "Email Subject" (replaces) and "OPS Remarks"
+   * (prepended newest-first as remark [Name  23 Sep, 12:00 pm] by the API).
+   *
+   * Headers are matched by name, falling back to the sample's column order so
+   * a renamed header does not block the file.
+   */
   const processBulkUpdateFile = async (file: File) => {
+    const toastId = 'bulk-update';
+
     try {
-      toast.loading('Reading Excel file...', { id: 'bulk-update' });
+      const { headers, dataRows } = await readBulkSheet(file, toastId);
 
-      const arrayBuffer = await file.arrayBuffer();
-      const workbook = XLSX.read(arrayBuffer, { type: 'array' });
-      const firstSheetName = workbook.SheetNames[0];
-      const worksheet = workbook.Sheets[firstSheetName];
-      const jsonData = XLSX.utils.sheet_to_json(worksheet, {
-        header: 1,
-        defval: null,
-        raw: false,
-      }) as any[][];
+      // Resolve every column by name first, then fall back to the sample's
+      // order for the ones still missing - never onto a column another field
+      // already claimed (a sheet without "Email Subject" must not send its
+      // remarks as the subject).
+      let identifierIndex = findColumnIndex(headers, KB_SHEET_COLUMNS.identifier);
+      let emailSubjectIndex = findColumnIndex(headers, KB_SHEET_COLUMNS.emailSubject);
+      let opsRemarksIndex = findColumnIndex(headers, KB_SHEET_COLUMNS.opsRemarks);
+      const taken = () => [identifierIndex, emailSubjectIndex, opsRemarksIndex];
+      if (identifierIndex === -1) identifierIndex = findColumnIndex(headers, KB_SHEET_COLUMNS.identifier, 0, taken());
+      if (emailSubjectIndex === -1) emailSubjectIndex = findColumnIndex(headers, KB_SHEET_COLUMNS.emailSubject, 1, taken());
+      if (opsRemarksIndex === -1) opsRemarksIndex = findColumnIndex(headers, KB_SHEET_COLUMNS.opsRemarks, 2, taken());
 
-      if (jsonData.length < 2) {
-        toast.error('Excel file must have at least a header row and one data row', { id: 'bulk-update' });
-        throw new Error('Invalid file format');
+      if (identifierIndex === -1) {
+        toast.error('Excel file must have an "AWB OR VSID" column', { id: toastId });
+        throw new BulkFileError('Missing identifier column');
       }
-
-      const headers = jsonData[0].map((h: any) => String(h || '').toLowerCase().trim());
-
-      const vsidIndex = headers.findIndex((h: string) =>
-        h === 'vsid' ||
-        h === 'shipment_no' || h === 'shipment no' || h === 'shipmentno'
-      );
-      const emailSubjectIndex = headers.findIndex((h: string) =>
-        h === 'email_subject' || h === 'email subject' || h === 'emailsubject'
-      );
-      const opsRemarksIndex = headers.findIndex((h: string) =>
-        h === 'ops_remarks' || h === 'ops remarks' || h === 'ops remark' || h === 'opsremarks'
-      );
-
-      if (vsidIndex === -1) {
-        toast.error('Excel file must have a "VSID" column', { id: 'bulk-update' });
-        throw new Error('Missing identifier column');
-      }
-
       if (emailSubjectIndex === -1 && opsRemarksIndex === -1) {
-        toast.error('Excel file must have an "Email Subject" or "OPS Remarks" column', { id: 'bulk-update' });
-        throw new Error('Missing update columns');
+        toast.error('Excel file must have an "Email Subject" or "OPS Remarks" column', { id: toastId });
+        throw new BulkFileError('Missing update columns');
       }
 
-      const uploadData: Array<{
-        shipment_no: number;
-        email_subject?: string | null;
-        ops_remarks?: string | null;
-      }> = [];
+      // A remark typed past the "OPS Remarks" header (an unlabelled column to
+      // the right) still counts as the remark when the labelled cell is empty.
+      const spilloverIndexes = headerlessColumnIndexes(headers, taken());
 
-      for (let i = 1; i < jsonData.length; i++) {
-        const row = jsonData[i];
-        const vsid = normalizeExcelVsid(row[vsidIndex]);
+      const uploadData: BulkUpdateRow[] = [];
+      const excelRows: number[] = [];
 
-        if (vsid === null) continue;
+      for (const { cells, excelRow } of dataRows) {
+        const identifier = cellIdentifier(cells[identifierIndex]);
+        if (identifier === null) continue;
 
-        const record: {
-          shipment_no: number;
-          email_subject?: string | null;
-          ops_remarks?: string | null;
-        } = {
-          shipment_no: vsid,
-        };
+        const emailSubject = cellText(cells[emailSubjectIndex]);
+        const opsRemarks = cellText(cells[opsRemarksIndex])
+          || spilloverIndexes.map((index) => cellText(cells[index])).filter(Boolean).join(' ');
+        // Nothing to change on this row - the API would reject it anyway.
+        if (!emailSubject && !opsRemarks) continue;
 
-        if (emailSubjectIndex !== -1 && row[emailSubjectIndex]) {
-          record.email_subject = String(row[emailSubjectIndex]).trim() || null;
-        }
-
-        if (opsRemarksIndex !== -1 && row[opsRemarksIndex]) {
-          record.ops_remarks = String(row[opsRemarksIndex]).trim() || null;
-        }
-
-        if (!record.email_subject && !record.ops_remarks) continue;
+        const record: BulkUpdateRow = { shipment_no: identifier };
+        if (emailSubject) record.email_subject = emailSubject;
+        if (opsRemarks) record.ops_remarks = opsRemarks;
 
         uploadData.push(record);
+        excelRows.push(excelRow);
       }
 
       if (uploadData.length === 0) {
-        toast.error('No valid data rows found in Excel file', { id: 'bulk-update' });
-        throw new Error('No valid data');
+        toast.error('No rows with an AWB/VSID and something to update were found', { id: toastId });
+        throw new BulkFileError('No valid data');
       }
 
-      toast.loading(`Updating ${uploadData.length} tickets...`, { id: 'bulk-update' });
+      toast.loading(`Updating ${uploadData.length} rows...`, { id: toastId });
 
-      const response = await sheetApiService.bulkUpdateEscalations(uploadData);
+      const result = (await sheetApiService.bulkUpdateEscalations(uploadData)).data ?? {};
+      const updatedTickets = result.updated ?? [];
+      const updatedCount = result.success_count ?? uploadData.length;
+      const ticketCount = result.updated_ticket_count ?? updatedTickets.length;
 
-      const result = response?.data || {};
-      const updatedCount = typeof result.success_count === 'number'
-        ? result.success_count
-        : uploadData.length;
-      const rejectedRows = Object.entries(result.errors || {}).map(([row, reasons]) => ({
-        row: Number(row) + 1,
-        reason: Array.isArray(reasons) ? reasons.join(', ') : String(reasons),
-      }));
+      // The first stamped entry is the remark this update prepended.
+      const preview = updatedTickets
+        .slice(0, 3)
+        .map((ticket) => {
+          const latest = latestOpsRemarkEntry(ticket.ops_remarks ?? '');
+          return `${ticket.shipment_no}: ${latest || ticket.email_subject || 'updated'}`;
+        })
+        .join('\n');
 
-      if (rejectedRows.length > 0) {
-        const preview = rejectedRows.slice(0, 5);
-        const remaining = rejectedRows.length - preview.length;
-        const description = (
-          <div className="mt-1 space-y-0.5 text-xs">
-            {preview.map((entry) => (
-              <div key={entry.row}>
-                Row {entry.row}: {entry.reason}
-              </div>
-            ))}
-            {remaining > 0 && <div>+{remaining} more</div>}
-          </div>
-        );
+      notifyBulkOutcome({
+        toastId,
+        sent: uploadData.length,
+        succeeded: updatedCount,
+        rejected: toRejectedRows(result.errors, excelRows),
+        verb: 'Updated',
+        noun: 'rows',
+        success: {
+          title: `Updated ${ticketCount} ticket${ticketCount === 1 ? '' : 's'}`,
+          description: preview || 'OPS Remarks appended with time and updater name',
+        },
+      });
 
-        if (updatedCount > 0) {
-          toast.warning(
-            `Updated ${updatedCount} of ${uploadData.length} tickets - ${rejectedRows.length} skipped`,
-            { id: 'bulk-update', duration: 12000, description }
-          );
-        } else {
-          toast.error(
-            `No tickets were updated - all ${rejectedRows.length} rows were rejected`,
-            { id: 'bulk-update', duration: 12000, description }
-          );
-        }
-      } else {
-        toast.success(`Successfully updated ${updatedCount} tickets!`, { id: 'bulk-update' });
-      }
-
-      if (refetch) {
-        await refetch();
-      }
-
-    } catch (error: any) {
-      console.error('Bulk update error:', error);
-      const known =
-        error.message === 'Invalid file format' ||
-        error.message === 'Missing identifier column' ||
-        error.message === 'Missing update columns' ||
-        error.message === 'No valid data';
-      if (!known) {
-        toast.error(error.message || 'Failed to update tickets from Excel', { id: 'bulk-update' });
-      }
-      throw error;
+      // Show the new remarks straight away; the refetch then confirms them
+      // along with the audit fields the API stamped (updated_at, modified by).
+      patchCachedTickets(updatedTickets);
+      await queryClient.invalidateQueries({ queryKey: sheetQueryKey });
+    } catch (error) {
+      failBulkFlow(error, toastId, 'Failed to update tickets from Excel');
     }
   };
 

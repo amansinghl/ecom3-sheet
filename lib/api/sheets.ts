@@ -57,10 +57,36 @@ export interface LSDResponse {
   [key: string]: any;
 }
 
+/** Row of the KB bulk upload sheet; `shipment_no` is an AWB or VSID. */
+export interface BulkUploadRow {
+  shipment_no: string | number;
+  manual_case?: string;
+  notes?: string;
+  source_of_complaint?: string;
+  email_subject?: string;
+  ops_remarks?: string;
+}
+
+/** Row of the KB bulk update sheet; at least one of the two fields is set. */
+export interface BulkUpdateRow {
+  shipment_no: string | number;
+  email_subject?: string;
+  ops_remarks?: string;
+}
+
+/** Ticket as written by a bulk update, with the final stored values. */
+export interface BulkUpdatedTicket {
+  id: number | string;
+  shipment_no?: string | number;
+  awb_no?: string | number;
+  ops_remarks?: string | null;
+  email_subject?: string | null;
+}
+
 /**
  * Outcome of a bulk escalation upload/update. `errors` is keyed by the 1-based
- * index of the data row that failed (add one for the header to get the Excel
- * row number), each holding the reasons that row was skipped.
+ * position of the row in the submitted payload (not the Excel row), each
+ * holding the reasons that row was skipped.
  */
 export interface BulkUploadResult {
   status?: boolean;
@@ -69,6 +95,9 @@ export interface BulkUploadResult {
   total_count?: number;
   error_count?: number;
   errors?: Record<string, string[]>;
+  /** Update only: tickets touched (one row can match several tickets). */
+  updated_ticket_count?: number;
+  updated?: BulkUpdatedTicket[];
 }
 
 /**
@@ -186,14 +215,7 @@ class SheetApiService {
    * @returns API response with per-row outcome
    * @throws Error if API request fails
    */
-  async bulkUploadEscalations(
-    data: Array<{
-      shipment_no: string | number;
-      manual_case?: string | null;
-      followup_remarks?: string | null;
-      [key: string]: any;
-    }>
-  ): Promise<ApiResponse<BulkUploadResult>> {
+  async bulkUploadEscalations(data: BulkUploadRow[]): Promise<ApiResponse<BulkUploadResult>> {
     try {
       const response = await apiClient.post<ApiResponse<BulkUploadResult>>(
         '/sheets/escalation/bulk-upload-escalations',
@@ -210,16 +232,10 @@ class SheetApiService {
   /**
    * Bulk update existing escalation tickets from Excel.
    *
-   * Rows are identified by VSID (shipment_no) only. Email subject replaces
-   * the current value; OPS remarks are appended with a timestamp.
+   * Rows are identified by AWB or VSID. Email subject replaces the current
+   * value; OPS remarks are prepended newest-first as remark [Name  23 Sep, 12:00 pm].
    */
-  async bulkUpdateEscalations(
-    data: Array<{
-      shipment_no: number;
-      email_subject?: string | null;
-      ops_remarks?: string | null;
-    }>
-  ): Promise<ApiResponse<BulkUploadResult>> {
+  async bulkUpdateEscalations(data: BulkUpdateRow[]): Promise<ApiResponse<BulkUploadResult>> {
     try {
       const response = await apiClient.post<ApiResponse<BulkUploadResult>>(
         '/sheets/escalation/bulk-update-escalations',

@@ -8,6 +8,9 @@ import { useSession } from 'next-auth/react';
 import { RowData } from '@/types';
 import { sheetApiService } from '@/lib/api/sheets';
 
+/** Cache key for a sheet, shared by the fetch hook and any cache patch/invalidate. */
+export const sheetQueryKey = (sheetName: string) => ['sheet', sheetName] as const;
+
 export interface UseSheetDataOptions {
   enabled?: boolean;
   retry?: number | false;
@@ -83,7 +86,7 @@ export function useSheetData(
   const isSessionReady = status !== 'loading';
   
   return useQuery({
-    queryKey: ['sheet', sheetName],
+    queryKey: sheetQueryKey(sheetName),
     queryFn: async () => {
       const data = await sheetApiService.getSheetData(sheetName);
       return data;

@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Upload, Download } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import * as XLSX from 'xlsx';
+import { KB_UPDATE_SAMPLE_HEADERS } from '@/lib/utils/bulk-excel';
 
 export type BulkUploadMode = 'create' | 'update';
 
@@ -39,7 +40,7 @@ const MODE_COPY: Record<BulkUploadMode, {
   update: {
     title: 'Bulk Update Tickets',
     sampleName: 'KB_Bulk_Update_sheet.xlsx',
-    hint: 'Columns: VSID, Email Subject (replaces existing), OPS Remarks (appended with timestamp). Lookup is by VSID only.',
+    hint: 'Columns: AWB OR VSID, Email Subject (replaces), OPS Remarks (newest first: remark [your name  23 Sep, 12:00 pm], dotted line between entries).',
     action: 'Update & Process',
     actionLoading: 'Updating...',
   },
@@ -128,9 +129,10 @@ export function BulkUploadModal({ isOpen, onClose, onUpload, mode = 'create' }: 
 
   const handleDownloadSample = useCallback(() => {
     if (mode === 'update') {
-      const worksheet = XLSX.utils.aoa_to_sheet([
-        ['VSID', 'Email Subject', 'OPS Remarks'],
-      ]);
+      const worksheet = XLSX.utils.aoa_to_sheet([[...KB_UPDATE_SAMPLE_HEADERS]]);
+      // Wide enough that every header reads in full, so the remark is typed
+      // under "OPS Remarks" and not one column past it.
+      worksheet['!cols'] = [{ wch: 20 }, { wch: 40 }, { wch: 60 }];
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, 'Bulk Update');
       XLSX.writeFile(workbook, copy.sampleName);
