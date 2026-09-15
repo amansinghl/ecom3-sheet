@@ -1291,6 +1291,7 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
       ref={tableContainerRef}
       tabIndex={0}
       onKeyDown={handleKeyDown}
+      data-sheet-viewport
       className="relative h-full w-full overflow-auto rounded-md border border-border bg-white focus:outline-none scroll-auto select-none"
     >
       <table className="border-collapse" style={{ width: table.getCenterTotalSize(), tableLayout: 'fixed' }}>

@@ -2023,7 +2023,7 @@ export function SheetView({ config, userRole }: SheetViewProps) {
 
   /**
    * KB bulk update: "AWB OR VSID", "Email Subject" (replaces) and "OPS Remarks"
-   * (prepended newest-first as remark [Name  23 Sep, 12:00 pm] by the API).
+   * (prepended newest-first as name + timestamp, then the remark, by the API).
    *
    * Headers are matched by name, falling back to the sample's column order so
    * a renamed header does not block the file.

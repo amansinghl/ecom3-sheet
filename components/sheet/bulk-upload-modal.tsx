@@ -40,7 +40,7 @@ const MODE_COPY: Record<BulkUploadMode, {
   update: {
     title: 'Bulk Update Tickets',
     sampleName: 'KB_Bulk_Update_sheet.xlsx',
-    hint: 'Columns: AWB OR VSID, Email Subject (replaces), OPS Remarks (newest first: remark [your name  23 Sep, 12:00 pm], dotted line between entries).',
+    hint: 'Columns: AWB OR VSID, Email Subject (replaces), OPS Remarks (newest first: your name and time on one line, remark below, dotted line between entries).',
     action: 'Update & Process',
     actionLoading: 'Updating...',
   },

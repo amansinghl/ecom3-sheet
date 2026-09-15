@@ -233,7 +233,7 @@ class SheetApiService {
    * Bulk update existing escalation tickets from Excel.
    *
    * Rows are identified by AWB or VSID. Email subject replaces the current
-   * value; OPS remarks are prepended newest-first as remark [Name  23 Sep, 12:00 pm].
+   * value; OPS remarks are prepended newest-first as name + timestamp, then the remark.
    */
   async bulkUpdateEscalations(data: BulkUpdateRow[]): Promise<ApiResponse<BulkUploadResult>> {
     try {
