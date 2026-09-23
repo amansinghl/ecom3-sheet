@@ -2,6 +2,7 @@ import { auth } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { SheetView } from '@/components/sheet/sheet-view';
 import { getSheetById } from '@/lib/config/sheets';
+import { canAccessSheet } from '@/lib/sheet-access';
 
 interface PageProps {
   params: Promise<{
@@ -19,7 +20,7 @@ export default async function SheetPage({ params }: PageProps) {
 
   const config = getSheetById(sheetId);
 
-  if (!config) {
+  if (!config || !canAccessSheet(sheetId, session.user?.email)) {
     redirect('/sheets/escalations');
   }
 
