@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import { SheetConfig, RowData, UserRole, ColumnFilter, UserView } from '@/types';
-import { DataGrid } from './data-grid';
+import { DataGrid, ActiveCellInfo } from './data-grid';
 import { Toolbar, ToolbarRef } from './toolbar';
 import { CommandPalette } from './command-palette';
 import { TableSkeleton } from './table-skeleton';
@@ -42,7 +42,6 @@ export function SheetView({ config, userRole }: SheetViewProps) {
     selectedRows, 
     clearSelection, 
     setEditingCell, 
-    focusedCell,
     editingCell, // Get editing state to disable refetch while editing
     clearAllFilters,
     setColumnFilter,
@@ -68,7 +67,6 @@ export function SheetView({ config, userRole }: SheetViewProps) {
     setDefaultViewId,
     applyView,
     getCurrentViewState,
-    columnOrder,
   } = useSheetStore();
   const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [showBulkUploadModal, setShowBulkUploadModal] = useState(false);
@@ -77,6 +75,23 @@ export function SheetView({ config, userRole }: SheetViewProps) {
   const [viewDialogMode, setViewDialogMode] = useState<'create' | 'edit'>('create');
   const toolbarRef = useRef<ToolbarRef>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [activeCell, setActiveCell] = useState<ActiveCellInfo | null>(null);
+  const handleActiveCellChange = useCallback((cell: ActiveCellInfo | null) => {
+    setActiveCell((prev) => {
+      if (prev === cell) return prev;
+      if (
+        prev &&
+        cell &&
+        prev.rowId === cell.rowId &&
+        prev.columnId === cell.columnId &&
+        prev.columnLabel === cell.columnLabel &&
+        prev.value === cell.value
+      ) {
+        return prev;
+      }
+      return cell;
+    });
+  }, []);
   const queryClient = useQueryClient();
 
   // Pause auto-refetch while user is editing OR has rows selected.
@@ -2088,40 +2103,6 @@ export function SheetView({ config, userRole }: SheetViewProps) {
     clearAllFilters();
   };
 
-  const orderedVisibleColumns = useMemo(() => {
-    const pinnedIds = viewState.pinnedColumns || [];
-    const fixedColumns = config.columns.filter((col) => col.fixed && columnVisibility[col.id] !== false);
-    const nonFixedColumns = config.columns.filter((col) => !col.fixed);
-
-    const orderedNonFixed = (columnOrder.length > 0 ? columnOrder : nonFixedColumns.map((col) => col.id))
-      .map((id) => nonFixedColumns.find((col) => col.id === id))
-      .filter((col): col is typeof config.columns[number] => !!col && columnVisibility[col.id] !== false);
-
-    const orderedSet = new Set(orderedNonFixed.map((col) => col.id));
-    const newColumns = nonFixedColumns.filter((col) => !orderedSet.has(col.id) && columnVisibility[col.id] !== false);
-
-    const allNonFixedVisible = [...orderedNonFixed, ...newColumns];
-    const pinned = allNonFixedVisible.filter((col) => pinnedIds.includes(col.id));
-    const unpinned = allNonFixedVisible.filter((col) => !pinnedIds.includes(col.id));
-
-    return [...fixedColumns, ...pinned, ...unpinned];
-  }, [config.columns, viewState.pinnedColumns, columnOrder, columnVisibility]);
-
-  const activeCell = useMemo(() => {
-    if (!focusedCell) return null;
-
-    const row = filteredData[focusedCell.rowIndex];
-    const column = orderedVisibleColumns[focusedCell.colIndex];
-    if (!row || !column) return null;
-
-    return {
-      rowId: String(row.id),
-      columnId: column.id,
-      columnLabel: column.label,
-      value: row[column.id],
-    };
-  }, [focusedCell, filteredData, orderedVisibleColumns]);
-
   const handleActiveCellUpdate = async (rowId: string, columnId: string, value: string) => {
     const canEditSheet = config.permissions?.[userRole]?.canEdit ?? false;
     const columnConfig = config.columns.find((column) => column.id === columnId);
@@ -2327,6 +2308,7 @@ export function SheetView({ config, userRole }: SheetViewProps) {
                 data={filteredData}
                 userRole={userRole}
                 onCellUpdate={handleCellUpdate}
+                onActiveCellChange={handleActiveCellChange}
                 columnVisibility={columnVisibility}
                 onColumnVisibilityChange={handleColumnVisibilityChange}
                 onDuplicateRow={handleDuplicateRow}
