@@ -30,11 +30,19 @@ import { useThreadUnread } from '@/lib/store/thread-store';
 // stickyPositions below offsets pinned columns by the same value.
 const SELECT_COLUMN_WIDTH = 78;
 
+export interface ActiveCellInfo {
+  rowId: string;
+  columnId: string;
+  columnLabel: string;
+  value: unknown;
+}
+
 interface DataGridProps {
   config: SheetConfig;
   data: RowData[];
   userRole: UserRole;
   onCellUpdate: (rowId: string, columnId: string, value: any) => void;
+  onActiveCellChange?: (cell: ActiveCellInfo | null) => void;
   columnVisibility?: Record<string, boolean>;
   onColumnVisibilityChange?: (visibility: Record<string, boolean>) => void;
   onDuplicateRow?: (rowId: string) => void;
@@ -52,7 +60,7 @@ interface DataGridProps {
   onRedo?: () => void;
 }
 
-export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibility: externalColumnVisibility, onColumnVisibilityChange, onDuplicateRow, onDuplicateRows, onCopyRow, onCopyRows, onDeleteRow, onDeleteRows, onAddRow, onClearFilters, hasActiveFilters, scrollContainerRef, globalSearch = '', onUndo, onRedo }: DataGridProps) {
+export function DataGrid({ config, data, userRole, onCellUpdate, onActiveCellChange, columnVisibility: externalColumnVisibility, onColumnVisibilityChange, onDuplicateRow, onDuplicateRows, onCopyRow, onCopyRows, onDeleteRow, onDeleteRows, onAddRow, onClearFilters, hasActiveFilters, scrollContainerRef, globalSearch = '', onUndo, onRedo }: DataGridProps) {
   const { 
     selectedRows, 
     toggleRowSelection, 
@@ -161,6 +169,7 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
   const selectionRangeRef = useRef(selectionRange);
   // Initialize with empty arrays - will be updated after rows and orderedColumns are defined
   const rowsRef = useRef<any[]>([]);
+  const tableDataRef = useRef<RowData[]>([]);
   const orderedColumnsRef = useRef<any[]>([]);
   
   // Keep refs up to date
@@ -295,6 +304,17 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
 
     return result;
   }, [data, groupByColumn, collapsedGroups]);
+
+  // Focus, copy, and the formula bar count data rows only. The virtualizer
+  // also counts group-header rows, so scrolling has to translate.
+  const visualIndexByDataIndex = useMemo(() => {
+    const map: number[] = [];
+    groupedData.forEach((item, visualIndex) => {
+      if ((item as GroupHeader)._isGroupHeader) return;
+      map.push(visualIndex);
+    });
+    return map;
+  }, [groupedData]);
 
   // Create columns from config
   const columns = useMemo<ColumnDef<RowData>[]>(() => {
@@ -550,6 +570,30 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
   const tableData = useMemo(() => {
     return groupedData.filter((item): item is RowData => !isGroupHeader(item));
   }, [groupedData]);
+  tableDataRef.current = tableData;
+
+  // Formula bar reads this, not the ungrouped filtered list. Grouping reorders
+  // rows and inserts headers, so a raw focusedCell.rowIndex into filteredData
+  // points at a different row than the one on screen.
+  useEffect(() => {
+    if (!onActiveCellChange) return;
+    if (!focusedCell) {
+      onActiveCellChange(null);
+      return;
+    }
+    const row = tableData[focusedCell.rowIndex];
+    const column = orderedColumns[focusedCell.colIndex];
+    if (!row || !column) {
+      onActiveCellChange(null);
+      return;
+    }
+    onActiveCellChange({
+      rowId: String(row.id),
+      columnId: column.id,
+      columnLabel: column.label,
+      value: row[column.id],
+    });
+  }, [focusedCell, tableData, orderedColumns, onActiveCellChange]);
 
   // Looked up from the live data rather than captured at click time, so the
   // dialog's detail rail keeps showing current values while it is open.
@@ -747,14 +791,15 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
     if (!tableContainerRef.current) return;
     
     const container = tableContainerRef.current;
+    const visualIndex = visualIndexByDataIndex[rowIndex] ?? rowIndex;
     
     // Check if row is already visible in the virtualizer
     const virtualItems = rowVirtualizer.getVirtualItems();
-    const isRowVisible = virtualItems.some(item => item.index === rowIndex);
+    const isRowVisible = virtualItems.some(item => item.index === visualIndex);
     
     // Only scroll if the row is not visible
     if (!isRowVisible) {
-      rowVirtualizer.scrollToIndex(rowIndex, { 
+      rowVirtualizer.scrollToIndex(visualIndex, { 
         align: 'auto',
         behavior: 'auto'
       });
@@ -788,7 +833,7 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
         }
       });
     }
-  }, [rowVirtualizer]);
+  }, [rowVirtualizer, visualIndexByDataIndex]);
 
   // Scroll effect - minimal during rapid nav, precise otherwise
   useEffect(() => {
@@ -810,14 +855,15 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
 
     if (isRapidNavRef.current) {
       // During rapid nav: only use fast virtualizer scroll, skip DOM queries
-      rowVirtualizer.scrollToIndex(rowIndex, { align: 'auto', behavior: 'auto' });
+      const visualIndex = visualIndexByDataIndex[rowIndex] ?? rowIndex;
+      rowVirtualizer.scrollToIndex(visualIndex, { align: 'auto', behavior: 'auto' });
       // Store for precise scroll when rapid nav ends
       pendingScrollRef.current = { rowIndex, colIndex };
     } else {
       // Normal navigation: precise scroll
       scrollToCell(rowIndex, colIndex, true);
     }
-  }, [focusedCell, rowVirtualizer, scrollToCell]);
+  }, [focusedCell, rowVirtualizer, scrollToCell, visualIndexByDataIndex]);
 
   // Copy selected cells to clipboard
   const handleCopy = useCallback(() => {
@@ -834,14 +880,14 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
       
       const rowTexts: string[] = [];
       for (let r = minRow; r <= maxRow; r++) {
-        const row = rows[r];
+        const row = tableData[r];
         if (!row) continue;
         
         const cellTexts: string[] = [];
         for (let c = minCol; c <= maxCol; c++) {
           const columnId = orderedColumns[c]?.id;
           if (columnId) {
-            const value = row.original[columnId];
+            const value = row[columnId];
             cellTexts.push(value != null ? String(value) : '');
           }
         }
@@ -867,7 +913,7 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
       const rowTexts: string[] = [];
       
       for (const rowIdx of sortedRows) {
-        const row = rows[rowIdx];
+        const row = tableData[rowIdx];
         if (!row) continue;
         
         const cols = cellsByRow.get(rowIdx)!.sort((a, b) => a - b);
@@ -875,7 +921,7 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
         for (const colIdx of cols) {
           const columnId = orderedColumns[colIdx]?.id;
           if (columnId) {
-            const value = row.original[columnId];
+            const value = row[columnId];
             cellTexts.push(value != null ? String(value) : '');
           }
         }
@@ -884,10 +930,10 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
       textToCopy = rowTexts.join('\n');
     } else if (focusedCell) {
       // Copy single focused cell
-      const row = rows[focusedCell.rowIndex];
+      const row = tableData[focusedCell.rowIndex];
       const columnId = orderedColumns[focusedCell.colIndex]?.id;
       if (row && columnId) {
-        const value = row.original[columnId];
+        const value = row[columnId];
         textToCopy = value != null ? String(value) : '';
       }
     }
@@ -897,7 +943,7 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
         console.error('Failed to copy to clipboard:', err);
       });
     }
-  }, [focusedCell, selectionRange, selectedCells, rows, orderedColumns]);
+  }, [focusedCell, selectionRange, selectedCells, tableData, orderedColumns]);
 
   // Paste from clipboard to focused/selected cells
   // Takes clipboard text directly from the native paste event (no permission required)
@@ -906,7 +952,7 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
     // Read from refs to ensure we have the latest values (important after arrow key navigation)
     const currentFocusedCell = focusedCellRef.current;
     const currentSelectionRange = selectionRangeRef.current;
-    const currentRows = rowsRef.current;
+    const currentRows = tableDataRef.current;
     const currentOrderedColumns = orderedColumnsRef.current;
     
     if (!currentFocusedCell || !clipboardText) return;
@@ -1104,8 +1150,8 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
       if (e.ctrlKey || e.metaKey) {
         if (direction === 'up' || direction === 'down') {
           // For up/down, find the last row with data (not empty)
-          const lastFilledRowIndex = rows.findLastIndex(row => row.original._isEmpty !== true);
-          const firstFilledRowIndex = rows.findIndex(row => row.original._isEmpty !== true);
+          const lastFilledRowIndex = tableData.findLastIndex(row => row._isEmpty !== true);
+          const firstFilledRowIndex = tableData.findIndex(row => row._isEmpty !== true);
           
           if (lastFilledRowIndex === -1) {
             // All rows are empty, just go to edge
@@ -1129,7 +1175,7 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
             setFocusedCell(newFocusedCell);
             
             // Scroll with proper alignment to ensure cell is fully visible
-            rowVirtualizer.scrollToIndex(targetRow, { 
+            rowVirtualizer.scrollToIndex(visualIndexByDataIndex[targetRow] ?? targetRow, { 
               align: direction === 'up' ? 'start' : 'end',
               behavior: 'auto'
             });
@@ -1164,7 +1210,7 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
     // Enter key to start editing
     if (e.key === 'Enter' && focusedCell) {
       e.preventDefault();
-      const row = rows[focusedCell.rowIndex];
+      const row = tableData[focusedCell.rowIndex];
       const columnId = orderedColumns[focusedCell.colIndex]?.id;
       if (row && columnId) {
         setEditingCell({ rowId: row.id, columnId });
@@ -1179,7 +1225,7 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
     // Direct typing on focused cell - start editing with the typed character
     // Detect printable characters (single character, not a control key)
     if (focusedCell && e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
-      const row = rows[focusedCell.rowIndex];
+      const row = tableData[focusedCell.rowIndex];
       const columnId = orderedColumns[focusedCell.colIndex]?.id;
       const colConfig = config.columns.find(c => c.id === columnId);
       
@@ -1194,7 +1240,7 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
         }
       }
     }
-  }, [editingCell, focusedCell, selectionRange, setFocusedCell, setSelectionRange, moveFocus, moveToExtreme, rows, rowVirtualizer, orderedColumns, setEditingCell, clearCellSelection, handleCopy, finishRapidNav, onUndo, onRedo, config.columns, canEdit]);
+  }, [editingCell, focusedCell, selectionRange, setFocusedCell, setSelectionRange, moveFocus, moveToExtreme, tableData, rowVirtualizer, orderedColumns, setEditingCell, clearCellSelection, handleCopy, finishRapidNav, onUndo, onRedo, config.columns, canEdit, visualIndexByDataIndex]);
 
   // Track if we have multi-selected cells (avoid recalculating on every render)
   const hasSelectedCells = selectedCells.size > 0;
@@ -1252,10 +1298,10 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
     if (!fillDragState) return;
     
     const { sourceCell, columnId, targetEndRow } = fillDragState;
-    const sourceRow = rows[sourceCell.rowIndex];
+    const sourceRow = tableData[sourceCell.rowIndex];
     
     if (sourceRow && columnId) {
-      const sourceValue = sourceRow.original[columnId];
+      const sourceValue = sourceRow[columnId];
       
       // Fill cells between source and target (only the specific column)
       const startRow = Math.min(sourceCell.rowIndex, targetEndRow);
@@ -1263,7 +1309,7 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
       
       for (let r = startRow; r <= endRow; r++) {
         if (r !== sourceCell.rowIndex) {
-          const targetRow = rows[r];
+          const targetRow = tableData[r];
           if (targetRow) {
             onCellUpdate(targetRow.id, columnId, sourceValue);
           }
@@ -1272,7 +1318,7 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
     }
     
     endFillDrag();
-  }, [fillDragState, rows, onCellUpdate, endFillDrag]);
+  }, [fillDragState, tableData, onCellUpdate, endFillDrag]);
 
   // Attach/detach fill drag listeners
   useEffect(() => {
@@ -1417,7 +1463,6 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
                   return (
                     <tr
                       key={item._groupId}
-                      data-index={virtualRow.index}
                       onClick={() => toggleGroupCollapse(item.groupValue)}
                       className="bg-muted/60 hover:bg-muted cursor-pointer border-b border-border"
                       style={{ height: 36 }}
@@ -1458,7 +1503,7 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
                 return (
                   <tr
                     key={row.id}
-                    data-index={virtualRow.index}
+                    data-index={row.index}
                     onContextMenu={(e) => {
                       if (!isEmptyRow) {
                         e.preventDefault();
@@ -1503,7 +1548,7 @@ export function DataGrid({ config, data, userRole, onCellUpdate, columnVisibilit
                       
                       // Calculate column index for cell navigation (skip select column)
                       const colIndex = columnId === 'select' ? -1 : orderedColumns.findIndex(c => c.id === columnId);
-                      const rowIndex = virtualRow.index;
+                      const rowIndex = row.index;
                       
                       // Check if this cell is focused or in selection range (using memoized fast lookups)
                       const cellIsFocused = isCellFocused(rowIndex, colIndex);
