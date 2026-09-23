@@ -66,6 +66,10 @@ export interface BulkUploadResult {
   status?: boolean;
   message?: string;
   success_count?: number;
+  /** Rows that raised a new escalation. */
+  created_count?: number;
+  /** Rows that matched an existing shipment and subject request, updated in place. */
+  updated_count?: number;
   total_count?: number;
   error_count?: number;
   errors?: Record<string, string[]>;

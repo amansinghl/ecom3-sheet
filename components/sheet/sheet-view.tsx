@@ -1861,8 +1861,15 @@ export function SheetView({ config, userRole }: SheetViewProps) {
         throw new Error('Invalid file format');
       }
 
-      // Get headers from first row
-      const headers = jsonData[0].map((h: any) => String(h || '').toLowerCase().trim());
+      // Get headers from first row. The sample sheet spells out behaviour in
+      // brackets ("OPS Remarks (Appended with timestamp)"), so match on the
+      // header with any bracketed note stripped.
+      const headers = jsonData[0].map((h: any) =>
+        String(h || '')
+          .toLowerCase()
+          .replace(/\([^)]*\)/g, '')
+          .trim()
+      );
       
       // Find column indices
       // The downloadable sample labels this column "AWB No OR VSID", so accept
@@ -1880,6 +1887,12 @@ export function SheetView({ config, userRole }: SheetViewProps) {
       const sourceOfComplaintIndex = headers.findIndex((h: string) => 
         h === 'source_of_complaint' || h === 'source of complaint' || h === 'Source of Complaint'
       )
+      const emailSubjectIndex = headers.findIndex((h: string) =>
+        h === 'email_subject' || h === 'email subject' || h === 'emailsubject'
+      );
+      const opsRemarksIndex = headers.findIndex((h: string) =>
+        h === 'ops_remarks' || h === 'ops remarks' || h === 'opsremarks'
+      );
 
       if (shipmentNoIndex === -1) {
         toast.error('Excel file must have a "shipment_no" column', { id: 'bulk-upload' });
@@ -1905,6 +1918,8 @@ export function SheetView({ config, userRole }: SheetViewProps) {
         manual_case?: string | null;
         notes?: string | null;
         source_of_complaint?: string | null;
+        email_subject?: string | null;
+        ops_remarks?: string | null;
       }> = [];
 
       // Process data rows (skip header row)
@@ -1938,6 +1953,15 @@ export function SheetView({ config, userRole }: SheetViewProps) {
 
         if (sourceOfComplaintIndex !== -1 && row[sourceOfComplaintIndex]) {
           record.source_of_complaint = String(row[sourceOfComplaintIndex]).trim() || null;
+        }
+
+        if (emailSubjectIndex !== -1 && row[emailSubjectIndex]) {
+          record.email_subject = String(row[emailSubjectIndex]).trim() || null;
+        }
+
+        // Timestamped and appended server side, so send the raw text.
+        if (opsRemarksIndex !== -1 && row[opsRemarksIndex]) {
+          record.ops_remarks = String(row[opsRemarksIndex]).trim() || null;
         }
 
         uploadData.push(record);
@@ -1988,6 +2012,12 @@ export function SheetView({ config, userRole }: SheetViewProps) {
       const createdCount = typeof result.success_count === 'number'
         ? result.success_count
         : uploadData.length;
+      // Rows matching an existing shipment and subject request are updated in
+      // place rather than raised again, so name both outcomes.
+      const updatedCount = typeof result.updated_count === 'number' ? result.updated_count : 0;
+      const outcome = updatedCount > 0
+        ? `${createdCount - updatedCount} raised, ${updatedCount} updated`
+        : `${createdCount} raised`;
       // Keys are 1-based data rows; +1 for the header gives the Excel row number.
       const rejectedRows = Object.entries(result.errors || {}).map(([row, reasons]) => ({
         row: Number(row) + 1,
@@ -2010,7 +2040,7 @@ export function SheetView({ config, userRole }: SheetViewProps) {
 
         if (createdCount > 0) {
           toast.warning(
-            `Uploaded ${createdCount} of ${uploadData.length} records - ${rejectedRows.length} skipped`,
+            `Processed ${createdCount} of ${uploadData.length} records (${outcome}) - ${rejectedRows.length} skipped`,
             { id: 'bulk-upload', duration: 12000, description }
           );
         } else {
@@ -2020,7 +2050,7 @@ export function SheetView({ config, userRole }: SheetViewProps) {
           );
         }
       } else {
-        toast.success(`Successfully uploaded ${createdCount} records!`, { id: 'bulk-upload' });
+        toast.success(`Successfully processed ${createdCount} records (${outcome})`, { id: 'bulk-upload' });
       }
 
       // Refresh the data after successful upload

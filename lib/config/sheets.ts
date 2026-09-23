@@ -1166,6 +1166,19 @@ export const leadManagerSheetConfig: SheetConfig = {
       ],
     },
     {
+      id: 'aadhaar_status',
+      label: 'Aadhaar',
+      type: 'status',
+      width: 120,
+      required: false,
+      editable: false,
+      options: [
+        { label: 'Verified', value: 'Verified', color: '#10b981' },
+        { label: 'Skipped', value: 'Skipped', color: '#f59e0b' },
+        { label: 'Not Verified', value: 'Not Verified', color: '#ef4444' },
+      ],
+    },
+    {
       id: 'next_action',
       label: 'Next Action',
       type: 'status',

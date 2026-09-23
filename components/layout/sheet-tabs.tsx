@@ -1,6 +1,8 @@
 'use client';
 
 import { useRouter, usePathname } from 'next/navigation';
+import { useSession } from 'next-auth/react';
+import { canAccessSheet } from '@/lib/sheet-access';
 import { sheets } from '@/lib/config/sheets';
 import { cn } from '@/lib/utils';
 import { AlertCircle, Users, Plus, Star } from 'lucide-react';
@@ -15,12 +17,13 @@ const iconMap: Record<string, any> = {
 export function SheetTabs() {
   const router = useRouter();
   const pathname = usePathname();
+  const { data: session } = useSession();
 
   const currentSheetId = pathname.split('/').pop();
 
   return (
     <div className="flex items-center gap-1 overflow-x-auto whitespace-nowrap border-b border-border bg-muted/30 px-2 sm:px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-      {sheets.map((sheet) => {
+      {sheets.filter((sheet) => canAccessSheet(sheet.id, session?.user?.email)).map((sheet) => {
         const Icon = sheet.icon ? iconMap[sheet.icon] : null;
         const isActive = currentSheetId === sheet.id;
 
