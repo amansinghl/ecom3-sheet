@@ -1,6 +1,6 @@
 'use client';
 
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useSession } from 'next-auth/react';
 import { format, isToday, isYesterday } from 'date-fns';
 import { MessageSquare, Send } from 'lucide-react';
@@ -16,7 +16,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { getRandomAvatar } from '@/lib/config/user-avatar';
-import { appendRemark, parseRemarks, RemarkColumnId, RemarkMessage, REMARK_COLUMNS, remarkSnapshot } from '@/lib/remarks';
+import { activeMention, appendRemark, parseRemarks, RemarkColumnId, RemarkMessage, REMARK_COLUMNS, remarkColumnText, remarkSnapshot } from '@/lib/remarks';
 import { useRemarkReadStore } from '@/lib/store/remark-read-store';
 import { cn } from '@/lib/utils';
 import { ColumnConfig, MediaItem, RowData, SheetConfig } from '@/types';
@@ -28,6 +28,7 @@ interface RowThreadDialogProps {
   /** Thread the dialog opens on - the grid passes the remarks cell that was clicked. */
   column: RemarkColumnId;
   config: SheetConfig;
+  mentionUsers: string[];
   onCellUpdate: (rowId: string, columnId: string, value: string) => void | Promise<void>;
 }
 
@@ -85,7 +86,7 @@ function dayLabel(iso: string): string {
   return format(date, 'EEEE, dd MMM yyyy');
 }
 
-export function RowThreadDialog({ open, onOpenChange, row: activeRow, column, config, onCellUpdate }: RowThreadDialogProps) {
+export function RowThreadDialog({ open, onOpenChange, row: activeRow, column, config, mentionUsers, onCellUpdate }: RowThreadDialogProps) {
   const { data: session } = useSession();
   const currentName = session?.user?.name || '';
   const markRead = useRemarkReadStore((state) => state.markRead);
@@ -98,10 +99,15 @@ export function RowThreadDialog({ open, onOpenChange, row: activeRow, column, co
   const row = activeRow ?? lastRow.current;
 
   const [draft, setDraft] = useState('');
+  const [cursor, setCursor] = useState(0);
+  const [mentionIndex, setMentionIndex] = useState(0);
+  const [mentionDismissed, setMentionDismissed] = useState(false);
   const [sending, setSending] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const mentionListRef = useRef<HTMLUListElement>(null);
   const [activeColumn, setActiveColumn] = useState<RemarkColumnId>(column);
   const scrollNodes = useRef<Partial<Record<RemarkColumnId, HTMLDivElement | null>>>({});
-  const seenLength = useRef<Record<RemarkColumnId, number>>({ ops_remarks: -1 });
+  const seenLength = useRef<Partial<Record<RemarkColumnId, number>>>({});
   const rowRef = useRef(row);
   rowRef.current = row;
 
@@ -118,7 +124,7 @@ export function RowThreadDialog({ open, onOpenChange, row: activeRow, column, co
     setDraft('');
   }, [open, column, row?.id]);
 
-  const opsText = typeof row?.ops_remarks === 'string' ? row.ops_remarks : '';
+  const remarksText = remarkColumnText(row);
   const notes = typeof row?.notes === 'string' ? row.notes.trim() : '';
   const rowId = row?.id ?? '';
   const readKey = row ? remarkSnapshot(row) : '';
@@ -129,16 +135,20 @@ export function RowThreadDialog({ open, onOpenChange, row: activeRow, column, co
     markRead(current);
   }, [open, rowId, readKey, markRead]);
 
-  const threads = useMemo(() => ({
-    ops_remarks: parseRemarks(opsText, rowId),
-  }), [opsText, rowId]);
+  const threads = useMemo(() => {
+    const parsed = {} as Record<RemarkColumnId, RemarkMessage[]>;
+    REMARK_COLUMNS.forEach((columnId) => {
+      parsed[columnId] = parseRemarks(row?.[columnId], rowId);
+    });
+    return parsed;
+  }, [row, remarksText, rowId]);
 
   const setScrollNode = useCallback((columnId: RemarkColumnId, node: HTMLDivElement | null) => {
     scrollNodes.current[columnId] = node;
   }, []);
 
   useEffect(() => {
-    seenLength.current = { ops_remarks: -1 };
+    seenLength.current = {};
   }, [open, rowId]);
 
   useEffect(() => {
@@ -150,7 +160,7 @@ export function RowThreadDialog({ open, onOpenChange, row: activeRow, column, co
     const node = scrollNodes.current[activeColumn];
     if (!node) return;
     // First open jumps to the latest line. A new message glides there.
-    node.scrollTo({ top: node.scrollHeight, behavior: previous < 0 ? 'auto' : 'smooth' });
+    node.scrollTo({ top: node.scrollHeight, behavior: previous == null ? 'auto' : 'smooth' });
   }, [open, activeColumn, threads]);
 
   const headerChips = useMemo(() => {
@@ -175,6 +185,43 @@ export function RowThreadDialog({ open, onOpenChange, row: activeRow, column, co
   // silently skips them, so a message would vanish on the next refetch.
   const canSendToRow = row !== null && (typeof row.id === 'number' || !Number.isNaN(Number(row.id)));
 
+  const mention = useMemo(() => activeMention(draft, cursor), [draft, cursor]);
+  const mentionQuery = mention ? `${mention.start}:${mention.query}` : '';
+  const mentionMatches = useMemo(() => {
+    if (!mention) return [];
+    const query = mention.query.trim().toLowerCase();
+    // Bare "@" stays closed. The first letter opens names that start with it.
+    if (!query) return [];
+    return mentionUsers.filter((name) => name.toLowerCase().startsWith(query)).slice(0, 8);
+  }, [mention, mentionUsers]);
+  const mentionOpen = mention !== null && !mentionDismissed && mentionMatches.length > 0;
+
+  useEffect(() => {
+    setMentionDismissed(false);
+    setMentionIndex(0);
+  }, [mentionQuery]);
+
+  const picked = mentionMatches[Math.min(mentionIndex, Math.max(mentionMatches.length - 1, 0))];
+
+  useEffect(() => {
+    if (!mentionOpen) return;
+    mentionListRef.current?.querySelector('[data-active="true"]')?.scrollIntoView({ block: 'nearest' });
+  }, [mentionOpen, picked]);
+
+  const insertMention = useCallback((name: string) => {
+    if (!mention) return;
+    const next = `${draft.slice(0, mention.start)}@${name} ${draft.slice(cursor)}`;
+    const caret = mention.start + name.length + 2;
+    setDraft(next);
+    setCursor(caret);
+    requestAnimationFrame(() => {
+      const node = textareaRef.current;
+      if (!node) return;
+      node.focus();
+      node.setSelectionRange(caret, caret);
+    });
+  }, [mention, draft, cursor]);
+
   const handleSend = useCallback(async () => {
     if (!row || sending || !canSendToRow || !currentName) return;
     const body = draft.trim();
@@ -184,6 +231,7 @@ export function RowThreadDialog({ open, onOpenChange, row: activeRow, column, co
     try {
       await onCellUpdate(String(row.id), activeColumn, appendRemark(row[activeColumn], body, currentName));
       setDraft('');
+      setCursor(0);
     } finally {
       setSending(false);
     }
@@ -271,23 +319,81 @@ export function RowThreadDialog({ open, onOpenChange, row: activeRow, column, co
                 key={columnId}
                 columnId={columnId}
                 messages={threads[columnId]}
+                mentionUsers={mentionUsers}
                 active={activeColumn === columnId}
                 onScrollRef={setScrollNode}
               />
             ))}
 
             {/* Composer */}
-            <div className="shrink-0 border-t p-3">
+            <div className="relative shrink-0 border-t p-3">
+              {mentionOpen && (
+                <ul
+                  ref={mentionListRef}
+                  className="absolute bottom-full left-3 z-20 mb-2 max-h-52 w-64 overflow-y-auto bg-popover p-1.5 shadow-md"
+                >
+                  {mentionMatches.map((name) => {
+                    const active = name === picked;
+                    return (
+                      <li key={name}>
+                        <button
+                          type="button"
+                          data-active={active}
+                          className={cn(
+                            'w-full rounded-sm px-3 py-1.5 text-left text-sm leading-5',
+                            active ? 'bg-accent font-medium' : 'hover:bg-muted'
+                          )}
+                          onMouseEnter={() => setMentionIndex(mentionMatches.indexOf(name))}
+                          onMouseDown={(event) => {
+                            event.preventDefault();
+                            insertMention(name);
+                          }}
+                        >
+                          {name}
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
               <Textarea
+                ref={textareaRef}
                 value={draft}
-                onChange={(event) => setDraft(event.target.value)}
+                onChange={(event) => {
+                  setDraft(event.target.value);
+                  setCursor(event.target.selectionStart);
+                }}
+                onClick={(event) => setCursor(event.currentTarget.selectionStart)}
+                onKeyUp={(event) => setCursor(event.currentTarget.selectionStart)}
                 onKeyDown={(event) => {
+                  if (mentionOpen) {
+                    if (event.key === 'ArrowDown') {
+                      event.preventDefault();
+                      setMentionIndex((index) => (index + 1) % mentionMatches.length);
+                      return;
+                    }
+                    if (event.key === 'ArrowUp') {
+                      event.preventDefault();
+                      setMentionIndex((index) => (index - 1 + mentionMatches.length) % mentionMatches.length);
+                      return;
+                    }
+                    if (event.key === 'Enter' || event.key === 'Tab') {
+                      event.preventDefault();
+                      if (picked) insertMention(picked);
+                      return;
+                    }
+                    if (event.key === 'Escape') {
+                      event.preventDefault();
+                      setMentionDismissed(true);
+                      return;
+                    }
+                  }
                   if (event.key === 'Enter' && !event.shiftKey) {
                     event.preventDefault();
                     handleSend();
                   }
                 }}
-                placeholder="Write a note. Enter to send, Shift plus Enter for a new line."
+                placeholder="Write a note. @ to mention someone. Enter to send."
                 className="max-h-[140px] min-h-[64px] resize-none"
               />
               <div className="mt-2 flex items-center gap-2">
@@ -313,11 +419,12 @@ export function RowThreadDialog({ open, onOpenChange, row: activeRow, column, co
 interface RemarkThreadProps {
   columnId: RemarkColumnId;
   messages: RemarkMessage[];
+  mentionUsers: string[];
   active: boolean;
   onScrollRef: (columnId: RemarkColumnId, node: HTMLDivElement | null) => void;
 }
 
-const RemarkThread = memo(function RemarkThread({ columnId, messages, active, onScrollRef }: RemarkThreadProps) {
+const RemarkThread = memo(function RemarkThread({ columnId, messages, mentionUsers, active, onScrollRef }: RemarkThreadProps) {
   return (
     <div
       ref={(node) => onScrollRef(columnId, node)}
@@ -330,6 +437,7 @@ const RemarkThread = memo(function RemarkThread({ columnId, messages, active, on
         <MessageRow
           key={message.id}
           message={message}
+          mentionUsers={mentionUsers}
           previous={messages[index - 1]}
         />
       ))}
@@ -339,10 +447,31 @@ const RemarkThread = memo(function RemarkThread({ columnId, messages, active, on
 
 interface MessageRowProps {
   message: RemarkMessage;
+  mentionUsers: string[];
   previous?: RemarkMessage;
 }
 
-const MessageRow = memo(function MessageRow({ message, previous }: MessageRowProps) {
+function MentionText({ body, users }: { body: string; users: string[] }) {
+  const names = [...users].sort((a, b) => b.length - a.length);
+  if (names.length === 0) return <>{body}</>;
+  const pattern = new RegExp(`@(${names.map((name) => name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})(?=\\s|$)`, 'gi');
+  const parts: ReactNode[] = [];
+  let last = 0;
+  for (const match of body.matchAll(pattern)) {
+    const index = match.index ?? 0;
+    if (index > last) parts.push(body.slice(last, index));
+    parts.push(
+      <span key={index} className="rounded-sm px-0.5 font-bold text-blue-500">
+        {match[0]}
+      </span>
+    );
+    last = index + match[0].length;
+  }
+  if (last < body.length) parts.push(body.slice(last));
+  return <>{parts}</>;
+}
+
+const MessageRow = memo(function MessageRow({ message, mentionUsers, previous }: MessageRowProps) {
   const showDaySeparator = Boolean(
     message.createdAt && (!previous?.createdAt || dayLabel(previous.createdAt) !== dayLabel(message.createdAt))
   );
@@ -378,7 +507,7 @@ const MessageRow = memo(function MessageRow({ message, previous }: MessageRowPro
             </div>
           )}
           <p className="text-sm break-words whitespace-pre-wrap">
-            {message.body}
+            <MentionText body={message.body} users={mentionUsers} />
             {message.createdAt && (
               <span
                 className="ml-2 text-xs text-muted-foreground"
