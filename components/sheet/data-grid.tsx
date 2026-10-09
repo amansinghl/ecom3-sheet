@@ -731,6 +731,11 @@ export function DataGrid({ config, data, userRole, onCellUpdate, onActiveCellCha
       }
     },
     overscan: 5,
+    // Measure real rendered row heights (Safari border-collapse rows can differ
+    // from the estimate, which made content jump when the window shifted).
+    // data-index is already used for fill-drag with the table row index, so use
+    // a separate attribute for the virtual index.
+    indexAttribute: 'data-virtual-index',
   });
 
   useEffect(() => {
@@ -1503,6 +1508,8 @@ export function DataGrid({ config, data, userRole, onCellUpdate, onActiveCellCha
                   return (
                     <tr
                       key={item._groupId}
+                      ref={rowVirtualizer.measureElement}
+                      data-virtual-index={virtualRow.index}
                       onClick={() => toggleGroupCollapse(item.groupValue)}
                       className="bg-muted/60 hover:bg-muted cursor-pointer border-b border-border"
                       style={{ height: 36 }}
@@ -1548,6 +1555,8 @@ export function DataGrid({ config, data, userRole, onCellUpdate, onActiveCellCha
                 return (
                   <tr
                     key={row.id}
+                    ref={rowVirtualizer.measureElement}
+                    data-virtual-index={virtualRow.index}
                     data-index={row.index}
                     onContextMenu={(e) => {
                       if (!isEmptyRow) {

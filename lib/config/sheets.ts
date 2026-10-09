@@ -179,7 +179,17 @@ export const escalationSheetConfig: SheetConfig = {
     },
     {
       id: 'ops_remarks',
-      label: 'Remarks',
+      label: 'Internal Remarks',
+      type: 'text',
+      width: 200,
+      required: false,
+      editable: true,
+    },
+    {
+      // Shown to the shipper in the customer panel - the one remark column that
+      // leaves the building.
+      id: 'vamaship_remarks',
+      label: 'Remarks for External Customer',
       type: 'text',
       width: 200,
       required: false,

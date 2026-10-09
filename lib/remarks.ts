@@ -1,6 +1,8 @@
 import { RowData } from '@/types';
 
-/** KB Remarks column. Sheet id is ops_remarks; the header label is Remarks. */
+/** KB remarks thread column. Sheet id is ops_remarks; the header label is Internal Remarks. */
+// Only the internal column is a thread. vamaship_remarks is an ordinary editable
+// cell, so it is deliberately absent here.
 export const REMARK_COLUMNS = ['ops_remarks'] as const;
 
 export type RemarkColumnId = (typeof REMARK_COLUMNS)[number];
