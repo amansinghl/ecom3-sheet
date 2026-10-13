@@ -1,10 +1,13 @@
 import { RowData } from '@/types';
 
+/** KB remarks thread column. Sheet id is ops_remarks; the header label is Internal Remarks. */
 // Only the internal column is a thread. vamaship_remarks is an ordinary editable
 // cell, so it is deliberately absent here.
 export const REMARK_COLUMNS = ['ops_remarks'] as const;
 
 export type RemarkColumnId = (typeof REMARK_COLUMNS)[number];
+
+export const REMARK_COLUMN: RemarkColumnId = REMARK_COLUMNS[0];
 
 const REMARK_COLUMN_IDS: ReadonlySet<string> = new Set(REMARK_COLUMNS);
 
@@ -95,6 +98,48 @@ export function appendRemark(existing: unknown, body: string, authorName: string
   return base === '' ? line : `${base}\n${line}`;
 }
 
+export function remarkColumnText(row: RowData | null | undefined): string {
+  return columnText(row?.[REMARK_COLUMN]);
+}
+
 export function remarkSnapshot(row: RowData): string {
-  return columnText(row.ops_remarks);
+  return remarkColumnText(row);
+}
+
+function samePerson(a: string, b: string): boolean {
+  return a.trim().toLowerCase() === b.trim().toLowerCase();
+}
+
+function mentionsUser(text: string, userName: string): boolean {
+  const name = userName.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  if (!name) return false;
+  return new RegExp(`@${name}(?=\\s|$)`, 'i').test(text);
+}
+
+/** Ticket creator, ops owner, authors, and anyone @mentioned in the thread. */
+export function isChatParticipant(row: RowData, userName: string): boolean {
+  const me = userName.trim();
+  if (!me) return false;
+  const remarks = remarkColumnText(row);
+  if (mentionsUser(remarks, me)) return true;
+
+  const names = [
+    String(row.vamashipper ?? ''),
+    String(row.ops_name ?? ''),
+    ...parseRemarks(remarks, String(row.id)).map((message) => message.authorName),
+  ];
+
+  return names.some((name) => name !== '' && samePerson(name, me));
+}
+
+/** Active `@query` at the caret, or null when the user is not tagging. */
+export function activeMention(text: string, cursor: number): { start: number; query: string } | null {
+  const upto = text.slice(0, cursor);
+  const at = upto.lastIndexOf('@');
+  if (at < 0) return null;
+  const before = at === 0 ? ' ' : upto[at - 1];
+  if (before !== ' ' && before !== '\n') return null;
+  const query = upto.slice(at + 1);
+  if (/[\n@]/.test(query)) return null;
+  return { start: at, query };
 }

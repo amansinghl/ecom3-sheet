@@ -12,6 +12,7 @@ import { ViewCreateDialog } from './view-create-dialog';
 import { HeroSection } from './hero-section';
 import { BulkUploadModal } from './bulk-upload-modal';
 import { useSheetStore } from '@/lib/store/sheet-store';
+import { useRemarkReadStore } from '@/lib/store/remark-read-store';
 import { useKeyboardShortcuts } from '@/hooks/use-keyboard-shortcuts';
 import { loadColumnVisibility, saveColumnVisibility } from '@/lib/utils/storage';
 import { useSheetData } from '@/hooks/use-sheet-data';
@@ -111,6 +112,14 @@ export function SheetView({ config, userRole }: SheetViewProps) {
       isEditing: pauseRefetch,
     }
   );
+
+  // Remember the KB threads already on screen, so only a message sent after this shows as unread.
+  const hydrateRemarkReads = useRemarkReadStore((state) => state.hydrate);
+  const captureRemarkBaseline = useRemarkReadStore((state) => state.captureBaseline);
+
+  useEffect(() => {
+    hydrateRemarkReads();
+  }, [hydrateRemarkReads]);
 
   // N8N sheet only: pull the escalation sheet as well, so rows whose shipment
   // already has an OPEN escalation can be highlighted in yellow.
@@ -223,6 +232,7 @@ export function SheetView({ config, userRole }: SheetViewProps) {
       }
 
       setData(dedupedData);
+      if (config.id === 'escalations') captureRemarkBaseline(dedupedData);
       setLocalError(null);
     }
   }, [apiData, config.id]);

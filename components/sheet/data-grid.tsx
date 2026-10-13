@@ -12,6 +12,8 @@ import {
   ColumnResizeMode,
 } from '@tanstack/react-table';
 import { useVirtualizer } from '@tanstack/react-virtual';
+import { useQuery } from '@tanstack/react-query';
+import { useSession } from 'next-auth/react';
 import { SheetConfig, RowData, UserRole, ColumnFilter, GroupHeader, ColumnConfig } from '@/types';
 import { useSheetStore, CellPosition, SelectionRange } from '@/lib/store/sheet-store';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -24,8 +26,9 @@ import { cn } from '@/lib/utils';
 import { ChevronDown, ChevronUp, ChevronRight, Filter, MessageSquare, Pin, PinOff } from 'lucide-react';
 import { toast } from 'sonner';
 import { RowThreadDialog } from './row-thread-dialog';
-import { isRemarkColumn, RemarkColumnId } from '@/lib/remarks';
-import { useRemarkReadStore, useRemarkUnread } from '@/lib/store/remark-read-store';
+import { isRemarkColumn, RemarkColumnId, REMARK_COLUMN } from '@/lib/remarks';
+import { sheetApiService } from '@/lib/api/sheets';
+import { isRemarkUnread, useRemarkReadStore, useRemarkUnread } from '@/lib/store/remark-read-store';
 
 // Wide enough for the row number, the select checkbox and the thread button.
 // stickyPositions below offsets pinned columns by the same value.
@@ -62,6 +65,8 @@ interface DataGridProps {
 }
 
 export function DataGrid({ config, data, userRole, onCellUpdate, onActiveCellChange, columnVisibility: externalColumnVisibility, onColumnVisibilityChange, onDuplicateRow, onDuplicateRows, onCopyRow, onCopyRows, onDeleteRow, onDeleteRows, onAddRow, onClearFilters, hasActiveFilters, scrollContainerRef, globalSearch = '', onUndo, onRedo }: DataGridProps) {
+  const { data: session } = useSession();
+  const userName = session?.user?.name || '';
   const { 
     selectedRows, 
     toggleRowSelection, 
@@ -103,6 +108,8 @@ export function DataGrid({ config, data, userRole, onCellUpdate, onActiveCellCha
   // RowData type, so the id is kept raw for the lookup against `data` below.
   const [thread, setThread] = useState<{ rowId: string; columnId: RemarkColumnId } | null>(null);
   const hydrateRemarkReads = useRemarkReadStore((state) => state.hydrate);
+  const remarkSnapshots = useRemarkReadStore((state) => state.snapshots);
+  const remarkReadsReady = useRemarkReadStore((state) => state.hydrated && state.baselined);
 
   useEffect(() => {
     hydrateRemarkReads();
@@ -374,7 +381,8 @@ export function DataGrid({ config, data, userRole, onCellUpdate, onActiveCellCha
               {!isEmptyRow && (
                 <RowThreadButton
                   row={row.original}
-                  onOpen={() => setThread({ rowId: row.original.id, columnId: 'ops_remarks' })}
+                  userName={userName}
+                  onOpen={() => setThread({ rowId: row.original.id, columnId: REMARK_COLUMN })}
                 />
               )}
             </div>
@@ -580,7 +588,7 @@ export function DataGrid({ config, data, userRole, onCellUpdate, onActiveCellCha
     return cols;
   // PERFORMANCE: Removed editingCell, setEditingCell, onCellUpdate, globalSearch from deps
   // They're now read from refs to prevent column recreation on every state change
-  }, [orderedColumns, canEdit, columnWidths, viewState.columnFilters, viewState.pinnedColumns, setColumnFilter, toggleColumnPin, rowHeight, openFilterPopover, data, config.id]);
+  }, [orderedColumns, canEdit, columnWidths, viewState.columnFilters, viewState.pinnedColumns, setColumnFilter, toggleColumnPin, rowHeight, openFilterPopover, data, config.id, userName]);
 
   const tableData = useMemo(() => {
     return groupedData.filter((item): item is RowData => !isGroupHeader(item));
@@ -612,6 +620,13 @@ export function DataGrid({ config, data, userRole, onCellUpdate, onActiveCellCha
 
   // Looked up from the live data rather than captured at click time, so the
   // dialog's detail rail keeps showing current values while it is open.
+  const { data: mentionUsers = [] } = useQuery({
+    queryKey: ['escalation-mention-employees'],
+    queryFn: () => sheetApiService.getMentionEmployees(),
+    enabled: config.id === 'escalations',
+    staleTime: 10 * 60 * 1000,
+  });
+
   const threadRow = useMemo(
     () => (thread ? data.find((row) => row.id === thread.rowId) || null : null),
     [thread, data]
@@ -1531,6 +1546,11 @@ export function DataGrid({ config, data, userRole, onCellUpdate, onActiveCellCha
                 const isMultiManualCaseLatest =
                   (row.original._isMultiManualCaseLatest === true ||
                     row.original._isOpenEscalationMatch === true) && !isDuplicate;
+                // New remark since this person last opened the thread.
+                const hasUnreadRemark =
+                  config.id === 'escalations' &&
+                  !isEmptyRow &&
+                  isRemarkUnread(row.original, remarkSnapshots, remarkReadsReady, userName);
 
                 return (
                   <tr
@@ -1568,7 +1588,8 @@ export function DataGrid({ config, data, userRole, onCellUpdate, onActiveCellCha
                         idx % 2 !== 0 &&
                         'hover:bg-gray-100',
                       isEmptyRow && 'bg-gray-50',
-                      selectedRows.has(row.id) && !isEmptyRow && !isDuplicate && 'bg-blue-50 hover:bg-blue-100',
+                      hasUnreadRemark && 'bg-blue-100',
+                      selectedRows.has(row.id) && !isEmptyRow && !isDuplicate && !hasUnreadRemark && 'bg-blue-50 hover:bg-blue-100',
                       rowHeightClasses[rowHeight]
                     )}
                   >
@@ -1615,7 +1636,9 @@ export function DataGrid({ config, data, userRole, onCellUpdate, onActiveCellCha
                         const isMultiManual =
                           (row.original._isMultiManualCaseLatest === true ||
                             row.original._isOpenEscalationMatch === true) && !isDuplicate;
-                        
+
+                        if (hasUnreadRemark) return '#dbeafe';
+
                         // Duplicate row styling takes highest precedence
                         if (isDuplicate && !isEmptyRow) {
                           return '#fecaca'; // red-200
@@ -1648,6 +1671,7 @@ export function DataGrid({ config, data, userRole, onCellUpdate, onActiveCellCha
                         // Determine if CSS class will be applied (which has !important and overrides inline styles)
                         const willHavePinkClass =
                           isDataCell &&
+                          !hasUnreadRemark &&
                           !isDuplicate &&
                           !isMultiManual &&
                           (config.id === 'escalations'
@@ -1673,6 +1697,7 @@ export function DataGrid({ config, data, userRole, onCellUpdate, onActiveCellCha
                         className={cn(
                           'border-r border-border p-0 overflow-hidden relative',
                           rowHeightClasses[rowHeight],
+                          hasUnreadRemark && 'remark-unread',
                           !isEditable && 'cursor-not-allowed',
                           isPinned && 'sticky z-20',
                           isLastPinned && 'shadow-[2px_0_4px_rgba(0,0,0,0.1)]',
@@ -1685,6 +1710,7 @@ export function DataGrid({ config, data, userRole, onCellUpdate, onActiveCellCha
                           // Column styling - sheet-specific, only apply if NOT a duplicate row
                           // Duplicate rows should show red background, not the column color
                           isDataCell &&
+                          !hasUnreadRemark &&
                           !isDuplicate &&
                           !isMultiManualCaseLatest &&
                           (config.id === 'escalations'
@@ -1785,8 +1811,9 @@ export function DataGrid({ config, data, userRole, onCellUpdate, onActiveCellCha
           if (!open) setThread(null);
         }}
         row={threadRow}
-        column={thread?.columnId ?? 'ops_remarks'}
+        column={thread?.columnId ?? REMARK_COLUMN}
         config={config}
+        mentionUsers={mentionUsers}
         onCellUpdate={onCellUpdate}
       />
     </div>
@@ -1795,6 +1822,7 @@ export function DataGrid({ config, data, userRole, onCellUpdate, onActiveCellCha
 
 interface RowThreadButtonProps {
   row: RowData;
+  userName: string;
   onOpen: () => void;
 }
 
@@ -1804,8 +1832,8 @@ interface RowThreadButtonProps {
  * hovering every row. Everything stays inside the row box - a count badge or a
  * negatively offset dot spills into the rows above and below at compact height.
  */
-function RowThreadButton({ row, onOpen }: RowThreadButtonProps) {
-  const isUnread = useRemarkUnread(row);
+function RowThreadButton({ row, userName, onOpen }: RowThreadButtonProps) {
+  const isUnread = useRemarkUnread(row, userName);
 
   return (
     <button

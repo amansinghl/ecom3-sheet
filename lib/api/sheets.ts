@@ -585,6 +585,18 @@ class SheetApiService {
   /**
    * Get sales employees for lead assignment dropdown
    */
+  async getMentionEmployees(): Promise<string[]> {
+    try {
+      const response = await apiClient.get<ApiResponse<{ employees: string[] }>>(
+        '/sheets/escalation/mention-employees'
+      );
+      return response.data?.employees || [];
+    } catch (error) {
+      console.error('Failed to fetch mention employees:', error);
+      return [];
+    }
+  }
+
   async getSalesEmployees(): Promise<{ id: number; email: string; name: string }[]> {
     try {
       const response = await apiClient.get<ApiResponse<any>>(
