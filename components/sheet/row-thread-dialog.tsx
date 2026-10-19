@@ -262,8 +262,8 @@ export function RowThreadDialog({ open, onOpenChange, row: activeRow, column, co
           Remarks for this shipment.
         </DialogDescription>
 
-        <div className="grid min-h-0 flex-1 grid-rows-[auto_1fr] md:grid-cols-[300px_1fr] md:grid-rows-1">
-          <div className="flex shrink-0 flex-col border-b bg-muted/30 md:min-h-0 md:overflow-y-auto md:scroll-smooth md:border-r md:border-b-0">
+        <div className="grid min-h-0 flex-1 grid-rows-[auto_1fr] md:grid-cols-[min(420px,42%)_1fr] md:grid-rows-1">
+          <div className="flex shrink-0 flex-col border-b bg-muted/30 md:min-h-0 md:overflow-hidden md:border-r md:border-b-0">
             <div className="sticky top-0 z-10 flex gap-2 bg-muted/30 px-4 py-3 md:pt-4">
               {remarkColumns.map((columnId) => {
                 const column = config.columns.find((col) => col.id === columnId);
@@ -286,16 +286,16 @@ export function RowThreadDialog({ open, onOpenChange, row: activeRow, column, co
               })}
             </div>
             <div className="hidden px-5 py-4 md:block">
-              <p className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Shipment details
               </p>
-              <dl className="space-y-3">
+              <dl className="grid grid-cols-2 gap-x-4 gap-y-2.5">
                 {detailFields.map(({ column, value }) => (
-                  <div key={column.id} className="text-left">
-                    <dt className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                  <div key={column.id} className="min-w-0 text-left">
+                    <dt className="text-xs uppercase tracking-wide text-muted-foreground">
                       {column.label}
                     </dt>
-                    <dd className="text-sm break-words whitespace-pre-wrap">{value}</dd>
+                    <dd className="text-[15px] break-words whitespace-pre-wrap">{value}</dd>
                   </div>
                 ))}
                 {detailFields.length === 0 && (
@@ -504,18 +504,18 @@ const MessageRow = memo(function MessageRow({ message, mentionUsers, previous }:
               <span className="text-sm font-semibold">
                 {author}
               </span>
+              {message.createdAt && (
+                <span
+                  className="text-xs text-muted-foreground"
+                  title={format(new Date(message.createdAt), 'dd MMM yyyy, HH:mm')}
+                >
+                  {format(new Date(message.createdAt), 'hh:mm a')}
+                </span>
+              )}
             </div>
           )}
           <p className="text-sm break-words whitespace-pre-wrap">
             <MentionText body={message.body} users={mentionUsers} />
-            {message.createdAt && (
-              <span
-                className="ml-2 text-xs text-muted-foreground"
-                title={format(new Date(message.createdAt), 'dd MMM yyyy, HH:mm')}
-              >
-                {format(new Date(message.createdAt), 'hh:mm a')}
-              </span>
-            )}
           </p>
         </div>
       </div>

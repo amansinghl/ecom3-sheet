@@ -26,6 +26,29 @@ interface SheetViewProps {
   userRole: UserRole;
 }
 
+function isUnsavedSheetRow(row: RowData): boolean {
+  const id = String(row.id ?? '');
+  return id.startsWith('row-') || id.startsWith('empty-');
+}
+
+/**
+ * Fold a KB poll into the rows already on screen.
+ * Unchanged rows keep their object so a selected id does not flicker.
+ * A new Internal Remarks value stays on the row; the existing unread check paints it blue.
+ */
+function applyEscalationPoll(current: RowData[], incoming: RowData[]): RowData[] {
+  if (current.length === 0) return incoming;
+  const currentById = new Map(current.map((row) => [String(row.id), row]));
+  const merged = incoming.map((row) => {
+    const prev = currentById.get(String(row.id));
+    if (!prev) return row;
+    if (prev.ops_remarks === row.ops_remarks && prev.updated_at === row.updated_at) return prev;
+    return row;
+  });
+  const unsaved = current.filter(isUnsavedSheetRow);
+  return unsaved.length === 0 ? merged : [...merged, ...unsaved];
+}
+
 export function SheetView({ config, userRole }: SheetViewProps) {
   // Get user session for personalized views
   const { data: session } = useSession();
@@ -95,10 +118,11 @@ export function SheetView({ config, userRole }: SheetViewProps) {
   }, []);
   const queryClient = useQueryClient();
 
-  // Pause auto-refetch while user is editing OR has rows selected.
-  // Why: poll mid-action swaps row refs/ids, which causes border flicker
-  // and silently breaks copy (selected ids vanish from new data array).
-  const pauseRefetch = !!editingCell || selectedRows.size > 0;
+  // Pause auto-refetch while a cell is being edited, and on other sheets while
+  // rows are selected: a full swap mid-action flickers borders and drops selected ids.
+  // KB keeps the 30s pull during selection. applyEscalationPoll keeps those ids,
+  // and a changed Internal Remarks value is what turns the row blue.
+  const pauseRefetch = !!editingCell || (config.id !== 'escalations' && selectedRows.size > 0);
   const {
     data: apiData,
     isLoading,
@@ -231,7 +255,9 @@ export function SheetView({ config, userRole }: SheetViewProps) {
         );
       }
 
-      setData(dedupedData);
+      setData((current) =>
+        config.id === 'escalations' ? applyEscalationPoll(current, dedupedData) : dedupedData
+      );
       if (config.id === 'escalations') captureRemarkBaseline(dedupedData);
       setLocalError(null);
     }
