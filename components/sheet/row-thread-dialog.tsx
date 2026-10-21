@@ -35,6 +35,9 @@ interface RowThreadDialogProps {
 // Rendered as chips in the header rather than repeated in the field list below.
 const HEADER_STATUS_COLUMNS = ['manual_case', 'manual_ticket_status', 'auto_ticket_status', 'status'];
 
+// Already in the dialog header (title / AWB) or the notes strip on the right.
+const HIDDEN_SIDEBAR_COLUMNS = new Set(['shipment_no', 'awb_no', 'notes']);
+
 // Derived or interactive columns have no meaningful read-only value.
 const SKIPPED_COLUMN_TYPES = new Set(['highlights', 'action-button']);
 
@@ -176,7 +179,7 @@ export function RowThreadDialog({ open, onOpenChange, row: activeRow, column, co
     if (!row) return [];
     const chatColumns = new Set<string>(REMARK_COLUMNS);
     return config.columns
-      .filter((column) => !SKIPPED_COLUMN_TYPES.has(column.type) && !chatColumns.has(column.id))
+      .filter((column) => !SKIPPED_COLUMN_TYPES.has(column.type) && !chatColumns.has(column.id) && !HIDDEN_SIDEBAR_COLUMNS.has(column.id))
       .filter((column) => hasValue(row[column.id]))
       .map((column) => ({ column, value: formatFieldValue(row[column.id], column) }));
   }, [row, config.columns]);
@@ -264,42 +267,21 @@ export function RowThreadDialog({ open, onOpenChange, row: activeRow, column, co
 
         <div className="grid min-h-0 flex-1 grid-rows-[auto_1fr] md:grid-cols-[min(420px,42%)_1fr] md:grid-rows-1">
           <div className="flex shrink-0 flex-col border-b bg-muted/30 md:min-h-0 md:overflow-hidden md:border-r md:border-b-0">
-            <div className="sticky top-0 z-10 flex gap-2 bg-muted/30 px-4 py-3 md:pt-4">
-              {remarkColumns.map((columnId) => {
-                const column = config.columns.find((col) => col.id === columnId);
-                const selected = activeColumn === columnId;
-                return (
-                  <Button
-                    key={columnId}
-                    type="button"
-                    size="sm"
-                    variant={selected ? 'default' : 'outline'}
-                    className="flex-1"
-                    onClick={() => {
-                      setActiveColumn(columnId);
-                      setDraft('');
-                    }}
-                  >
-                    {column?.label || columnId}
-                  </Button>
-                );
-              })}
-            </div>
-            <div className="hidden px-5 py-4 md:block">
-              <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            <div className="hidden min-h-0 flex-1 overflow-y-auto px-4 py-3 md:block">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Shipment details
               </p>
-              <dl className="grid grid-cols-2 gap-x-4 gap-y-2.5">
+              <dl className="grid grid-cols-2 gap-x-3 gap-y-1.5">
                 {detailFields.map(({ column, value }) => (
                   <div key={column.id} className="min-w-0 text-left">
                     <dt className="text-xs uppercase tracking-wide text-muted-foreground">
                       {column.label}
                     </dt>
-                    <dd className="text-[15px] break-words whitespace-pre-wrap">{value}</dd>
+                    <dd className="text-[15px] leading-snug break-words whitespace-pre-wrap">{value}</dd>
                   </div>
                 ))}
                 {detailFields.length === 0 && (
-                  <p className="text-sm text-muted-foreground">This row is empty.</p>
+                  <p className="text-[13px] text-muted-foreground">This row is empty.</p>
                 )}
               </dl>
             </div>
