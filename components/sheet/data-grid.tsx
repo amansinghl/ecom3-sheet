@@ -107,6 +107,8 @@ export function DataGrid({ config, data, userRole, onCellUpdate, onActiveCellCha
   // scrolls out of the virtualiser. Saved rows carry numeric ids despite the
   // RowData type, so the id is kept raw for the lookup against `data` below.
   const [thread, setThread] = useState<{ rowId: string; columnId: RemarkColumnId } | null>(null);
+  // Row the chat was opened on. Stays set for 3s after close so the red can fade.
+  const [openedRowId, setOpenedRowId] = useState<string | null>(null);
   const hydrateRemarkReads = useRemarkReadStore((state) => state.hydrate);
   const remarkSnapshots = useRemarkReadStore((state) => state.snapshots);
   const remarkReadsReady = useRemarkReadStore((state) => state.hydrated && state.baselined);
@@ -114,6 +116,17 @@ export function DataGrid({ config, data, userRole, onCellUpdate, onActiveCellCha
   useEffect(() => {
     hydrateRemarkReads();
   }, [hydrateRemarkReads]);
+
+  useEffect(() => {
+    if (!thread) return;
+    setOpenedRowId(String(thread.rowId));
+  }, [thread]);
+
+  useEffect(() => {
+    if (thread || !openedRowId) return;
+    const timer = window.setTimeout(() => setOpenedRowId(null), 1000);
+    return () => window.clearTimeout(timer);
+  }, [thread, openedRowId]);
 
   // Memoized selection state for fast O(1) lookups - prevents lag
   const selectionState = useMemo(() => {
@@ -1551,6 +1564,8 @@ export function DataGrid({ config, data, userRole, onCellUpdate, onActiveCellCha
                   config.id === 'escalations' &&
                   !isEmptyRow &&
                   isRemarkUnread(row.original, remarkSnapshots, remarkReadsReady, userName);
+                const isOpenedThread =
+                  openedRowId !== null && String(row.original.id) === openedRowId;
 
                 return (
                   <tr
@@ -1569,7 +1584,8 @@ export function DataGrid({ config, data, userRole, onCellUpdate, onActiveCellCha
                       }
                     }}
                     className={cn(
-                      'border-b border-border group/row',
+                      'border-b border-border group/row transition-[background-color] duration-500',
+                      isOpenedThread && 'thread-opened',
                       isDuplicate && !isEmptyRow && 'bg-red-200 hover:bg-red-300',
                       isMultiManualCaseLatest && !isEmptyRow && 'bg-yellow-100 hover:bg-yellow-200',
                       !isDuplicate &&
@@ -1637,6 +1653,7 @@ export function DataGrid({ config, data, userRole, onCellUpdate, onActiveCellCha
                           (row.original._isMultiManualCaseLatest === true ||
                             row.original._isOpenEscalationMatch === true) && !isDuplicate;
 
+                        if (isOpenedThread) return '#bbf7d0';
                         if (hasUnreadRemark) return '#dbeafe';
 
                         // Duplicate row styling takes highest precedence
@@ -1671,6 +1688,7 @@ export function DataGrid({ config, data, userRole, onCellUpdate, onActiveCellCha
                         // Determine if CSS class will be applied (which has !important and overrides inline styles)
                         const willHavePinkClass =
                           isDataCell &&
+                          !isOpenedThread &&
                           !hasUnreadRemark &&
                           !isDuplicate &&
                           !isMultiManual &&
@@ -1695,9 +1713,10 @@ export function DataGrid({ config, data, userRole, onCellUpdate, onActiveCellCha
                         data-cell={isDataCell ? `${rowIndex}-${colIndex}` : undefined}
                         onClick={isDataCell ? (e) => handleCellClick(rowIndex, colIndex, e) : undefined}
                         className={cn(
-                          'border-r border-border p-0 overflow-hidden relative',
+                          'border-r border-border p-0 overflow-hidden relative transition-[background-color] duration-500',
                           rowHeightClasses[rowHeight],
-                          hasUnreadRemark && 'remark-unread',
+                          isOpenedThread && 'thread-opened',
+                          hasUnreadRemark && !isOpenedThread && 'remark-unread',
                           !isEditable && 'cursor-not-allowed',
                           isPinned && 'sticky z-20',
                           isLastPinned && 'shadow-[2px_0_4px_rgba(0,0,0,0.1)]',
@@ -1710,6 +1729,7 @@ export function DataGrid({ config, data, userRole, onCellUpdate, onActiveCellCha
                           // Column styling - sheet-specific, only apply if NOT a duplicate row
                           // Duplicate rows should show red background, not the column color
                           isDataCell &&
+                          !isOpenedThread &&
                           !hasUnreadRemark &&
                           !isDuplicate &&
                           !isMultiManualCaseLatest &&

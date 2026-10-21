@@ -399,6 +399,12 @@ tr[data-group-header] td {
   transition: background-color 180ms ease;
 }
 
+/* Row whose chat is open, and for 1second after it closes. */
+.thread-opened {
+  background-color: #bbf7d0 !important;
+  transition: background-color 500ms ease;
+}
+
 .non-editable-column * {
   color: #374151 !important; /* Dark gray text for better visibility */
   opacity: 1 !important; /* Full opacity for text to ensure visibility */
