@@ -81,7 +81,13 @@ export function EmptyState({ type, onAddRow, onClearFilters }: EmptyStateProps) 
       ],
       emoji: '🎛️',
       action: onClearFilters ? (
-        <Button onClick={onClearFilters} variant="outline" size="sm" className="mt-2">
+        <Button
+          type="button"
+          onClick={onClearFilters}
+          variant="outline"
+          size="sm"
+          className="mt-2 border-black bg-white text-black hover:bg-gray-100 hover:text-black"
+        >
           Clear filters
         </Button>
       ) : null,
@@ -120,7 +126,10 @@ export function EmptyState({ type, onAddRow, onClearFilters }: EmptyStateProps) 
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.3 }}
-        className="text-xl font-bold mb-3 text-gray-900 dark:text-gray-100"
+        className={cn(
+          'mb-3 text-xl font-bold',
+          type === 'no-filtered' ? 'text-black' : 'text-gray-900 dark:text-gray-100'
+        )}
       >
         {config.title}
       </motion.h3>
@@ -129,7 +138,10 @@ export function EmptyState({ type, onAddRow, onClearFilters }: EmptyStateProps) 
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.4 }}
-        className="text-sm text-gray-700 dark:text-gray-300 mb-6 max-w-md leading-relaxed"
+        className={cn(
+          'mb-6 max-w-md text-sm leading-relaxed',
+          type === 'no-filtered' ? 'text-black' : 'text-gray-700 dark:text-gray-300'
+        )}
       >
         {description}
       </motion.p>

@@ -17,7 +17,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Search, FileDown, Plus, Info, SplitSquareVertical, Eye, EyeOff, Download, FileSpreadsheet, RefreshCw, ArrowUpNarrowWide, ArrowDownWideNarrow, Rows3, Upload, Pin, PinOff, X, GripVertical, Layers, Check, ChevronDown, ChevronUp, Minimize2, Maximize2, Menu, ListFilter, XCircle } from 'lucide-react';
+import { Search, FileDown, Plus, Info, SplitSquareVertical, Eye, EyeOff, Download, FileSpreadsheet, RefreshCw, ArrowUpNarrowWide, ArrowDownWideNarrow, Rows3, Upload, Pin, PinOff, X, GripVertical, Layers, Check, ChevronDown, ChevronUp, Minimize2, Maximize2, Menu, ListFilter, XCircle, Filter } from 'lucide-react';
 import { useSheetStore, RowHeight } from '@/lib/store/sheet-store';
 import { SheetConfig, RowData, UserRole, ColumnConfig, ColumnFilter } from '@/types';
 import { summarizeHighlightsFilter } from '@/lib/utils/highlights';
@@ -139,13 +139,15 @@ export interface ToolbarProps {
   onActiveCellUpdate?: (rowId: string, columnId: string, value: string) => void;
   onToggleSidebar?: () => void;
   showSidebarToggle?: boolean;
+  remarkFilter?: { unread: boolean; tagged: boolean };
+  onRemarkFilterChange?: (filter: { unread: boolean; tagged: boolean }) => void;
 }
 
 export interface ToolbarRef {
   focusSearch: () => void;
 }
 
-export const Toolbar = forwardRef<ToolbarRef, ToolbarProps>(({ config, data, userRole, onAddRow, onDeleteRows, onBulkUpload, onRefresh, columnVisibility = {}, onColumnVisibilityChange, onOpenCommandPalette, globalSearch = '', onGlobalSearchChange, visibleRowCount = 0, activeViewId, columnFilters = {}, activeCell = null, onToggleSidebar, showSidebarToggle = false }, ref) => {
+export const Toolbar = forwardRef<ToolbarRef, ToolbarProps>(({ config, data, userRole, onAddRow, onDeleteRows, onBulkUpload, onRefresh, columnVisibility = {}, onColumnVisibilityChange, onOpenCommandPalette, globalSearch = '', onGlobalSearchChange, visibleRowCount = 0, activeViewId, columnFilters = {}, activeCell = null, onToggleSidebar, showSidebarToggle = false, remarkFilter, onRemarkFilterChange }, ref) => {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [showInfoDialog, setShowInfoDialog] = useState(false);
   const [formulaValue, setFormulaValue] = useState('');
@@ -163,6 +165,7 @@ export const Toolbar = forwardRef<ToolbarRef, ToolbarProps>(({ config, data, use
     selectedRows, 
     clearSelection,
     clearColumnFilter,
+    clearAllFilters,
     rowHeight,
     setRowHeight,
     toggleColumnPin,
@@ -635,6 +638,50 @@ export const Toolbar = forwardRef<ToolbarRef, ToolbarProps>(({ config, data, use
             </TooltipContent>
           </Tooltip>
         )}
+
+        {remarkFilter && onRemarkFilterChange && (
+          <DropdownMenu>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant={remarkFilter.unread || remarkFilter.tagged ? 'default' : 'outline'}
+                    size="sm"
+                    className="h-7 w-7 shrink-0 px-0"
+                    aria-label="Filter notes"
+                  >
+                    <Filter className="h-3.5 w-3.5" />
+                  </Button>
+                </DropdownMenuTrigger>
+              </TooltipTrigger>
+              <TooltipContent>Filter by Unread and tagged</TooltipContent>
+            </Tooltip>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                onClick={() => onRemarkFilterChange({ unread: !remarkFilter.unread, tagged: false })}
+              >
+                Unread
+                {remarkFilter.unread && <Check className="ml-auto h-4 w-4" />}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => onRemarkFilterChange({ unread: false, tagged: !remarkFilter.tagged })}
+              >
+                Tagged
+                {remarkFilter.tagged && <Check className="ml-auto h-4 w-4" />}
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={() => {
+                  onRemarkFilterChange({ unread: false, tagged: false });
+                  clearAllFilters();
+                  onGlobalSearchChange?.('');
+                }}
+              >
+                Clear all filters
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
       </div>
       </div>
 
@@ -710,6 +757,7 @@ export const Toolbar = forwardRef<ToolbarRef, ToolbarProps>(({ config, data, use
             onClick={() => {
               // Preserve view-defining filters (e.g. is_closed=0 on Open Escalations).
               activeFilterEntries.forEach(([columnId]) => clearColumnFilter(columnId));
+              onRemarkFilterChange?.({ unread: false, tagged: false });
             }}
           >
             <XCircle className="h-3.5 w-3.5" />
