@@ -30,9 +30,9 @@ import { isRemarkColumn, RemarkColumnId, REMARK_COLUMN } from '@/lib/remarks';
 import { sheetApiService } from '@/lib/api/sheets';
 import { isRemarkUnread, useRemarkReadStore, useRemarkUnread } from '@/lib/store/remark-read-store';
 
-// Wide enough for the row number, the select checkbox and the thread button.
+// Wide enough for the record id, the select checkbox and the thread button.
 // stickyPositions below offsets pinned columns by the same value.
-const SELECT_COLUMN_WIDTH = 78;
+const SELECT_COLUMN_WIDTH = 98;
 
 export interface ActiveCellInfo {
   rowId: string;
@@ -121,12 +121,18 @@ export function DataGrid({ config, data, userRole, onCellUpdate, onActiveCellCha
     hydrateRemarkReads();
   }, [hydrateRemarkReads]);
 
-  // The bell lives in the toolbar, above this grid, so it asks for a thread by
-  // row id and the request is cleared once opened.
+  // The bell lives in the header, above this grid, so it asks for a thread by
+  // row id. The request is left standing while the row is not on screen - the
+  // sheet clears whatever is hiding it and this runs again - and is only
+  // cleared once the thread is actually open.
   useEffect(() => {
     if (!openThreadRowId) return;
-    const exists = data.some((row) => String(row.id) === String(openThreadRowId));
-    if (exists) setThread({ rowId: openThreadRowId, columnId: REMARK_COLUMN });
+    const match = data.find((row) => String(row.id) === String(openThreadRowId));
+    if (!match) return;
+
+    // The row's own id, not the string the bell asked with: threadRow below
+    // matches it by identity against the ids the API sent, which are numbers.
+    setThread({ rowId: match.id, columnId: REMARK_COLUMN });
     onThreadRequestHandled?.();
   }, [openThreadRowId, data, onThreadRequestHandled]);
 
@@ -364,32 +370,45 @@ export function DataGrid({ config, data, userRole, onCellUpdate, onActiveCellCha
         id: 'select',
         header: ({ table }) => (
           <div className="flex items-center gap-0.5 pl-2 pr-1 group">
-            <div className="flex h-5 w-5 shrink-0 items-center justify-center">
+            <div className="flex h-5 w-10 shrink-0 items-center justify-center">
               <Checkbox
                 checked={table.getIsAllRowsSelected()}
                 onCheckedChange={(value) => table.toggleAllRowsSelected(!!value)}
                 aria-label="Select all"
               />
             </div>
+            <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+              ID
+            </span>
           </div>
         ),
         cell: ({ row }) => {
-          const rowIndex = row.index + 1;
           const isSelected = row.getIsSelected();
           const isEmptyRow = row.original._isEmpty === true;
+
+          // The table's own id, which is the ticket number people quote, rather
+          // than the position in the list - that shifted with every sort and
+          // filter and so was never worth reading. Rows added in the grid carry
+          // a temporary "row-" id until the API returns a real one, so they stay
+          // blank instead of showing scaffolding.
+          const recordId = String(row.original.id ?? '');
+          const ticketId = recordId.startsWith('row-') ? '' : recordId;
 
           // Hover is driven by the row's group/row class rather than the
           // hoveredRow state, which this memoised column definition does not
           // see updates to.
           return (
             <div className="flex items-center gap-0.5 pl-2 pr-1 group">
-              <div className="relative flex h-5 w-5 shrink-0 items-center justify-center">
-                <span className={cn(
-                  "text-sm text-muted-foreground transition-opacity",
-                  !isEmptyRow && "group-hover/row:opacity-0",
-                  isSelected && !isEmptyRow && "opacity-0"
-                )}>
-                  {!isEmptyRow ? rowIndex : ''}
+              <div className="relative flex h-5 w-10 shrink-0 items-center justify-center">
+                <span
+                  title={ticketId || undefined}
+                  className={cn(
+                    "truncate text-xs tabular-nums text-muted-foreground transition-opacity",
+                    !isEmptyRow && "group-hover/row:opacity-0",
+                    isSelected && !isEmptyRow && "opacity-0"
+                  )}
+                >
+                  {!isEmptyRow ? ticketId : ''}
                 </span>
                 {!isEmptyRow && (
                   <div className={cn(

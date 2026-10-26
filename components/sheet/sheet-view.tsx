@@ -159,6 +159,12 @@ export function SheetView({ config, userRole }: SheetViewProps) {
   // view: read state is per browser and per person, so it is not shareable.
   const [remarkFilter, setRemarkFilter] = useState<RemarkFilterMode>('all');
 
+  // A notification is nearly always for a row the current view hides - the
+  // Unread filter is the obvious case, but a search term does it too - so the
+  // request clears what is hiding it rather than quietly doing nothing. The
+  // grid opens the thread on the next pass, and opening it marks it read.
+  const revealedRequestRef = useRef<string | null>(null);
+
 
   // N8N sheet only: pull the escalation sheet as well, so rows whose shipment
   // already has an OPEN escalation can be highlighted in yellow.
@@ -679,6 +685,28 @@ export function SheetView({ config, userRole }: SheetViewProps) {
 
     return [...result, ...emptyRows];
   }, [data, viewState.columnFilters, config.columns, config.id, globalSearch, activeViewId, activeView, viewState.sorts.length, openEscalationRefs, remarkFilter, remarkSnapshots, remarkReadsReady, userName]);
+
+  useEffect(() => {
+    if (!threadRequestRowId) {
+      revealedRequestRef.current = null;
+      return;
+    }
+    if (!data.some((row) => String(row.id) === threadRequestRowId)) return;
+    if (filteredData.some((row) => String(row.id) === threadRequestRowId)) return;
+
+    // Only try once per request, so a row a column filter still hides does not
+    // loop. The grid leaves the request standing, so say why nothing opened.
+    if (revealedRequestRef.current === threadRequestRowId) {
+      toast.info('That ticket is hidden by the filters on this sheet', { id: 'thread-hidden' });
+      handleThreadRequestHandled();
+      return;
+    }
+    revealedRequestRef.current = threadRequestRowId;
+
+    if (remarkFilter !== 'all') setRemarkFilter('all');
+    if (globalSearch.trim()) setGlobalSearch('');
+  }, [threadRequestRowId, data, filteredData, remarkFilter, globalSearch, handleThreadRequestHandled]);
+
 
   // Update visible row IDs after render (not during render)
   // This runs after the filteredData useMemo has computed the new filtered IDs
