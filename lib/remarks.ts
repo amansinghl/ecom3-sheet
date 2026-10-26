@@ -110,10 +110,30 @@ function samePerson(a: string, b: string): boolean {
   return a.trim().toLowerCase() === b.trim().toLowerCase();
 }
 
+export interface MentionPerson {
+  name: string;
+  email: string;
+  team: string;
+}
+
+/** True when the query is a prefix of the full name, any name part, or the team. */
+export function personMatchesMention(person: MentionPerson, query: string): boolean {
+  const needle = query.trim().toLowerCase();
+  if (!needle) return false;
+  const name = person.name.trim().toLowerCase();
+  const parts = name.split(/\s+/).filter(Boolean);
+  return name.startsWith(needle) || parts.some((part) => part.startsWith(needle)) || person.team.trim().toLowerCase().startsWith(needle);
+}
+
 function mentionsUser(text: string, userName: string): boolean {
   const name = userName.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   if (!name) return false;
   return new RegExp(`@${name}(?=\\s|$)`, 'i').test(text);
+}
+
+/** True when this person's name is @mentioned in the remarks thread. */
+export function isUserTagged(row: RowData, userName: string): boolean {
+  return mentionsUser(remarkColumnText(row), userName);
 }
 
 /** Ticket creator, ops owner, authors, and anyone @mentioned in the thread. */

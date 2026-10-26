@@ -12,7 +12,8 @@ import { ViewCreateDialog } from './view-create-dialog';
 import { HeroSection } from './hero-section';
 import { BulkUploadModal } from './bulk-upload-modal';
 import { useSheetStore } from '@/lib/store/sheet-store';
-import { useRemarkReadStore } from '@/lib/store/remark-read-store';
+import { isRemarkUnread, useRemarkReadStore } from '@/lib/store/remark-read-store';
+import { isUserTagged } from '@/lib/remarks';
 import { useKeyboardShortcuts } from '@/hooks/use-keyboard-shortcuts';
 import { loadColumnVisibility, saveColumnVisibility } from '@/lib/utils/storage';
 import { useSheetData } from '@/hooks/use-sheet-data';
@@ -59,6 +60,7 @@ export function SheetView({ config, userRole }: SheetViewProps) {
   
   const [data, setData] = useState<RowData[]>([]);
   const [globalSearch, setGlobalSearch] = useState('');
+  const [remarkFilter, setRemarkFilter] = useState({ unread: false, tagged: false });
   const [localError, setLocalError] = useState<string | null>(null);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const { 
@@ -140,6 +142,9 @@ export function SheetView({ config, userRole }: SheetViewProps) {
   // Remember the KB threads already on screen, so only a message sent after this shows as unread.
   const hydrateRemarkReads = useRemarkReadStore((state) => state.hydrate);
   const captureRemarkBaseline = useRemarkReadStore((state) => state.captureBaseline);
+  const remarkSnapshots = useRemarkReadStore((state) => state.snapshots);
+  const remarkReadsReady = useRemarkReadStore((state) => state.hydrated && state.baselined);
+  const remarkUserName = session?.user?.name || '';
 
   useEffect(() => {
     hydrateRemarkReads();
@@ -646,8 +651,17 @@ export function SheetView({ config, userRole }: SheetViewProps) {
       });
     }
 
-    return [...result, ...emptyRows];
-  }, [data, viewState.columnFilters, config.columns, config.id, globalSearch, activeViewId, activeView, viewState.sorts.length, openEscalationRefs]);
+    const inboxOn = config.id === 'escalations' && (remarkFilter.unread || remarkFilter.tagged);
+    if (inboxOn) {
+      result = result.filter((row) => {
+        if (remarkFilter.unread && !isRemarkUnread(row, remarkSnapshots, remarkReadsReady, remarkUserName)) return false;
+        if (remarkFilter.tagged && !isUserTagged(row, remarkUserName)) return false;
+        return true;
+      });
+    }
+
+    return inboxOn ? result : [...result, ...emptyRows];
+  }, [data, viewState.columnFilters, config.columns, config.id, globalSearch, activeViewId, activeView, viewState.sorts.length, openEscalationRefs, remarkFilter, remarkSnapshots, remarkReadsReady, remarkUserName]);
 
   // Update visible row IDs after render (not during render)
   // This runs after the filteredData useMemo has computed the new filtered IDs
@@ -2156,6 +2170,8 @@ export function SheetView({ config, userRole }: SheetViewProps) {
 
   const handleClearFilters = () => {
     clearAllFilters();
+    setRemarkFilter({ unread: false, tagged: false });
+    setGlobalSearch('');
   };
 
   const handleActiveCellUpdate = async (rowId: string, columnId: string, value: string) => {
@@ -2331,6 +2347,8 @@ export function SheetView({ config, userRole }: SheetViewProps) {
             activeCell,
             onActiveCellUpdate: handleActiveCellUpdate,
           } as any)}
+          remarkFilter={config.id === 'escalations' ? remarkFilter : undefined}
+          onRemarkFilterChange={config.id === 'escalations' ? setRemarkFilter : undefined}
         />
         <CommandPalette
           isOpen={showCommandPalette}
@@ -2374,7 +2392,7 @@ export function SheetView({ config, userRole }: SheetViewProps) {
                 onDeleteRows={handleDeleteRowsBulk}
                 onAddRow={handleAddRow}
                 onClearFilters={handleClearFilters}
-                hasActiveFilters={Object.keys(viewState.columnFilters).length > 0}
+                hasActiveFilters={Object.keys(viewState.columnFilters).length > 0 || remarkFilter.unread || remarkFilter.tagged}
                 scrollContainerRef={scrollContainerRef}
                 globalSearch={globalSearch}
                 onUndo={handleUndo}
