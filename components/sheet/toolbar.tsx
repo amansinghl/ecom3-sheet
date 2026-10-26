@@ -17,10 +17,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Search, FileDown, Plus, Info, SplitSquareVertical, Eye, EyeOff, Download, FileSpreadsheet, RefreshCw, ArrowUpNarrowWide, ArrowDownWideNarrow, Rows3, Upload, Pin, PinOff, X, GripVertical, Layers, Check, ChevronDown, ChevronUp, Minimize2, Maximize2, Menu, ListFilter, XCircle } from 'lucide-react';
+import { Search, FileDown, Plus, Info, SplitSquareVertical, Eye, EyeOff, Download, FileSpreadsheet, RefreshCw, ArrowUpNarrowWide, ArrowDownWideNarrow, Rows3, Upload, Pin, PinOff, X, GripVertical, Layers, Check, ChevronDown, ChevronUp, Minimize2, Maximize2, Menu, ListFilter, XCircle, MailOpen, Mail, Inbox } from 'lucide-react';
 import { useSheetStore, RowHeight } from '@/lib/store/sheet-store';
 import { SheetConfig, RowData, UserRole, ColumnConfig, ColumnFilter } from '@/types';
 import { summarizeHighlightsFilter } from '@/lib/utils/highlights';
+import { NotificationBell } from './notification-bell';
+import { RemarkNotifications } from '@/hooks/use-remark-notifications';
+import { RemarkFilterMode, REMARK_FILTER_LABELS } from '@/lib/remarks';
+import { cn } from '@/lib/utils';
 import { exportToCSV, exportToExcel } from '@/lib/utils/export';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -139,13 +143,19 @@ export interface ToolbarProps {
   onActiveCellUpdate?: (rowId: string, columnId: string, value: string) => void;
   onToggleSidebar?: () => void;
   showSidebarToggle?: boolean;
+  /** Unread remark threads for the signed-in user; absent on sheets without threads. */
+  notifications?: RemarkNotifications;
+  onOpenThread?: (rowId: string) => void;
+  /** Read/unread view of the remark threads. */
+  remarkFilter?: RemarkFilterMode;
+  onRemarkFilterChange?: (mode: RemarkFilterMode) => void;
 }
 
 export interface ToolbarRef {
   focusSearch: () => void;
 }
 
-export const Toolbar = forwardRef<ToolbarRef, ToolbarProps>(({ config, data, userRole, onAddRow, onDeleteRows, onBulkUpload, onRefresh, columnVisibility = {}, onColumnVisibilityChange, onOpenCommandPalette, globalSearch = '', onGlobalSearchChange, visibleRowCount = 0, activeViewId, columnFilters = {}, activeCell = null, onToggleSidebar, showSidebarToggle = false }, ref) => {
+export const Toolbar = forwardRef<ToolbarRef, ToolbarProps>(({ config, data, userRole, onAddRow, onDeleteRows, onBulkUpload, onRefresh, columnVisibility = {}, onColumnVisibilityChange, onOpenCommandPalette, globalSearch = '', onGlobalSearchChange, visibleRowCount = 0, activeViewId, columnFilters = {}, activeCell = null, onToggleSidebar, showSidebarToggle = false, notifications, onOpenThread, remarkFilter = 'all', onRemarkFilterChange }, ref) => {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [showInfoDialog, setShowInfoDialog] = useState(false);
   const [formulaValue, setFormulaValue] = useState('');
@@ -575,6 +585,46 @@ export const Toolbar = forwardRef<ToolbarRef, ToolbarProps>(({ config, data, use
             )}
           </DropdownMenuContent>
         </DropdownMenu>
+
+        {notifications && onOpenThread && (
+          <NotificationBell notifications={notifications} onOpenThread={onOpenThread} />
+        )}
+
+        {onRemarkFilterChange && config.id === 'escalations' && (
+          <DropdownMenu>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    size="sm"
+                    variant={remarkFilter === 'all' ? 'outline' : 'default'}
+                    className="h-7 shrink-0 px-2 text-xs"
+                    aria-label="Filter by remark read state"
+                  >
+                    {remarkFilter === 'unread' ? (
+                      <Mail className="h-3.5 w-3.5" />
+                    ) : remarkFilter === 'read' ? (
+                      <MailOpen className="h-3.5 w-3.5" />
+                    ) : (
+                      <Inbox className="h-3.5 w-3.5" />
+                    )}
+                  </Button>
+                </DropdownMenuTrigger>
+              </TooltipTrigger>
+              <TooltipContent>{REMARK_FILTER_LABELS[remarkFilter]}</TooltipContent>
+            </Tooltip>
+            <DropdownMenuContent align="end">
+              {(['all', 'unread', 'read'] as RemarkFilterMode[]).map((mode) => (
+                <DropdownMenuItem key={mode} onClick={() => onRemarkFilterChange(mode)}>
+                  <Check
+                    className={cn('mr-2 h-4 w-4', remarkFilter === mode ? 'opacity-100' : 'opacity-0')}
+                  />
+                  {REMARK_FILTER_LABELS[mode]}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
 
         {canEdit && onBulkUpload && config.id === 'escalations' && (
           <Tooltip>

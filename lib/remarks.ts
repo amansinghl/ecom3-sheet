@@ -132,6 +132,18 @@ export function isChatParticipant(row: RowData, userName: string): boolean {
   return names.some((name) => name !== '' && samePerson(name, me));
 }
 
+/**
+ * Which remark threads the grid shows: everything, only threads with a message
+ * this person has not seen, or only the ones they have already read.
+ */
+export type RemarkFilterMode = 'all' | 'unread' | 'read';
+
+export const REMARK_FILTER_LABELS: Record<RemarkFilterMode, string> = {
+  all: 'All rows',
+  unread: 'Unread remarks',
+  read: 'Read remarks',
+};
+
 /** Active `@query` at the caret, or null when the user is not tagging. */
 export function activeMention(text: string, cursor: number): { start: number; query: string } | null {
   const upto = text.slice(0, cursor);

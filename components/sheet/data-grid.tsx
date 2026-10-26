@@ -62,9 +62,13 @@ interface DataGridProps {
   globalSearch?: string;
   onUndo?: () => void;
   onRedo?: () => void;
+  /** Row whose thread an outside control (the notification bell) asked to open. */
+  openThreadRowId?: string | null;
+  /** Called once the request has been consumed, so it can be re-requested later. */
+  onThreadRequestHandled?: () => void;
 }
 
-export function DataGrid({ config, data, userRole, onCellUpdate, onActiveCellChange, columnVisibility: externalColumnVisibility, onColumnVisibilityChange, onDuplicateRow, onDuplicateRows, onCopyRow, onCopyRows, onDeleteRow, onDeleteRows, onAddRow, onClearFilters, hasActiveFilters, scrollContainerRef, globalSearch = '', onUndo, onRedo }: DataGridProps) {
+export function DataGrid({ config, data, userRole, onCellUpdate, onActiveCellChange, columnVisibility: externalColumnVisibility, onColumnVisibilityChange, onDuplicateRow, onDuplicateRows, onCopyRow, onCopyRows, onDeleteRow, onDeleteRows, onAddRow, onClearFilters, hasActiveFilters, scrollContainerRef, globalSearch = '', onUndo, onRedo, openThreadRowId = null, onThreadRequestHandled }: DataGridProps) {
   const { data: session } = useSession();
   const userName = session?.user?.name || '';
   const { 
@@ -116,6 +120,15 @@ export function DataGrid({ config, data, userRole, onCellUpdate, onActiveCellCha
   useEffect(() => {
     hydrateRemarkReads();
   }, [hydrateRemarkReads]);
+
+  // The bell lives in the toolbar, above this grid, so it asks for a thread by
+  // row id and the request is cleared once opened.
+  useEffect(() => {
+    if (!openThreadRowId) return;
+    const exists = data.some((row) => String(row.id) === String(openThreadRowId));
+    if (exists) setThread({ rowId: openThreadRowId, columnId: REMARK_COLUMN });
+    onThreadRequestHandled?.();
+  }, [openThreadRowId, data, onThreadRequestHandled]);
 
   useEffect(() => {
     if (!thread) return;

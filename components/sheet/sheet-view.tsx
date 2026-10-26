@@ -12,7 +12,9 @@ import { ViewCreateDialog } from './view-create-dialog';
 import { HeroSection } from './hero-section';
 import { BulkUploadModal } from './bulk-upload-modal';
 import { useSheetStore } from '@/lib/store/sheet-store';
-import { useRemarkReadStore } from '@/lib/store/remark-read-store';
+import { isRemarkUnread, useRemarkReadStore } from '@/lib/store/remark-read-store';
+import { isChatParticipant, remarkColumnText, RemarkFilterMode } from '@/lib/remarks';
+import { useRemarkNotifications } from '@/hooks/use-remark-notifications';
 import { useKeyboardShortcuts } from '@/hooks/use-keyboard-shortcuts';
 import { loadColumnVisibility, saveColumnVisibility } from '@/lib/utils/storage';
 import { useSheetData } from '@/hooks/use-sheet-data';
@@ -140,10 +142,29 @@ export function SheetView({ config, userRole }: SheetViewProps) {
   // Remember the KB threads already on screen, so only a message sent after this shows as unread.
   const hydrateRemarkReads = useRemarkReadStore((state) => state.hydrate);
   const captureRemarkBaseline = useRemarkReadStore((state) => state.captureBaseline);
+  const remarkSnapshots = useRemarkReadStore((state) => state.snapshots);
+  const remarkReadsReady = useRemarkReadStore((state) => state.hydrated && state.baselined);
 
   useEffect(() => {
     hydrateRemarkReads();
   }, [hydrateRemarkReads]);
+
+  // Thread the bell asked the grid to open. Cleared as soon as the grid takes it.
+  const [threadRequestRowId, setThreadRequestRowId] = useState<string | null>(null);
+  const handleThreadRequestHandled = useCallback(() => setThreadRequestRowId(null), []);
+
+  // Read/unread view of the remark threads. Deliberately not part of the saved
+  // view: read state is per browser and per person, so it is not shareable.
+  const [remarkFilter, setRemarkFilter] = useState<RemarkFilterMode>('all');
+
+  // Unread remark threads for this person, raised as browser notifications.
+  // Fed from the unfiltered rows: a filtered-out ticket still deserves an alert.
+  const remarkNotifications = useRemarkNotifications({
+    rows: data,
+    userName,
+    enabled: config.id === 'escalations',
+    onOpen: setThreadRequestRowId,
+  });
 
   // N8N sheet only: pull the escalation sheet as well, so rows whose shipment
   // already has an OPEN escalation can be highlighted in yellow.
@@ -368,6 +389,22 @@ export function SheetView({ config, userRole }: SheetViewProps) {
 
           return stringValue.toLowerCase().includes(searchTerm);
         });
+      });
+    }
+
+    // Read/unread view of the remark threads. Unread mirrors the blue row and the
+    // bell exactly; read is the other side of it, so a row with no thread or one
+    // this person is not part of falls out of both.
+    if (config.id === 'escalations' && remarkFilter !== 'all' && remarkReadsReady) {
+      result = result.filter((row) => {
+        const idString = String(row.id);
+        if (idString.startsWith('empty-')) return false;
+        if (idString.startsWith('row-')) return true;
+
+        const unread = isRemarkUnread(row, remarkSnapshots, remarkReadsReady, userName);
+        if (remarkFilter === 'unread') return unread;
+
+        return !unread && remarkColumnText(row).trim() !== '' && isChatParticipant(row, userName);
       });
     }
 
@@ -647,7 +684,7 @@ export function SheetView({ config, userRole }: SheetViewProps) {
     }
 
     return [...result, ...emptyRows];
-  }, [data, viewState.columnFilters, config.columns, config.id, globalSearch, activeViewId, activeView, viewState.sorts.length, openEscalationRefs]);
+  }, [data, viewState.columnFilters, config.columns, config.id, globalSearch, activeViewId, activeView, viewState.sorts.length, openEscalationRefs, remarkFilter, remarkSnapshots, remarkReadsReady, userName]);
 
   // Update visible row IDs after render (not during render)
   // This runs after the filteredData useMemo has computed the new filtered IDs
@@ -2330,6 +2367,10 @@ export function SheetView({ config, userRole }: SheetViewProps) {
             columnFilters: viewState.columnFilters,
             activeCell,
             onActiveCellUpdate: handleActiveCellUpdate,
+            notifications: config.id === 'escalations' ? remarkNotifications : undefined,
+            onOpenThread: setThreadRequestRowId,
+            remarkFilter,
+            onRemarkFilterChange: setRemarkFilter,
           } as any)}
         />
         <CommandPalette
@@ -2379,6 +2420,8 @@ export function SheetView({ config, userRole }: SheetViewProps) {
                 globalSearch={globalSearch}
                 onUndo={handleUndo}
                 onRedo={handleRedo}
+                openThreadRowId={threadRequestRowId}
+                onThreadRequestHandled={handleThreadRequestHandled}
               />
             )}
           </div>
