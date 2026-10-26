@@ -21,8 +21,6 @@ import { Search, FileDown, Plus, Info, SplitSquareVertical, Eye, EyeOff, Downloa
 import { useSheetStore, RowHeight } from '@/lib/store/sheet-store';
 import { SheetConfig, RowData, UserRole, ColumnConfig, ColumnFilter } from '@/types';
 import { summarizeHighlightsFilter } from '@/lib/utils/highlights';
-import { NotificationBell } from './notification-bell';
-import { RemarkNotifications } from '@/hooks/use-remark-notifications';
 import { RemarkFilterMode, REMARK_FILTER_LABELS } from '@/lib/remarks';
 import { cn } from '@/lib/utils';
 import { exportToCSV, exportToExcel } from '@/lib/utils/export';
@@ -143,9 +141,6 @@ export interface ToolbarProps {
   onActiveCellUpdate?: (rowId: string, columnId: string, value: string) => void;
   onToggleSidebar?: () => void;
   showSidebarToggle?: boolean;
-  /** Unread remark threads for the signed-in user; absent on sheets without threads. */
-  notifications?: RemarkNotifications;
-  onOpenThread?: (rowId: string) => void;
   /** Read/unread view of the remark threads. */
   remarkFilter?: RemarkFilterMode;
   onRemarkFilterChange?: (mode: RemarkFilterMode) => void;
@@ -155,7 +150,7 @@ export interface ToolbarRef {
   focusSearch: () => void;
 }
 
-export const Toolbar = forwardRef<ToolbarRef, ToolbarProps>(({ config, data, userRole, onAddRow, onDeleteRows, onBulkUpload, onRefresh, columnVisibility = {}, onColumnVisibilityChange, onOpenCommandPalette, globalSearch = '', onGlobalSearchChange, visibleRowCount = 0, activeViewId, columnFilters = {}, activeCell = null, onToggleSidebar, showSidebarToggle = false, notifications, onOpenThread, remarkFilter = 'all', onRemarkFilterChange }, ref) => {
+export const Toolbar = forwardRef<ToolbarRef, ToolbarProps>(({ config, data, userRole, onAddRow, onDeleteRows, onBulkUpload, onRefresh, columnVisibility = {}, onColumnVisibilityChange, onOpenCommandPalette, globalSearch = '', onGlobalSearchChange, visibleRowCount = 0, activeViewId, columnFilters = {}, activeCell = null, onToggleSidebar, showSidebarToggle = false, remarkFilter = 'all', onRemarkFilterChange }, ref) => {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [showInfoDialog, setShowInfoDialog] = useState(false);
   const [formulaValue, setFormulaValue] = useState('');
@@ -585,10 +580,6 @@ export const Toolbar = forwardRef<ToolbarRef, ToolbarProps>(({ config, data, use
             )}
           </DropdownMenuContent>
         </DropdownMenu>
-
-        {notifications && onOpenThread && (
-          <NotificationBell notifications={notifications} onOpenThread={onOpenThread} />
-        )}
 
         {onRemarkFilterChange && config.id === 'escalations' && (
           <DropdownMenu>

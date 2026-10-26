@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { signOut, useSession } from 'next-auth/react';
 import { LoadingState } from '@/components/ui/loading-state';
 import { Button } from '@/components/ui/button';
@@ -20,6 +20,13 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useTheme } from 'next-themes';
 import { Marquee } from '@/components/ui/marquee';
 import { useSessionContext } from '@/app/providers';
+import { usePathname, useRouter } from 'next/navigation';
+import { useSheetData } from '@/hooks/use-sheet-data';
+import { useSheetStore } from '@/lib/store/sheet-store';
+import { useRemarkNotifications } from '@/hooks/use-remark-notifications';
+import { useRemarkReadStore } from '@/lib/store/remark-read-store';
+import { useThreadRequestStore } from '@/lib/store/thread-request-store';
+import { NotificationBell } from '@/components/sheet/notification-bell';
 
 export function Header() {
   const { data: session } = useSession();
@@ -28,6 +35,51 @@ export function Header() {
   const [isHovering, setIsHovering] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const { theme, setTheme } = useTheme();
+  const router = useRouter();
+  const pathname = usePathname();
+
+  // KB remark threads, for the bell beside the avatar. Shares the
+  // ['sheet','escalation'] cache with the escalation sheet, so on that sheet
+  // this adds no request at all; on the others it is one 30s poll, which is
+  // what makes the bell work wherever the user happens to be.
+  const userName = user?.name || '';
+  // Several observers share one ['sheet','escalation'] query, and React Query
+  // polls on the shortest interval any of them asks for. Passing the same
+  // editing pause the sheet uses keeps this observer from reviving the poll
+  // mid-edit and overwriting the cell someone is typing in.
+  const editingCell = useSheetStore((state) => state.editingCell);
+  const { data: escalationRows } = useSheetData('escalation', {
+    enabled: !!user,
+    isEditing: !!editingCell,
+  });
+  const hydrateRemarkReads = useRemarkReadStore((state) => state.hydrate);
+  const captureRemarkBaseline = useRemarkReadStore((state) => state.captureBaseline);
+  const requestThread = useThreadRequestStore((state) => state.request);
+
+  useEffect(() => {
+    hydrateRemarkReads();
+  }, [hydrateRemarkReads]);
+
+  // The sheet itself baselines too, but the header sees the data first on any
+  // other sheet, and an unbaselined store reports every thread as unread.
+  useEffect(() => {
+    if (escalationRows) captureRemarkBaseline(escalationRows);
+  }, [escalationRows, captureRemarkBaseline]);
+
+  const openThread = useCallback(
+    (rowId: string) => {
+      requestThread(rowId);
+      if (pathname !== '/sheets/escalations') router.push('/sheets/escalations');
+    },
+    [pathname, requestThread, router]
+  );
+
+  const notifications = useRemarkNotifications({
+    rows: escalationRows ?? [],
+    userName,
+    enabled: !!user && !!userName,
+    onOpen: openThread,
+  });
 
   const handleSignOut = async () => {
     setIsSigningOut(true);
@@ -125,6 +177,8 @@ export function Header() {
           </Badge>
           {user && (
             <>
+              <NotificationBell notifications={notifications} onOpenThread={openThread} />
+
               {/* User Menu */}
               <div 
                 className="relative"

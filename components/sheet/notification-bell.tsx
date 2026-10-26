@@ -77,7 +77,7 @@ function NotificationRow({
  */
 export function NotificationBell({ notifications, onOpenThread }: NotificationBellProps) {
   const [open, setOpen] = useState(false);
-  const { items, count, permission, enablePush, dismiss, dismissAll } = notifications;
+  const { items, count, truncated, permission, enablePush, dismiss, dismissAll } = notifications;
 
   const Icon = permission === 'denied' ? BellOff : count > 0 ? BellRing : Bell;
 
@@ -92,14 +92,13 @@ export function NotificationBell({ notifications, onOpenThread }: NotificationBe
         <TooltipTrigger asChild>
           <PopoverTrigger asChild>
             <Button
-              size="sm"
-              variant="outline"
-              className="relative h-7 shrink-0 px-2 text-xs"
+              variant="ghost"
+              className="relative h-8 w-8 shrink-0 rounded-full"
               aria-label={count > 0 ? `${count} unread remarks` : 'Remark notifications'}
             >
-              <Icon className={cn('h-3.5 w-3.5', count > 0 && 'text-primary')} />
+              <Icon className={cn('h-4 w-4', count > 0 && 'text-primary')} />
               {count > 0 && (
-                <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[9px] font-semibold leading-none text-primary-foreground">
+                <span className="absolute right-0 top-0 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[9px] font-semibold leading-none text-primary-foreground">
                   {count > 99 ? '99+' : count}
                 </span>
               )}
@@ -148,16 +147,24 @@ export function NotificationBell({ notifications, onOpenThread }: NotificationBe
             Nothing new. Remarks on your tickets show up here.
           </p>
         ) : (
-          <ul className="max-h-80 overflow-y-auto">
-            {items.map((item) => (
-              <NotificationRow
-                key={item.rowId}
-                item={item}
-                onOpen={() => openThread(item.rowId)}
-                onDismiss={() => dismiss(item.rowId)}
-              />
-            ))}
-          </ul>
+          <>
+            <ul className="max-h-80 overflow-y-auto">
+              {items.map((item) => (
+                <NotificationRow
+                  key={item.rowId}
+                  item={item}
+                  onOpen={() => openThread(item.rowId)}
+                  onDismiss={() => dismiss(item.rowId)}
+                />
+              ))}
+            </ul>
+            {truncated && (
+              <p className="border-t bg-muted/40 px-3 py-2 text-[11px] text-muted-foreground">
+                Showing the newest {items.length} of {count}. The rest are on the sheet under the
+                Unread filter.
+              </p>
+            )}
+          </>
         )}
       </PopoverContent>
     </Popover>

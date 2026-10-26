@@ -14,7 +14,7 @@ import { BulkUploadModal } from './bulk-upload-modal';
 import { useSheetStore } from '@/lib/store/sheet-store';
 import { isRemarkUnread, useRemarkReadStore } from '@/lib/store/remark-read-store';
 import { isChatParticipant, remarkColumnText, RemarkFilterMode } from '@/lib/remarks';
-import { useRemarkNotifications } from '@/hooks/use-remark-notifications';
+import { useThreadRequestStore } from '@/lib/store/thread-request-store';
 import { useKeyboardShortcuts } from '@/hooks/use-keyboard-shortcuts';
 import { loadColumnVisibility, saveColumnVisibility } from '@/lib/utils/storage';
 import { useSheetData } from '@/hooks/use-sheet-data';
@@ -149,22 +149,16 @@ export function SheetView({ config, userRole }: SheetViewProps) {
     hydrateRemarkReads();
   }, [hydrateRemarkReads]);
 
-  // Thread the bell asked the grid to open. Cleared as soon as the grid takes it.
-  const [threadRequestRowId, setThreadRequestRowId] = useState<string | null>(null);
-  const handleThreadRequestHandled = useCallback(() => setThreadRequestRowId(null), []);
+  // Thread the header's notification bell asked the grid to open. The store
+  // carries the request across the route change when the bell was clicked from
+  // another sheet.
+  const threadRequestRowId = useThreadRequestStore((state) => state.rowId);
+  const handleThreadRequestHandled = useThreadRequestStore((state) => state.clear);
 
   // Read/unread view of the remark threads. Deliberately not part of the saved
   // view: read state is per browser and per person, so it is not shareable.
   const [remarkFilter, setRemarkFilter] = useState<RemarkFilterMode>('all');
 
-  // Unread remark threads for this person, raised as browser notifications.
-  // Fed from the unfiltered rows: a filtered-out ticket still deserves an alert.
-  const remarkNotifications = useRemarkNotifications({
-    rows: data,
-    userName,
-    enabled: config.id === 'escalations',
-    onOpen: setThreadRequestRowId,
-  });
 
   // N8N sheet only: pull the escalation sheet as well, so rows whose shipment
   // already has an OPEN escalation can be highlighted in yellow.
@@ -2367,8 +2361,6 @@ export function SheetView({ config, userRole }: SheetViewProps) {
             columnFilters: viewState.columnFilters,
             activeCell,
             onActiveCellUpdate: handleActiveCellUpdate,
-            notifications: config.id === 'escalations' ? remarkNotifications : undefined,
-            onOpenThread: setThreadRequestRowId,
             remarkFilter,
             onRemarkFilterChange: setRemarkFilter,
           } as any)}
