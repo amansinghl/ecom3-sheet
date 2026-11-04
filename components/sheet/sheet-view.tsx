@@ -691,7 +691,8 @@ export function SheetView({ config, userRole }: SheetViewProps) {
       revealedRequestRef.current = null;
       return;
     }
-    if (!data.some((row) => String(row.id) === threadRequestRowId)) return;
+    const requestedRow = data.find((row) => String(row.id) === threadRequestRowId);
+    if (!requestedRow) return;
     if (filteredData.some((row) => String(row.id) === threadRequestRowId)) return;
 
     // Only try once per request, so a row a column filter still hides does not
@@ -705,7 +706,18 @@ export function SheetView({ config, userRole }: SheetViewProps) {
 
     if (remarkFilter !== 'all') setRemarkFilter('all');
     if (globalSearch.trim()) setGlobalSearch('');
-  }, [threadRequestRowId, data, filteredData, remarkFilter, globalSearch, handleThreadRequestHandled]);
+
+    // The default view only shows open tickets (is_closed = 0), so a remark on a
+    // closed ticket was never reachable from the bell. Switch to the built-in
+    // view that holds the row: Closed Escalations for a closed ticket, Open
+    // Escalations otherwise. Custom views are left alone only when they already
+    // show the row, which they do not if we got this far.
+    if (config.id === 'escalations') {
+      const targetViewId = Number(requestedRow.is_closed) === 1 ? 'closed' : 'open';
+      const targetView = views.find((v) => v.id === targetViewId);
+      if (targetView && activeViewId !== targetViewId) applyView(targetView);
+    }
+  }, [threadRequestRowId, data, filteredData, remarkFilter, globalSearch, handleThreadRequestHandled, config.id, views, activeViewId, applyView]);
 
 
   // Update visible row IDs after render (not during render)
