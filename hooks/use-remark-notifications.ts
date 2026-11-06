@@ -108,7 +108,7 @@ export function useRemarkNotifications({ rows, userName, enabled, onOpen }: Opti
         rowId: String(row.id),
         reference: rowReference(row),
         authorName: latest.authorName,
-        body: latest.body,
+        body: latest.body || (latest.fileKeys.length > 0 ? 'Sent an attachment' : ''),
         createdAt: latest.createdAt,
         snapshot,
       });

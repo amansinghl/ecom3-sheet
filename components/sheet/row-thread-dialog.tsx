@@ -3,7 +3,7 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useSession } from 'next-auth/react';
 import { format, isToday, isYesterday } from 'date-fns';
-import { MessageSquare, Send } from 'lucide-react';
+import { Download, FileText, Loader2, MessageSquare, Paperclip, Send, X } from 'lucide-react';
 
 import {
   Dialog,
@@ -15,8 +15,11 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { ApiError } from '@/lib/api/client';
+import { sheetApiService } from '@/lib/api/sheets';
 import { getRandomAvatar } from '@/lib/config/user-avatar';
-import { activeMention, appendRemark, parseRemarks, RemarkColumnId, RemarkMessage, REMARK_COLUMNS, remarkColumnText, remarkSnapshot } from '@/lib/remarks';
+import { activeMention, appendRemark, parseRemarks, RemarkColumnId, RemarkMessage, REMARK_COLUMN, REMARK_COLUMNS, remarkColumnText, remarkSnapshot } from '@/lib/remarks';
+import { toast } from 'sonner';
 import { useRemarkReadStore } from '@/lib/store/remark-read-store';
 import { cn } from '@/lib/utils';
 import { ColumnConfig, MediaItem, RowData, SheetConfig } from '@/types';
@@ -29,7 +32,8 @@ interface RowThreadDialogProps {
   column: RemarkColumnId;
   config: SheetConfig;
   mentionUsers: string[];
-  onCellUpdate: (rowId: string, columnId: string, value: string) => void | Promise<void>;
+  staff?: { name: string; email: string }[];
+  onCellUpdate: (rowId: string, columnId: string, value: string | MediaItem[]) => void | Promise<void>;
 }
 
 // Rendered as chips in the header rather than repeated in the field list below.
@@ -82,6 +86,45 @@ function formatFieldValue(value: unknown, column: ColumnConfig): string {
   return String(value);
 }
 
+function mediaList(row: RowData | null | undefined): MediaItem[] {
+  return Array.isArray(row?.media) ? (row.media as MediaItem[]) : [];
+}
+
+function uploadedAtIso(value: string): string {
+  const match = String(value || '').trim().match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/);
+  if (!match) return '';
+  const iso = `${match[1]}-${match[2]}-${match[3]}T${match[4]}:${match[5]}:00+05:30`;
+  const date = new Date(iso);
+  return Number.isNaN(date.getTime()) ? '' : date.toISOString();
+}
+
+function uploaderName(uploadedBy: string, namesByEmail: Map<string, string>): string {
+  const value = uploadedBy.trim();
+  if (!value.includes('@')) return value;
+  return namesByEmail.get(value.toLowerCase()) || value;
+}
+
+/** Files already stored on the row, shown in the thread when no note points at them. */
+function withColumnAttachments(messages: RemarkMessage[], media: MediaItem[], rowId: string, namesByEmail: Map<string, string>): RemarkMessage[] {
+  const linked = new Set(messages.flatMap((message) => message.fileKeys));
+  const extras: RemarkMessage[] = media
+    .filter((item) => item?.key && !linked.has(item.key))
+    .map((item) => ({
+      id: `${rowId}-media-${item.key}`,
+      authorName: uploaderName(item.uploaded_by || '', namesByEmail),
+      body: '',
+      createdAt: uploadedAtIso(item.uploaded_at),
+      fileKeys: [item.key],
+    }));
+  if (extras.length === 0) return messages;
+  return [...messages, ...extras].sort((a, b) => {
+    if (a.createdAt === b.createdAt) return 0;
+    if (!a.createdAt) return 1;
+    if (!b.createdAt) return -1;
+    return a.createdAt.localeCompare(b.createdAt);
+  });
+}
+
 function dayLabel(iso: string): string {
   const date = new Date(iso);
   if (isToday(date)) return 'Today';
@@ -89,9 +132,18 @@ function dayLabel(iso: string): string {
   return format(date, 'EEEE, dd MMM yyyy');
 }
 
-export function RowThreadDialog({ open, onOpenChange, row: activeRow, column, config, mentionUsers, onCellUpdate }: RowThreadDialogProps) {
+export function RowThreadDialog({ open, onOpenChange, row: activeRow, column, config, mentionUsers, staff = [], onCellUpdate }: RowThreadDialogProps) {
   const { data: session } = useSession();
   const currentName = session?.user?.name || '';
+  const namesByEmail = useMemo(() => {
+    const map = new Map<string, string>();
+    staff.forEach((person) => {
+      if (person.email && person.name) map.set(person.email.toLowerCase(), person.name);
+    });
+    const email = session?.user?.email;
+    if (email && currentName) map.set(email.toLowerCase(), currentName);
+    return map;
+  }, [staff, session?.user?.email, currentName]);
   const markRead = useRemarkReadStore((state) => state.markRead);
 
   // The content stays mounted while the close animation plays, by which point the
@@ -102,11 +154,16 @@ export function RowThreadDialog({ open, onOpenChange, row: activeRow, column, co
   const row = activeRow ?? lastRow.current;
 
   const [draft, setDraft] = useState('');
+  const [files, setFiles] = useState<File[]>([]);
+  const [uploadingNames, setUploadingNames] = useState<string[]>([]);
+  const [readyKeys, setReadyKeys] = useState<string[]>([]);
+  const [preview, setPreview] = useState<MediaItem | null>(null);
   const [cursor, setCursor] = useState(0);
   const [mentionIndex, setMentionIndex] = useState(0);
   const [mentionDismissed, setMentionDismissed] = useState(false);
   const [sending, setSending] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const mentionListRef = useRef<HTMLUListElement>(null);
   const [activeColumn, setActiveColumn] = useState<RemarkColumnId>(column);
   const scrollNodes = useRef<Partial<Record<RemarkColumnId, HTMLDivElement | null>>>({});
@@ -125,9 +182,20 @@ export function RowThreadDialog({ open, onOpenChange, row: activeRow, column, co
     if (!open) return;
     setActiveColumn(column);
     setDraft('');
+    setFiles([]);
+    setUploadingNames([]);
+    setReadyKeys([]);
+    setPreview(null);
   }, [open, column, row?.id]);
 
   const remarksText = remarkColumnText(row);
+  const attachments = useMemo(() => {
+    const byKey = new Map<string, MediaItem>();
+    mediaList(row).forEach((item) => {
+      if (item?.key) byKey.set(item.key, item);
+    });
+    return byKey;
+  }, [row]);
   const notes = typeof row?.notes === 'string' ? row.notes.trim() : '';
   const rowId = row?.id ?? '';
   const readKey = row ? remarkSnapshot(row) : '';
@@ -141,10 +209,13 @@ export function RowThreadDialog({ open, onOpenChange, row: activeRow, column, co
   const threads = useMemo(() => {
     const parsed = {} as Record<RemarkColumnId, RemarkMessage[]>;
     REMARK_COLUMNS.forEach((columnId) => {
-      parsed[columnId] = parseRemarks(row?.[columnId], rowId);
+      const messages = parseRemarks(row?.[columnId], rowId);
+      parsed[columnId] = columnId === REMARK_COLUMN
+        ? withColumnAttachments(messages, mediaList(row), rowId, namesByEmail)
+        : messages;
     });
     return parsed;
-  }, [row, remarksText, rowId]);
+  }, [row, remarksText, rowId, namesByEmail]);
 
   const setScrollNode = useCallback((columnId: RemarkColumnId, node: HTMLDivElement | null) => {
     scrollNodes.current[columnId] = node;
@@ -225,20 +296,56 @@ export function RowThreadDialog({ open, onOpenChange, row: activeRow, column, co
     });
   }, [mention, draft, cursor]);
 
+  const addFiles = useCallback((list: FileList | null) => {
+    const picked = Array.from(list ?? []);
+    if (picked.length === 0) return;
+    setFiles((current) => [...current, ...picked]);
+  }, []);
+
+  const attachedNames = useMemo(() => new Set(mediaList(row).map((item) => item.name)), [row]);
+
+  useEffect(() => {
+    setFiles((current) => current.filter((file) => !attachedNames.has(file.name)));
+  }, [attachedNames]);
+
   const handleSend = useCallback(async () => {
     if (!row || sending || !canSendToRow || !currentName) return;
     const body = draft.trim();
-    if (!body) return;
+    const pending = files;
+    if (!body && pending.length === 0 && readyKeys.length === 0) return;
 
+    const rowId = String(row.id);
+    const existingRemark = row[activeColumn];
+    setFiles([]);
+    setDraft('');
+    setCursor(0);
+    if (pending.length > 0) setUploadingNames(pending.map((file) => file.name));
+    if (fileInputRef.current) fileInputRef.current.value = '';
     setSending(true);
     try {
-      await onCellUpdate(String(row.id), activeColumn, appendRemark(row[activeColumn], body, currentName));
-      setDraft('');
-      setCursor(0);
+      let fileKeys = readyKeys;
+      if (pending.length > 0) {
+        const known = new Set(mediaList(row).map((item) => item.key));
+        const updated = await sheetApiService.uploadEscalationMedia(row.id, pending);
+        const added = updated.map((item) => item.key).filter((key) => key && !known.has(key));
+        fileKeys = [...readyKeys, ...added];
+        await onCellUpdate(rowId, 'media', updated);
+        setReadyKeys(fileKeys);
+      }
+
+      if (body || fileKeys.length > 0) {
+        await onCellUpdate(rowId, activeColumn, appendRemark(existingRemark, body, currentName, fileKeys));
+      }
+      setReadyKeys([]);
+    } catch (error) {
+      if (body) setDraft(body);
+      const apiError = error as ApiError | undefined;
+      toast.error(apiError?.message || apiError?.error || 'Failed to send');
     } finally {
+      setUploadingNames([]);
       setSending(false);
     }
-  }, [row, sending, canSendToRow, currentName, draft, onCellUpdate, activeColumn]);
+  }, [row, sending, canSendToRow, currentName, draft, files, readyKeys, onCellUpdate, activeColumn]);
 
   const title = row ? String(row.shipment_no || row.awb_no || row.id) : '';
 
@@ -302,6 +409,8 @@ export function RowThreadDialog({ open, onOpenChange, row: activeRow, column, co
                 columnId={columnId}
                 messages={threads[columnId]}
                 mentionUsers={mentionUsers}
+                attachments={attachments}
+                onPreview={setPreview}
                 active={activeColumn === columnId}
                 onScrollRef={setScrollNode}
               />
@@ -378,12 +487,66 @@ export function RowThreadDialog({ open, onOpenChange, row: activeRow, column, co
                 placeholder="Write a note. @ to mention someone. Enter to send."
                 className="max-h-[140px] min-h-[64px] resize-none"
               />
-              <div className="mt-2 flex items-center gap-2">
+              {uploadingNames.length > 0 && (
+                <div className="text-muted-foreground mt-2 flex items-center gap-2 text-xs">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  <span className="truncate">Uploading {uploadingNames.join(', ')}</span>
+                </div>
+              )}
+              {files.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {files.map((file, index) => (
+                    <span
+                      key={`${file.name}-${file.size}-${file.lastModified}-${index}`}
+                      className="inline-flex max-w-full items-center gap-1 rounded-full border bg-muted/50 px-2 py-0.5 text-xs"
+                    >
+                      <FileText className="h-3 w-3 shrink-0 text-muted-foreground" />
+                      <span className="truncate">{file.name}</span>
+                      <button
+                        type="button"
+                        className="rounded-full p-0.5 text-muted-foreground hover:text-foreground"
+                        aria-label={`Remove ${file.name}`}
+                        onClick={() => setFiles((current) => current.filter((_, i) => i !== index))}
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+              <div className="mt-2 flex items-center justify-end gap-2">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  multiple
+                  className="hidden"
+                  onChange={(event) => {
+                    addFiles(event.target.files);
+                    event.target.value = '';
+                  }}
+                />
+                <Button
+                  type="button"
+                  size="icon-sm"
+                  variant="outline"
+                  title="Add attachment"
+                  aria-label="Add attachment"
+                  disabled={sending || !canSendToRow || !currentName}
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <Paperclip className="h-3.5 w-3.5" />
+                </Button>
                 <Button
                   type="button"
                   size="sm"
-                  className="ml-auto gap-1.5"
-                  disabled={draft.trim() === '' || sending || remarkColumns.length === 0 || !canSendToRow || !currentName}
+                  className="gap-1.5"
+                  disabled={
+                    (draft.trim() === '' && files.length === 0 && readyKeys.length === 0) ||
+                    sending ||
+                    remarkColumns.length === 0 ||
+                    !canSendToRow ||
+                    !currentName
+                  }
                   onClick={handleSend}
                 >
                   <Send className="h-3.5 w-3.5" />
@@ -393,6 +556,7 @@ export function RowThreadDialog({ open, onOpenChange, row: activeRow, column, co
             </div>
           </div>
         </div>
+        {preview && <DocPreview item={preview} onClose={() => setPreview(null)} />}
       </DialogContent>
     </Dialog>
   );
@@ -402,11 +566,13 @@ interface RemarkThreadProps {
   columnId: RemarkColumnId;
   messages: RemarkMessage[];
   mentionUsers: string[];
+  attachments: Map<string, MediaItem>;
+  onPreview: (item: MediaItem) => void;
   active: boolean;
   onScrollRef: (columnId: RemarkColumnId, node: HTMLDivElement | null) => void;
 }
 
-const RemarkThread = memo(function RemarkThread({ columnId, messages, mentionUsers, active, onScrollRef }: RemarkThreadProps) {
+const RemarkThread = memo(function RemarkThread({ columnId, messages, mentionUsers, attachments, onPreview, active, onScrollRef }: RemarkThreadProps) {
   return (
     <div
       ref={(node) => onScrollRef(columnId, node)}
@@ -420,6 +586,8 @@ const RemarkThread = memo(function RemarkThread({ columnId, messages, mentionUse
           key={message.id}
           message={message}
           mentionUsers={mentionUsers}
+          attachments={attachments}
+          onPreview={onPreview}
           previous={messages[index - 1]}
         />
       ))}
@@ -430,6 +598,8 @@ const RemarkThread = memo(function RemarkThread({ columnId, messages, mentionUse
 interface MessageRowProps {
   message: RemarkMessage;
   mentionUsers: string[];
+  attachments: Map<string, MediaItem>;
+  onPreview: (item: MediaItem) => void;
   previous?: RemarkMessage;
 }
 
@@ -453,7 +623,68 @@ function MentionText({ body, users }: { body: string; users: string[] }) {
   return <>{parts}</>;
 }
 
-const MessageRow = memo(function MessageRow({ message, mentionUsers, previous }: MessageRowProps) {
+function AttachmentMessage({ item, onPreview }: { item: MediaItem | undefined; onPreview: (item: MediaItem) => void }) {
+  if (!item) {
+    return <p className="mt-1 text-sm text-muted-foreground">Attachment unavailable</p>;
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => onPreview(item)}
+      className="mt-1 flex max-w-sm items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm hover:bg-muted/60"
+    >
+      <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+      <span className="truncate">{item.name}</span>
+    </button>
+  );
+}
+
+function documentPreviewUrl(fileUrl: string): string {
+  return `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(fileUrl)}`;
+}
+
+function downloadAttachment(item: MediaItem) {
+  const params = new URLSearchParams({ url: item.url, name: item.name });
+  const link = document.createElement('a');
+  link.href = `/api/attachment-download?${params.toString()}`;
+  link.download = item.name;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+}
+
+function DocPreview({ item, onClose }: { item: MediaItem; onClose: () => void }) {
+  const showInline = item.kind === 'image' || item.kind === 'video' || item.kind === 'audio';
+
+  return (
+    <div className="absolute inset-0 z-30 flex flex-col bg-background">
+      <div className="flex shrink-0 items-center gap-2 border-b px-4 py-3">
+        <p className="min-w-0 flex-1 truncate text-sm font-medium">{item.name}</p>
+        <Button type="button" size="icon-sm" variant="ghost" onClick={() => downloadAttachment(item)} aria-label="Download" title="Download">
+          <Download className="h-4 w-4" />
+        </Button>
+        <Button type="button" size="icon-sm" variant="ghost" onClick={onClose} aria-label="Close preview">
+          <X className="h-4 w-4" />
+        </Button>
+      </div>
+      <div className={cn('min-h-0 flex-1', showInline ? 'flex items-center justify-center overflow-auto p-4' : 'p-4')}>
+        {item.kind === 'image' ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={item.url} alt={item.name} className="max-h-full max-w-full object-contain" />
+        ) : item.kind === 'video' ? (
+          <video controls src={item.url} className="max-h-full max-w-full" />
+        ) : item.kind === 'audio' ? (
+          <audio controls src={item.url} className="w-full" />
+        ) : (
+          <iframe title={item.name} src={documentPreviewUrl(item.url)} className="h-full w-full rounded-md border" />
+        )}
+      </div>
+    </div>
+  );
+}
+
+const MessageRow = memo(function MessageRow({ message, mentionUsers, attachments, onPreview, previous }: MessageRowProps) {
   const showDaySeparator = Boolean(
     message.createdAt && (!previous?.createdAt || dayLabel(previous.createdAt) !== dayLabel(message.createdAt))
   );
@@ -496,9 +727,14 @@ const MessageRow = memo(function MessageRow({ message, mentionUsers, previous }:
               )}
             </div>
           )}
-          <p className="text-sm break-words whitespace-pre-wrap">
-            <MentionText body={message.body} users={mentionUsers} />
-          </p>
+          {message.body ? (
+            <p className="text-sm break-words whitespace-pre-wrap">
+              <MentionText body={message.body} users={mentionUsers} />
+            </p>
+          ) : null}
+          {message.fileKeys.map((key) => (
+            <AttachmentMessage key={key} item={attachments.get(key)} onPreview={onPreview} />
+          ))}
         </div>
       </div>
     </>
