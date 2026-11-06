@@ -20,9 +20,23 @@ export interface RemarkMessage {
   authorName: string;
   body: string;
   createdAt: string;
+  fileKeys: string[];
 }
 
 const STAMP_LINE = /^\[(\d{1,2} [A-Za-z]{3} \d{4} \d{2}:\d{2})(?: ([^\]]*))?\] ?(.*)$/;
+/** Pull `{{file:key}}` marks out of a remark line. The key points at an item in the row's media list. */
+function splitFileMarks(raw: string): { body: string; fileKeys: string[] } {
+  const fileKeys: string[] = [];
+  const body = raw
+    .replace(/\{\{file:([^}]*)\}\}/g, (_match, key: string) => {
+      const trimmed = key.trim();
+      if (trimmed) fileKeys.push(trimmed);
+      return ' ';
+    })
+    .replace(/[ \t]{2,}/g, ' ')
+    .trim();
+  return { body, fileKeys };
+}
 
 const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -62,11 +76,13 @@ export function parseRemarks(text: unknown, rowId: string): RemarkMessage[] {
   columnText(text).split('\n').forEach((line) => {
     const match = line.match(STAMP_LINE);
     if (match) {
+      const parsed = splitFileMarks(match[3] || '');
       messages.push({
         id: `${rowId}-${messages.length}`,
         authorName: (match[2] || '').trim(),
-        body: match[3] || '',
+        body: parsed.body,
         createdAt: stampToIso(match[1]),
+        fileKeys: parsed.fileKeys,
       });
       return;
     }
@@ -75,25 +91,35 @@ export function parseRemarks(text: unknown, rowId: string): RemarkMessage[] {
 
     const previous = messages[messages.length - 1];
     if (previous?.createdAt) {
-      previous.body = previous.body ? `${previous.body}\n${line}` : line;
+      const parsed = splitFileMarks(line);
+      previous.fileKeys.push(...parsed.fileKeys);
+      if (parsed.body) previous.body = previous.body ? `${previous.body}\n${parsed.body}` : parsed.body;
       return;
     }
 
+    const parsed = splitFileMarks(line);
     messages.push({
       id: `${rowId}-${messages.length}`,
       authorName: '',
-      body: line,
+      body: parsed.body,
       createdAt: '',
+      fileKeys: parsed.fileKeys,
     });
   });
 
   return messages;
 }
 
-export function appendRemark(existing: unknown, body: string, authorName: string): string {
+export function appendRemark(existing: unknown, body: string, authorName: string, fileKeys: string[] = []): string {
+  const files = fileKeys
+    .map((key) => key.trim())
+    .filter(Boolean)
+    .map((key) => `{{file:${key}}}`)
+    .join(' ');
+  const text = [body.trim(), files].filter(Boolean).join(' ');
   const stamp = formatStamp(new Date());
   const author = authorName.trim();
-  const line = `[${stamp}${author ? ` ${author}` : ''}] ${body}`;
+  const line = `[${stamp}${author ? ` ${author}` : ''}] ${text}`;
   const base = columnText(existing).trim();
   return base === '' ? line : `${base}\n${line}`;
 }

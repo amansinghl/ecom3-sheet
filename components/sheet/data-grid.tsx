@@ -669,7 +669,7 @@ export function DataGrid({ config, data, userRole, onCellUpdate, onActiveCellCha
     queryKey: ['escalation-mention-employees'],
     queryFn: () => sheetApiService.getMentionEmployees(),
     enabled: config.id === 'escalations',
-    staleTime: 10 * 60 * 1000,
+    staleTime: 60 * 60 * 1000,
   });
 
   const threadRow = useMemo(
@@ -1865,7 +1865,8 @@ export function DataGrid({ config, data, userRole, onCellUpdate, onActiveCellCha
         row={threadRow}
         column={thread?.columnId ?? REMARK_COLUMN}
         config={config}
-        mentionUsers={mentionUsers}
+        mentionUsers={mentionUsers.map((person) => person.name)}
+       
         onCellUpdate={onCellUpdate}
       />
     </div>

@@ -9,6 +9,7 @@
  */
 
 import { apiClient, ApiError, ApiResponse } from './client';
+import { MentionPerson } from '@/lib/remarks';
 import { MediaItem, RowData } from '@/types';
 
 /**
@@ -583,11 +584,11 @@ class SheetApiService {
   }
 
   /**
-   * Get sales employees for lead assignment dropdown
+   * Staff Chanakya can DM. The API caches Pulse for an hour.
    */
-  async getMentionEmployees(): Promise<string[]> {
+  async getMentionEmployees(): Promise<MentionPerson[]> {
     try {
-      const response = await apiClient.get<ApiResponse<{ employees: string[] }>>(
+      const response = await apiClient.get<ApiResponse<{ employees: MentionPerson[] }>>(
         '/sheets/escalation/mention-employees'
       );
       return response.data?.employees || [];
